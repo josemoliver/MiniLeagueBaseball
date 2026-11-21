@@ -1,0 +1,32 @@
+.lineup-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.lineup-table td {
+    padding: 2px 6px;
+}
+
+.lineup-num, .lineup-pos {
+    color: var(--mud-palette-text-secondary);
+    width: 1%;
+    white-space: nowrap;
+}
+
+.lineup-warn {
+    color: #ff8f00;
+    width: 1%;
+    padding: 0;
+}
+
+.lineup-avg {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--mud-palette-text-secondary);
+}
+
+.lineup-table tr.lineup-current {
+    background: rgba(255, 213, 79, 0.18);
+    font-weight: 600;
+}

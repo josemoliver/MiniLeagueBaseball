@@ -1,0 +1,85 @@
+@using FieldPosition = MiniLeague.Engine.Models.Position
+@* A human manager's player has been hurt: choose who takes his place. Play cannot continue until it's done. *@
+
+@{
+    var s = Game.State!;
+    var notice = s.PendingInjury;
+}
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Injury</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (notice is null)
+        {
+            <MudText>Nobody needs replacing.</MudText>
+        }
+        else
+        {
+            var team = s.TeamFor(notice.Visitor);
+            var hurt = team.Roster.First(p => p.Id == notice.PlayerId);
+            var position = notice.IsPitcher ? FieldPosition.P : s.PositionsFor(notice.Visitor)[notice.PlayerId];
+
+            <MudStack Spacing="2">
+                <MudAlert Severity="Severity.Warning" Dense="true">
+                    @team.Abbreviation @hurt.Name (@LineupRules.Label(position)) is injured and has to leave the game.
+                </MudAlert>
+
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+                }
+
+                @if (notice.IsPitcher)
+                {
+                    <MudText>Who comes in to pitch?</MudText>
+                    @foreach (var w in s.BullpenFor(notice.Visitor))
+                    {
+                        var id = w.Player.Id;
+                        <MudButton Variant="Variant.Outlined" FullWidth="true" OnClick="@(() => Choose(id))">
+                            @w.Player.Name (@w.Player.Role) · ERA @(w.Player.PitchingOverall?.ERA.ToString("F2") ?? "-") · @w.Status
+                        </MudButton>
+                    }
+                }
+                else
+                {
+                    <MudText>Who takes his place at @LineupRules.Label(position)?</MudText>
+                    @foreach (var b in s.Bench(notice.Visitor)
+                        .OrderByDescending(b => b.IsNaturalAt(position)).ThenByDescending(b => b.FieldingAt(position).Value))
+                    {
+                        var id = b.Id;
+                        <MudButton Variant="Variant.Outlined" FullWidth="true" OnClick="@(() => Choose(id))">
+                            <MudStack Spacing="0" Style="text-align:left; width:100%">
+                                <span>@PlayerLabels.Line(b)</span>
+                                <span class="@(b.IsNaturalAt(position) ? "mud-text-secondary" : "mud-warning-text")" style="font-size:0.75rem; text-transform:none">
+                                    @PlayerLabels.Fielding(b, position)
+                                </span>
+                            </MudStack>
+                        </MudButton>
+                    }
+                }
+            </MudStack>
+        }
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public GameService Game { get; set; } = null!;
+
+    private string? _error;
+
+    private void Choose(int playerId)
+    {
+        try
+        {
+            Game.ResolveInjury(playerId);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

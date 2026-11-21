@@ -1,0 +1,87 @@
+.diamond-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+}
+
+.diamond {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.diamond-row.middle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.base {
+    width: 28px;
+    height: 28px;
+    border: 2px solid #888;
+    transform: rotate(45deg);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.base.occupied {
+    border-color: #ffb300;
+    background: rgba(255, 179, 0, 0.15);
+}
+
+.base.home {
+    background: #e0e0e0;
+    border-color: #555;
+}
+
+.runner-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffb300;
+    display: block;
+    transform: rotate(-45deg);
+}
+
+.mound {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #8d6e63;
+    border: 1px solid #6d4c41;
+}
+
+.outs-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.out-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #888;
+    background: transparent;
+    display: inline-block;
+}
+
+.out-dot.recorded {
+    background: #ef5350;
+    border-color: #c62828;
+}
+
+.outs-label {
+    font-size: 0.7rem;
+    color: #aaa;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}

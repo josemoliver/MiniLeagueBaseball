@@ -1,0 +1,48 @@
+name: Deploy to Azure Static Web Apps
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: dotnet test MiniLeagueBaseball.slnx
+
+      - name: Test sounds
+        run: node --test tests/js/sound.test.js tests/js/pwa.test.js
+
+      - name: Publish
+        run: dotnet publish src/MiniLeague.Web -c Release -o publish
+
+      - name: Deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          skip_app_build: true
+          app_location: publish/wwwroot
+          api_location: ""
+
+  close_pull_request:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: close

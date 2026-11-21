@@ -1,0 +1,124 @@
+@* The game's box score: line score, each team's hitters and pitchers, and game notes. *@
+@inject ExportService Export
+
+@{
+    var s = State;
+    int innings = Math.Max(9, s.CurrentInning);
+}
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Box Score</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="box-score-print" data-testid="box-score">
+            <MudText Typo="Typo.subtitle1"><b>@BoxScoreFormatter.Result(s)</b></MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@s.Stadium.Name</MudText>
+
+            <table class="box-table box-line">
+                <tr>
+                    <th></th>
+                    @for (int i = 1; i <= innings; i++) { <th>@i</th> }
+                    <th class="sep">R</th><th>H</th><th>E</th>
+                </tr>
+                @foreach (var visitor in new[] { true, false })
+                {
+                    var box = s.Box.For(visitor);
+                    <tr>
+                        <td class="name">@s.TeamFor(visitor).Abbreviation</td>
+                        @for (int i = 1; i <= innings; i++) { <td>@s.LineScoreCell(visitor, i)</td> }
+                        <td class="sep">@(visitor ? s.VisitorTotalScore : s.HomeTotalScore)</td>
+                        <td>@box.Hits</td>
+                        <td>@box.Errors</td>
+                    </tr>
+                }
+            </table>
+
+            @foreach (var visitor in new[] { true, false })
+            {
+                var box = s.Box.For(visitor);
+                <table class="box-table">
+                    <tr>
+                        <th class="name">@s.TeamFor(visitor).DisplayName.ToUpperInvariant()</th>
+                        <th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>SO</th>
+                    </tr>
+                    @foreach (var b in box.Batters.OrderBy(b => b.Slot))
+                    {
+                        <tr>
+                            <td class="name @(box.IsSubstitute(b) ? "sub" : "")">@b.Name <span class="pos">@b.Pos.ToLowerInvariant()</span></td>
+                            <td>@b.AB</td><td>@b.R</td><td>@b.H</td><td>@b.RBI</td><td>@b.BB</td><td>@b.SO</td>
+                        </tr>
+                    }
+                    <tr class="totals">
+                        <td class="name">Totals</td>
+                        <td>@box.Batters.Sum(b => b.AB)</td><td>@box.Batters.Sum(b => b.R)</td><td>@box.Hits</td>
+                        <td>@box.Batters.Sum(b => b.RBI)</td><td>@box.Batters.Sum(b => b.BB)</td><td>@box.Batters.Sum(b => b.SO)</td>
+                    </tr>
+                </table>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary" Style="display:block">
+                    @Extras(box)
+                    LOB @box.LeftOnBase · E: @(box.Errors == 0 ? "none" : string.Join(", ", box.ErrorNotes)) · DP @box.DoublePlays
+                </MudText>
+
+                <table class="box-table">
+                    <tr>
+                        <th class="name">@s.TeamFor(visitor).Abbreviation PITCHING</th>
+                        <th>IP</th><th>H</th><th>R</th><th>ER</th><th>BB</th><th>SO</th>
+                    </tr>
+                    @foreach (var p in box.Pitchers)
+                    {
+                        <tr>
+                            <td class="name">@p.Name @(p.Decision.Length > 0 ? $"({p.Decision})" : "")</td>
+                            <td>@p.IP</td><td>@p.H</td><td>@p.R</td><td>@p.ER</td><td>@p.BB</td><td>@p.SO</td>
+                        </tr>
+                    }
+                </table>
+            }
+
+            @if (s.Box.Notes.Count > 0)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-2">Notes</MudText>
+                @foreach (var note in s.Box.Notes)
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary" Style="display:block">@note</MudText>
+                }
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary" data-testid="copy-status">@_status</MudText>
+        <MudSpacer />
+        <MudButton OnClick="CopyText">Copy text</MudButton>
+        <MudButton OnClick="Export.PrintAsync">Print</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@(() => MudDialog.Close())">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public GameState State { get; set; } = null!;
+
+    private string _status = "";
+
+    private async Task CopyText()
+    {
+        _status = await Export.CopyAsync(BoxScoreFormatter.ToText(State)) ? "Copied to the clipboard." : "Could not copy.";
+    }
+
+    // "2B: Gehrig, Ruth · HR: Ruth 2 · SB: Combs ·"
+    private static string Extras(TeamBox box)
+    {
+        var parts = new List<string>();
+        void Add(string label, IEnumerable<(string Name, int N)> items)
+        {
+            var list = items.Where(i => i.N > 0).Select(i => i.N > 1 ? $"{i.Name} {i.N}" : i.Name).ToList();
+            if (list.Count > 0) parts.Add($"{label}: {string.Join(", ", list)}");
+        }
+        Add("2B", box.Batters.Select(b => (b.Name, b.D2)));
+        Add("3B", box.Batters.Select(b => (b.Name, b.D3)));
+        Add("HR", box.Batters.Select(b => (b.Name, b.HR)));
+        Add("SB", box.Batters.Select(b => (b.Name, b.SB)));
+        Add("CS", box.Batters.Select(b => (b.Name, b.CS)));
+        return parts.Count == 0 ? "" : string.Join(" · ", parts) + " · ";
+    }
+}

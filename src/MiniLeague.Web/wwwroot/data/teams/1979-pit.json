@@ -1,0 +1,507 @@
+{
+  "id": 12,
+  "city": "Pittsburgh",
+  "nickname": "Pirates",
+  "abbreviation": "PIT",
+  "season": 1979,
+  "league": "NL",
+  "stadium": "threerivers-1979",
+  "eraErrorsPerGame": 0.86,
+  "eraStrikeoutsPerGame": 5.11,
+  "batters": [
+    {
+      "id": 1201,
+      "name": "J. Milner",
+      "pos": "DH",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 326,
+      "h": 90,
+      "hr": 16,
+      "bb": 53,
+      "so": 37,
+      "d2": 9,
+      "d3": 4,
+      "sb": 3,
+      "speed": 3,
+      "rbi": 60,
+      "cs": 5,
+      "hbp": 1,
+      "field": {
+        "1B": [
+          3,
+          1,
+          2
+        ],
+        "LF": [
+          4,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": 1202,
+      "name": "B. Madlock",
+      "pos": "3B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 311,
+      "h": 102,
+      "hr": 7,
+      "bb": 34,
+      "so": 22,
+      "d2": 17,
+      "d3": 3,
+      "sb": 21,
+      "speed": 4,
+      "rbi": 44,
+      "cs": 8,
+      "hbp": 1,
+      "field": {
+        "3B": [
+          5,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1203,
+      "name": "D. Parker",
+      "pos": "RF",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 622,
+      "h": 193,
+      "hr": 25,
+      "bb": 67,
+      "so": 101,
+      "d2": 45,
+      "d3": 7,
+      "sb": 20,
+      "speed": 4,
+      "rbi": 94,
+      "cs": 4,
+      "hbp": 9,
+      "field": {
+        "RF": [
+          6,
+          0,
+          4
+        ]
+      }
+    },
+    {
+      "id": 1204,
+      "name": "W. Stargell",
+      "pos": "1B",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 424,
+      "h": 119,
+      "hr": 32,
+      "bb": 47,
+      "so": 105,
+      "d2": 19,
+      "d3": 0,
+      "sb": 0,
+      "speed": 1,
+      "rbi": 82,
+      "cs": 1,
+      "hbp": 3,
+      "field": {
+        "1B": [
+          5,
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "id": 1205,
+      "name": "B. Robinson",
+      "pos": "LF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 421,
+      "h": 111,
+      "hr": 24,
+      "bb": 24,
+      "so": 81,
+      "d2": 17,
+      "d3": 6,
+      "sb": 13,
+      "speed": 4,
+      "rbi": 75,
+      "cs": 2,
+      "hbp": 1,
+      "field": {
+        "1B": [
+          5,
+          3,
+          3
+        ],
+        "LF": [
+          2,
+          2,
+          2
+        ],
+        "RF": [
+          2,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": 1206,
+      "name": "O. Moreno",
+      "pos": "CF",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 695,
+      "h": 196,
+      "hr": 8,
+      "bb": 51,
+      "so": 104,
+      "d2": 21,
+      "d3": 12,
+      "sb": 77,
+      "speed": 5,
+      "rbi": 69,
+      "cs": 21,
+      "hbp": 3,
+      "field": {
+        "CF": [
+          9,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1207,
+      "name": "E. Ott",
+      "pos": "C",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 403,
+      "h": 110,
+      "hr": 7,
+      "bb": 26,
+      "so": 62,
+      "d2": 20,
+      "d3": 2,
+      "sb": 0,
+      "speed": 2,
+      "rbi": 51,
+      "cs": 1,
+      "hbp": 0,
+      "field": {
+        "C": [
+          6,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1208,
+      "name": "T. Foli",
+      "pos": "SS",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 525,
+      "h": 153,
+      "hr": 1,
+      "bb": 28,
+      "so": 14,
+      "d2": 23,
+      "d3": 1,
+      "sb": 6,
+      "speed": 2,
+      "rbi": 65,
+      "cs": 5,
+      "hbp": 9,
+      "field": {
+        "SS": [
+          6,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1209,
+      "name": "R. Stennett",
+      "pos": "2B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 319,
+      "h": 76,
+      "hr": 0,
+      "bb": 24,
+      "so": 25,
+      "d2": 13,
+      "d3": 2,
+      "sb": 1,
+      "speed": 2,
+      "rbi": 24,
+      "cs": 4,
+      "hbp": 0,
+      "field": {
+        "2B": [
+          5,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1210,
+      "name": "P. Garner",
+      "pos": "2B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 549,
+      "h": 161,
+      "hr": 11,
+      "bb": 55,
+      "so": 74,
+      "d2": 32,
+      "d3": 8,
+      "sb": 17,
+      "speed": 4,
+      "rbi": 59,
+      "cs": 8,
+      "hbp": 3,
+      "field": {
+        "2B": [
+          6,
+          2,
+          3
+        ],
+        "3B": [
+          5,
+          1,
+          3
+        ],
+        "SS": [
+          3,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": 1211,
+      "name": "S. Nicosia",
+      "pos": "C",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 191,
+      "h": 55,
+      "hr": 4,
+      "bb": 23,
+      "so": 17,
+      "d2": 16,
+      "d3": 0,
+      "sb": 0,
+      "speed": 1,
+      "rbi": 13,
+      "cs": 2,
+      "hbp": 0,
+      "field": {
+        "C": [
+          5,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1212,
+      "name": "L. Lacy",
+      "pos": "LF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 182,
+      "h": 45,
+      "hr": 5,
+      "bb": 22,
+      "so": 36,
+      "d2": 9,
+      "d3": 3,
+      "sb": 6,
+      "speed": 3,
+      "rbi": 15,
+      "cs": 1,
+      "hbp": 1,
+      "field": {
+        "2B": [
+          4,
+          1,
+          3
+        ],
+        "LF": [
+          4,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1213,
+      "name": "D. Berra",
+      "pos": "3B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 123,
+      "h": 26,
+      "hr": 3,
+      "bb": 11,
+      "so": 17,
+      "d2": 5,
+      "d3": 0,
+      "sb": 0,
+      "speed": 1,
+      "rbi": 15,
+      "cs": 0,
+      "hbp": 0,
+      "field": {
+        "3B": [
+          5,
+          1,
+          3
+        ],
+        "SS": [
+          4,
+          1,
+          3
+        ]
+      }
+    }
+  ],
+  "pitchers": [
+    {
+      "id": 1250,
+      "name": "B. Blyleven",
+      "throws": "Right",
+      "era": 3.6,
+      "ip": 237.3,
+      "h": 238,
+      "bb": 92,
+      "so": 172,
+      "tiringFactor": 4,
+      "role": "Starter",
+      "wins": 12,
+      "losses": 5,
+      "saves": 0,
+      "cg": 4,
+      "hr": 21
+    },
+    {
+      "id": 1251,
+      "name": "J. Candelaria",
+      "throws": "Left",
+      "era": 3.22,
+      "ip": 207.0,
+      "h": 201,
+      "bb": 41,
+      "so": 101,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 14,
+      "losses": 9,
+      "saves": 0,
+      "cg": 8,
+      "hr": 25
+    },
+    {
+      "id": 1252,
+      "name": "B. Kison",
+      "throws": "Right",
+      "era": 3.19,
+      "ip": 172.3,
+      "h": 157,
+      "bb": 45,
+      "so": 105,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 13,
+      "losses": 7,
+      "saves": 0,
+      "cg": 3,
+      "hr": 13
+    },
+    {
+      "id": 1253,
+      "name": "D. Robinson",
+      "throws": "Right",
+      "era": 3.87,
+      "ip": 160.7,
+      "h": 171,
+      "bb": 52,
+      "so": 96,
+      "tiringFactor": 4,
+      "role": "Starter",
+      "wins": 8,
+      "losses": 8,
+      "saves": 0,
+      "cg": 4,
+      "hr": 12
+    },
+    {
+      "id": 1260,
+      "name": "K. Tekulve",
+      "throws": "Right",
+      "era": 2.75,
+      "ip": 134.3,
+      "h": 109,
+      "bb": 49,
+      "so": 75,
+      "tiringFactor": 5,
+      "role": "Closer",
+      "wins": 10,
+      "losses": 8,
+      "saves": 31,
+      "cg": 0,
+      "hr": 5
+    },
+    {
+      "id": 1261,
+      "name": "J. Bibby",
+      "throws": "Right",
+      "era": 2.81,
+      "ip": 137.7,
+      "h": 110,
+      "bb": 47,
+      "so": 103,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 12,
+      "losses": 4,
+      "saves": 0,
+      "cg": 4,
+      "hr": 9
+    },
+    {
+      "id": 1262,
+      "name": "E. Romo",
+      "throws": "Right",
+      "era": 2.99,
+      "ip": 129.3,
+      "h": 122,
+      "bb": 43,
+      "so": 106,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 10,
+      "losses": 5,
+      "saves": 5,
+      "cg": 0,
+      "hr": 11
+    }
+  ]
+}

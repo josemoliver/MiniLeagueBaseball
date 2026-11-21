@@ -1,0 +1,23 @@
+@* Scrollable play-by-play event log *@
+
+<div class="pbp-log">
+    @foreach (var ev in Events)
+    {
+        <div class="pbp-entry">
+            <span class="pbp-inning">@HalfInning(ev)</span>
+            <span class="pbp-desc">@ev.Description</span>
+            <span class="pbp-score">@ev.VisitorScore–@ev.HomeScore</span>
+        </div>
+    }
+    @if (!Events.Any())
+    {
+        <div class="pbp-empty">No plays yet</div>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<PlayEvent> Events { get; set; } = [];
+
+    private static string HalfInning(PlayEvent e) =>
+        $"{(e.IsTop ? "▲" : "▼")}{e.Inning}";
+}

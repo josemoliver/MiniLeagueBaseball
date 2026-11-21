@@ -1,0 +1,124 @@
+/* Classic ballpark scoreboard look */
+.linescore {
+    display: grid;
+    grid-template-columns: 60px repeat(9, minmax(1.5rem, 1fr)) 40px;
+    gap: 0;
+    font-size: 0.78rem;
+    font-family: 'Consolas', 'Courier New', monospace;
+    text-align: center;
+    align-items: center;
+    background: #0c1a0a;
+    color: #e8c558;
+    border: 1px solid #1f3318;
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+.ls-team {
+    text-align: left;
+    font-weight: 600;
+    padding: 3px 6px;
+    color: #f5f5f5;
+    letter-spacing: 1px;
+}
+
+.ls-inn {
+    padding: 3px 2px;
+    border-left: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.ls-inn.active-inn {
+    background: rgba(255, 213, 79, 0.16);
+    font-weight: 700;
+    color: #ffd54f;
+}
+
+.ls-tot {
+    font-weight: 700;
+    padding: 3px 4px;
+    border-left: 2px solid rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+}
+
+/* ── Page layout ────────────────────────────────────────────────────────────
+   Phone (default): one column, in the order you play: scoreboard, your decision,
+   what just happened, the field, the situation, the log, the lineups, the line score.
+   900px and up: the field and lineups on the left, the decision column on the right.
+   1700px and up (wide monitors): field | decisions | lineups side by side. */
+.game-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    max-width: 2300px;
+    margin: 0 auto;
+}
+
+/* On a phone the wrappers dissolve so every card can be ordered individually */
+.g-main, .g-side { display: contents; }
+
+.g-score     { order: 0; }
+.g-decision  { order: 1; }
+.g-lastplay  { order: 2; }
+.g-field     { order: 3; }
+.g-situation { order: 4; }
+.g-log       { order: 5; }
+.g-lineups   { order: 6; }
+.g-line      { order: 7; }
+
+.g-situation {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.g-lineups {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+}
+
+.g-lastplay:empty { display: none; }
+
+.linescore-scroll { overflow-x: auto; }
+
+@media (min-width: 600px) {
+    .g-lineups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 900px) {
+    .game-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
+        grid-template-areas:
+            "score   score"
+            "line    line"
+            "main    side"
+            "lineups side";
+        align-items: start;
+    }
+
+    .g-score   { grid-area: score; }
+    .g-line    { grid-area: line; }
+    .g-main    { grid-area: main; }
+    .g-side    { grid-area: side; }
+    .g-lineups { grid-area: lineups; }
+
+    .g-main, .g-side {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+    }
+}
+
+@media (min-width: 1700px) {
+    .game-layout {
+        grid-template-columns: minmax(0, 1.7fr) minmax(380px, 1fr) minmax(300px, 0.8fr);
+        grid-template-areas:
+            "score score   score"
+            "line  line    line"
+            "main  side    lineups";
+        gap: 20px;
+    }
+
+    .g-lineups { grid-template-columns: minmax(0, 1fr); align-content: start; }
+}

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MiniLeague.Engine/MiniLeague.Engine.csproj" />
+    <Project Path="src/MiniLeague.Web/MiniLeague.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MiniLeague.Engine.Tests/MiniLeague.Engine.Tests.csproj" />
+    <Project Path="tests/MiniLeague.Web.Tests/MiniLeague.Web.Tests.csproj" />
+  </Folder>
+</Solution>

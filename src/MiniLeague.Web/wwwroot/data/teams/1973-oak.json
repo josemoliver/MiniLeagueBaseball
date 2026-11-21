@@ -1,0 +1,497 @@
+{
+  "id": 9,
+  "city": "Oakland",
+  "nickname": "Athletics",
+  "abbreviation": "OAK",
+  "season": 1973,
+  "league": "AL",
+  "stadium": "oakland-1973",
+  "eraErrorsPerGame": 0.88,
+  "eraStrikeoutsPerGame": 5.07,
+  "batters": [
+    {
+      "id": 901,
+      "name": "D. Johnson",
+      "pos": "DH",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 464,
+      "h": 114,
+      "hr": 19,
+      "bb": 59,
+      "so": 116,
+      "d2": 14,
+      "d3": 2,
+      "sb": 0,
+      "speed": 2,
+      "rbi": 81,
+      "cs": 1,
+      "hbp": 1,
+      "field": {
+        "1B": [
+          5,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": 902,
+      "name": "G. Tenace",
+      "pos": "1B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 510,
+      "h": 132,
+      "hr": 24,
+      "bb": 101,
+      "so": 94,
+      "d2": 18,
+      "d3": 2,
+      "sb": 2,
+      "speed": 2,
+      "rbi": 84,
+      "cs": 2,
+      "hbp": 10,
+      "field": {
+        "C": [
+          4,
+          2,
+          3
+        ],
+        "1B": [
+          5,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": 903,
+      "name": "R. Jackson",
+      "pos": "RF",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 539,
+      "h": 158,
+      "hr": 32,
+      "bb": 76,
+      "so": 111,
+      "d2": 28,
+      "d3": 2,
+      "sb": 22,
+      "speed": 3,
+      "rbi": 117,
+      "cs": 8,
+      "hbp": 7,
+      "field": {
+        "RF": [
+          5,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": 904,
+      "name": "S. Bando",
+      "pos": "3B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 592,
+      "h": 170,
+      "hr": 29,
+      "bb": 82,
+      "so": 84,
+      "d2": 32,
+      "d3": 3,
+      "sb": 4,
+      "speed": 2,
+      "rbi": 98,
+      "cs": 2,
+      "hbp": 4,
+      "field": {
+        "3B": [
+          5,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 905,
+      "name": "J. Rudi",
+      "pos": "LF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 437,
+      "h": 118,
+      "hr": 12,
+      "bb": 30,
+      "so": 72,
+      "d2": 25,
+      "d3": 1,
+      "sb": 0,
+      "speed": 1,
+      "rbi": 66,
+      "cs": 0,
+      "hbp": 2,
+      "field": {
+        "LF": [
+          5,
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "id": 906,
+      "name": "B. North",
+      "pos": "CF",
+      "bats": "Switch",
+      "throws": "Right",
+      "ab": 554,
+      "h": 158,
+      "hr": 5,
+      "bb": 78,
+      "so": 89,
+      "d2": 10,
+      "d3": 5,
+      "sb": 53,
+      "speed": 5,
+      "rbi": 34,
+      "cs": 20,
+      "hbp": 3,
+      "field": {
+        "CF": [
+          9,
+          2,
+          5
+        ]
+      }
+    },
+    {
+      "id": 907,
+      "name": "D. Green",
+      "pos": "2B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 332,
+      "h": 87,
+      "hr": 3,
+      "bb": 21,
+      "so": 63,
+      "d2": 17,
+      "d3": 0,
+      "sb": 0,
+      "speed": 1,
+      "rbi": 42,
+      "cs": 2,
+      "hbp": 2,
+      "field": {
+        "2B": [
+          4,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": 908,
+      "name": "R. Fosse",
+      "pos": "C",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 492,
+      "h": 126,
+      "hr": 7,
+      "bb": 25,
+      "so": 62,
+      "d2": 23,
+      "d3": 2,
+      "sb": 2,
+      "speed": 2,
+      "rbi": 52,
+      "cs": 2,
+      "hbp": 1,
+      "field": {
+        "C": [
+          5,
+          2,
+          5
+        ]
+      }
+    },
+    {
+      "id": 909,
+      "name": "B. Campaneris",
+      "pos": "SS",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 601,
+      "h": 150,
+      "hr": 4,
+      "bb": 50,
+      "so": 79,
+      "d2": 17,
+      "d3": 6,
+      "sb": 34,
+      "speed": 4,
+      "rbi": 46,
+      "cs": 10,
+      "hbp": 4,
+      "field": {
+        "SS": [
+          6,
+          2,
+          4
+        ]
+      }
+    },
+    {
+      "id": 910,
+      "name": "A. Mangual",
+      "pos": "RF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 192,
+      "h": 43,
+      "hr": 3,
+      "bb": 8,
+      "so": 34,
+      "d2": 4,
+      "d3": 1,
+      "sb": 1,
+      "speed": 2,
+      "rbi": 13,
+      "cs": 1,
+      "hbp": 1,
+      "field": {
+        "LF": [
+          4,
+          0,
+          2
+        ],
+        "CF": [
+          4,
+          0,
+          2
+        ],
+        "RF": [
+          4,
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "id": 911,
+      "name": "T. Kubiak",
+      "pos": "2B",
+      "bats": "Switch",
+      "throws": "Right",
+      "ab": 182,
+      "h": 40,
+      "hr": 3,
+      "bb": 12,
+      "so": 19,
+      "d2": 6,
+      "d3": 1,
+      "sb": 1,
+      "speed": 2,
+      "rbi": 17,
+      "cs": 1,
+      "hbp": 0,
+      "field": {
+        "2B": [
+          2,
+          1,
+          2
+        ],
+        "SS": [
+          4,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": 912,
+      "name": "B. Conigliaro",
+      "pos": "LF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 110,
+      "h": 22,
+      "hr": 0,
+      "bb": 9,
+      "so": 26,
+      "d2": 2,
+      "d3": 2,
+      "sb": 1,
+      "speed": 2,
+      "rbi": 14,
+      "cs": 0,
+      "hbp": 0,
+      "field": {
+        "LF": [
+          5,
+          3,
+          5
+        ],
+        "CF": [
+          5,
+          3,
+          5
+        ]
+      }
+    },
+    {
+      "id": 913,
+      "name": "J. Alou",
+      "pos": "LF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 108,
+      "h": 33,
+      "hr": 1,
+      "bb": 2,
+      "so": 6,
+      "d2": 3,
+      "d3": 0,
+      "sb": 0,
+      "speed": 1,
+      "rbi": 11,
+      "cs": 0,
+      "hbp": 0,
+      "field": {
+        "LF": [
+          5,
+          2,
+          3
+        ]
+      }
+    }
+  ],
+  "pitchers": [
+    {
+      "id": 950,
+      "name": "K. Holtzman",
+      "throws": "Left",
+      "era": 2.97,
+      "ip": 297.3,
+      "h": 275,
+      "bb": 66,
+      "so": 157,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 21,
+      "losses": 13,
+      "saves": 0,
+      "cg": 16,
+      "hr": 22
+    },
+    {
+      "id": 951,
+      "name": "V. Blue",
+      "throws": "Left",
+      "era": 3.28,
+      "ip": 263.7,
+      "h": 214,
+      "bb": 105,
+      "so": 158,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 20,
+      "losses": 9,
+      "saves": 0,
+      "cg": 13,
+      "hr": 26
+    },
+    {
+      "id": 952,
+      "name": "C. Hunter",
+      "throws": "Right",
+      "era": 3.34,
+      "ip": 256.3,
+      "h": 222,
+      "bb": 69,
+      "so": 124,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 21,
+      "losses": 5,
+      "saves": 0,
+      "cg": 11,
+      "hr": 39
+    },
+    {
+      "id": 953,
+      "name": "B. Odom",
+      "throws": "Right",
+      "era": 4.49,
+      "ip": 150.3,
+      "h": 153,
+      "bb": 67,
+      "so": 83,
+      "tiringFactor": 4,
+      "role": "Starter",
+      "wins": 5,
+      "losses": 12,
+      "saves": 0,
+      "cg": 3,
+      "hr": 14
+    },
+    {
+      "id": 960,
+      "name": "R. Fingers",
+      "throws": "Right",
+      "era": 1.92,
+      "ip": 126.7,
+      "h": 107,
+      "bb": 39,
+      "so": 110,
+      "tiringFactor": 5,
+      "role": "Closer",
+      "wins": 7,
+      "losses": 8,
+      "saves": 22,
+      "cg": 0,
+      "hr": 5
+    },
+    {
+      "id": 961,
+      "name": "D. Knowles",
+      "throws": "Left",
+      "era": 3.09,
+      "ip": 99.0,
+      "h": 87,
+      "bb": 49,
+      "so": 46,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 6,
+      "losses": 8,
+      "saves": 9,
+      "cg": 1,
+      "hr": 7
+    },
+    {
+      "id": 962,
+      "name": "H. Pina",
+      "throws": "Right",
+      "era": 2.76,
+      "ip": 88.0,
+      "h": 58,
+      "bb": 34,
+      "so": 41,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 6,
+      "losses": 3,
+      "saves": 8,
+      "cg": 0,
+      "hr": 8
+    }
+  ]
+}

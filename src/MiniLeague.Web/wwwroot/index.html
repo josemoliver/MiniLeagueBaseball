@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b4ea2" />
+    <meta name="description" content="A modern recreation of the 1984 MicroLeague Baseball simulation." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MiniLeague" />
+    <title>MiniLeague Baseball</title>
+    <base href="/" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="css/site.css" rel="stylesheet" />
+    <link href="MiniLeague.Web.styles.css" rel="stylesheet" />
+    <link rel="icon" href="favicon.ico" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+</head>
+<body>
+    <div id="app">Loading...</div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <div id="update-banner" hidden>
+        A new version of MiniLeague Baseball is ready.
+        <button type="button">Reload</button>
+    </div>
+
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="js/sound.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/keys.js"></script>
+    <script src="js/pwa.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+</html>

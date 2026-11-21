@@ -1,0 +1,54 @@
+@page "/shortcuts"
+@inject ExportService Export
+
+<PageTitle>Keyboard Cards — MiniLeague Baseball</PageTitle>
+
+<div class="shortcut-page">
+    <div class="no-print">
+        <MudText Typo="Typo.h5">Keyboard cards</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+            Press these keys during a game instead of clicking. Print the cards, cut them out and keep them by the keyboard.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print"
+                   OnClick="Export.PrintAsync">
+            Print cards
+        </MudButton>
+    </div>
+
+    <div class="shortcut-cards" data-testid="shortcut-cards">
+        @foreach (var card in _cards)
+        {
+            <section class="shortcut-card" data-testid="@($"card-{card.Title.ToLowerInvariant()}")">
+                <header>
+                    <span class="card-title">@card.Title</span>
+                    <span class="card-subtitle">@card.Subtitle</span>
+                </header>
+
+                @foreach (var section in card.Sections)
+                {
+                    <h3>@section.Heading</h3>
+                    <table>
+                        @foreach (var row in section.Rows)
+                        {
+                            <tr>
+                                <td class="keys">
+                                    @foreach (var key in row.Keys.Split("  or  "))
+                                    {
+                                        <kbd>@key</kbd>
+                                    }
+                                </td>
+                                <td>@row.Action</td>
+                            </tr>
+                        }
+                    </table>
+                }
+
+                <footer>@card.Footer</footer>
+            </section>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly ShortcutCard[] _cards = [Shortcuts.OffenseCard(), Shortcuts.DefenseCard()];
+}

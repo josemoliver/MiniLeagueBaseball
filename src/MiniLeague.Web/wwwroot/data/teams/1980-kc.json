@@ -1,0 +1,517 @@
+{
+  "id": 14,
+  "city": "Kansas City",
+  "nickname": "Royals",
+  "abbreviation": "KC",
+  "season": 1980,
+  "league": "AL",
+  "stadium": "royals-1980",
+  "eraErrorsPerGame": 0.85,
+  "eraStrikeoutsPerGame": 4.58,
+  "batters": [
+    {
+      "id": 1401,
+      "name": "W. Aikens",
+      "pos": "1B",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 543,
+      "h": 151,
+      "hr": 20,
+      "bb": 64,
+      "so": 88,
+      "d2": 24,
+      "d3": 0,
+      "sb": 1,
+      "speed": 1,
+      "rbi": 98,
+      "cs": 0,
+      "hbp": 7,
+      "field": {
+        "1B": [
+          5,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": 1402,
+      "name": "C. Hurdle",
+      "pos": "RF",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 395,
+      "h": 116,
+      "hr": 10,
+      "bb": 34,
+      "so": 61,
+      "d2": 31,
+      "d3": 2,
+      "sb": 0,
+      "speed": 2,
+      "rbi": 60,
+      "cs": 0,
+      "hbp": 2,
+      "field": {
+        "RF": [
+          4,
+          0,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1403,
+      "name": "G. Brett",
+      "pos": "3B",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 449,
+      "h": 175,
+      "hr": 24,
+      "bb": 58,
+      "so": 22,
+      "d2": 33,
+      "d3": 9,
+      "sb": 15,
+      "speed": 4,
+      "rbi": 118,
+      "cs": 6,
+      "hbp": 1,
+      "field": {
+        "3B": [
+          7,
+          2,
+          4
+        ]
+      }
+    },
+    {
+      "id": 1404,
+      "name": "H. McRae",
+      "pos": "DH",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 489,
+      "h": 145,
+      "hr": 14,
+      "bb": 29,
+      "so": 56,
+      "d2": 39,
+      "d3": 5,
+      "sb": 10,
+      "speed": 3,
+      "rbi": 83,
+      "cs": 2,
+      "hbp": 8,
+      "field": {
+        "LF": [
+          5,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": 1405,
+      "name": "W. Wilson",
+      "pos": "LF",
+      "bats": "Switch",
+      "throws": "Right",
+      "ab": 705,
+      "h": 230,
+      "hr": 3,
+      "bb": 28,
+      "so": 81,
+      "d2": 28,
+      "d3": 15,
+      "sb": 79,
+      "speed": 5,
+      "rbi": 49,
+      "cs": 10,
+      "hbp": 6,
+      "field": {
+        "LF": [
+          9,
+          3,
+          2
+        ],
+        "CF": [
+          9,
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "id": 1406,
+      "name": "U. Washington",
+      "pos": "SS",
+      "bats": "Switch",
+      "throws": "Right",
+      "ab": 549,
+      "h": 150,
+      "hr": 6,
+      "bb": 53,
+      "so": 78,
+      "d2": 16,
+      "d3": 11,
+      "sb": 20,
+      "speed": 4,
+      "rbi": 53,
+      "cs": 7,
+      "hbp": 0,
+      "field": {
+        "SS": [
+          6,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1407,
+      "name": "A. Otis",
+      "pos": "CF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 394,
+      "h": 99,
+      "hr": 10,
+      "bb": 39,
+      "so": 70,
+      "d2": 16,
+      "d3": 3,
+      "sb": 16,
+      "speed": 4,
+      "rbi": 53,
+      "cs": 1,
+      "hbp": 3,
+      "field": {
+        "CF": [
+          8,
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "id": 1408,
+      "name": "D. Porter",
+      "pos": "C",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 418,
+      "h": 104,
+      "hr": 7,
+      "bb": 69,
+      "so": 50,
+      "d2": 14,
+      "d3": 2,
+      "sb": 1,
+      "speed": 2,
+      "rbi": 51,
+      "cs": 1,
+      "hbp": 2,
+      "field": {
+        "C": [
+          5,
+          1,
+          4
+        ]
+      }
+    },
+    {
+      "id": 1409,
+      "name": "F. White",
+      "pos": "2B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 560,
+      "h": 148,
+      "hr": 7,
+      "bb": 19,
+      "so": 69,
+      "d2": 23,
+      "d3": 4,
+      "sb": 19,
+      "speed": 3,
+      "rbi": 60,
+      "cs": 6,
+      "hbp": 2,
+      "field": {
+        "2B": [
+          6,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1410,
+      "name": "J. Wathan",
+      "pos": "C",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 453,
+      "h": 138,
+      "hr": 6,
+      "bb": 50,
+      "so": 42,
+      "d2": 14,
+      "d3": 7,
+      "sb": 17,
+      "speed": 4,
+      "rbi": 58,
+      "cs": 3,
+      "hbp": 3,
+      "field": {
+        "C": [
+          5,
+          1,
+          2
+        ],
+        "1B": [
+          5,
+          2,
+          3
+        ],
+        "LF": [
+          4,
+          2,
+          2
+        ],
+        "RF": [
+          4,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": 1411,
+      "name": "D. Chalk",
+      "pos": "3B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 167,
+      "h": 42,
+      "hr": 1,
+      "bb": 18,
+      "so": 27,
+      "d2": 10,
+      "d3": 1,
+      "sb": 1,
+      "speed": 2,
+      "rbi": 20,
+      "cs": 1,
+      "hbp": 2,
+      "field": {
+        "2B": [
+          4,
+          1,
+          2
+        ],
+        "3B": [
+          5,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 1412,
+      "name": "J. Quirk",
+      "pos": "3B",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 163,
+      "h": 45,
+      "hr": 5,
+      "bb": 7,
+      "so": 24,
+      "d2": 5,
+      "d3": 0,
+      "sb": 3,
+      "speed": 2,
+      "rbi": 21,
+      "cs": 2,
+      "hbp": 1,
+      "field": {
+        "C": [
+          4,
+          1,
+          3
+        ],
+        "3B": [
+          5,
+          1,
+          3
+        ],
+        "RF": [
+          4,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": 1413,
+      "name": "P. LaCock",
+      "pos": "1B",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 156,
+      "h": 32,
+      "hr": 1,
+      "bb": 17,
+      "so": 10,
+      "d2": 6,
+      "d3": 0,
+      "sb": 1,
+      "speed": 1,
+      "rbi": 18,
+      "cs": 0,
+      "hbp": 1,
+      "field": {
+        "1B": [
+          1,
+          3,
+          1
+        ],
+        "LF": [
+          4,
+          2,
+          2
+        ],
+        "RF": [
+          4,
+          2,
+          2
+        ]
+      }
+    }
+  ],
+  "pitchers": [
+    {
+      "id": 1450,
+      "name": "D. Leonard",
+      "throws": "Right",
+      "era": 3.79,
+      "ip": 280.3,
+      "h": 271,
+      "bb": 80,
+      "so": 155,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 20,
+      "losses": 11,
+      "saves": 0,
+      "cg": 9,
+      "hr": 30
+    },
+    {
+      "id": 1451,
+      "name": "L. Gura",
+      "throws": "Left",
+      "era": 2.95,
+      "ip": 283.3,
+      "h": 272,
+      "bb": 76,
+      "so": 113,
+      "tiringFactor": 2,
+      "role": "Starter",
+      "wins": 18,
+      "losses": 10,
+      "saves": 0,
+      "cg": 16,
+      "hr": 20
+    },
+    {
+      "id": 1452,
+      "name": "P. Splittorff",
+      "throws": "Left",
+      "era": 4.15,
+      "ip": 204.0,
+      "h": 236,
+      "bb": 43,
+      "so": 53,
+      "tiringFactor": 4,
+      "role": "Starter",
+      "wins": 14,
+      "losses": 11,
+      "saves": 0,
+      "cg": 4,
+      "hr": 17
+    },
+    {
+      "id": 1453,
+      "name": "R. Gale",
+      "throws": "Right",
+      "era": 3.92,
+      "ip": 190.7,
+      "h": 169,
+      "bb": 78,
+      "so": 97,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 13,
+      "losses": 9,
+      "saves": 1,
+      "cg": 6,
+      "hr": 16
+    },
+    {
+      "id": 1460,
+      "name": "D. Quisenberry",
+      "throws": "Right",
+      "era": 3.09,
+      "ip": 128.3,
+      "h": 129,
+      "bb": 27,
+      "so": 37,
+      "tiringFactor": 5,
+      "role": "Closer",
+      "wins": 12,
+      "losses": 7,
+      "saves": 33,
+      "cg": 0,
+      "hr": 5
+    },
+    {
+      "id": 1461,
+      "name": "R. Martin",
+      "throws": "Right",
+      "era": 4.39,
+      "ip": 137.3,
+      "h": 133,
+      "bb": 70,
+      "so": 68,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 10,
+      "losses": 10,
+      "saves": 2,
+      "cg": 2,
+      "hr": 18
+    },
+    {
+      "id": 1462,
+      "name": "M. Pattin",
+      "throws": "Right",
+      "era": 3.64,
+      "ip": 89.0,
+      "h": 97,
+      "bb": 23,
+      "so": 40,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 4,
+      "losses": 0,
+      "saves": 4,
+      "cg": 0,
+      "hr": 7
+    }
+  ]
+}

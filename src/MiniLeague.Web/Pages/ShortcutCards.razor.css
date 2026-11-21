@@ -1,0 +1,89 @@
+.shortcut-page {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.shortcut-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-top: 24px;
+}
+
+.shortcut-card {
+    flex: 1 1 380px;
+    max-width: 460px;
+    border: 2px solid var(--mud-palette-text-primary);
+    border-radius: 10px;
+    padding: 0 16px 12px;
+    background: var(--mud-palette-surface);
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.shortcut-card header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 0 -16px 8px;
+    padding: 8px 16px;
+    background: var(--mud-palette-text-primary);
+    color: var(--mud-palette-surface);
+    border-radius: 7px 7px 0 0;
+}
+
+.card-title {
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    font-size: 1.15rem;
+}
+
+.card-subtitle {
+    font-size: 0.8rem;
+    opacity: 0.85;
+}
+
+.shortcut-card h3 {
+    margin: 10px 0 2px;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+.shortcut-card table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.shortcut-card td {
+    padding: 3px 0;
+    font-size: 0.95rem;
+}
+
+.shortcut-card td.keys {
+    width: 9rem;
+    white-space: nowrap;
+}
+
+.shortcut-card kbd {
+    display: inline-block;
+    min-width: 1.7rem;
+    margin-right: 6px;
+    padding: 1px 7px;
+    text-align: center;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-weight: 700;
+    border: 1.5px solid currentColor;
+    border-bottom-width: 3px;
+    border-radius: 5px;
+}
+
+.shortcut-card footer {
+    margin-top: 10px;
+    padding-top: 6px;
+    border-top: 1px dashed currentColor;
+    font-size: 0.78rem;
+    font-style: italic;
+    opacity: 0.8;
+}

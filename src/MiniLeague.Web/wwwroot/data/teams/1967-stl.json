@@ -1,0 +1,507 @@
+{
+  "id": 5,
+  "city": "St. Louis",
+  "nickname": "Cardinals",
+  "abbreviation": "STL",
+  "season": 1967,
+  "league": "NL",
+  "stadium": "busch-1967",
+  "eraErrorsPerGame": 0.87,
+  "eraStrikeoutsPerGame": 5.84,
+  "batters": [
+    {
+      "id": 501,
+      "name": "C. Flood",
+      "pos": "CF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 514,
+      "h": 172,
+      "hr": 5,
+      "bb": 37,
+      "so": 46,
+      "d2": 24,
+      "d3": 1,
+      "sb": 2,
+      "speed": 1,
+      "rbi": 50,
+      "cs": 2,
+      "hbp": 2,
+      "field": {
+        "CF": [
+          8,
+          3,
+          1
+        ]
+      }
+    },
+    {
+      "id": 502,
+      "name": "L. Brock",
+      "pos": "LF",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 689,
+      "h": 206,
+      "hr": 21,
+      "bb": 24,
+      "so": 109,
+      "d2": 32,
+      "d3": 12,
+      "sb": 52,
+      "speed": 5,
+      "rbi": 76,
+      "cs": 18,
+      "hbp": 6,
+      "field": {
+        "LF": [
+          5,
+          0,
+          4
+        ]
+      }
+    },
+    {
+      "id": 503,
+      "name": "O. Cepeda",
+      "pos": "1B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 563,
+      "h": 183,
+      "hr": 25,
+      "bb": 62,
+      "so": 75,
+      "d2": 37,
+      "d3": 0,
+      "sb": 11,
+      "speed": 2,
+      "rbi": 111,
+      "cs": 2,
+      "hbp": 12,
+      "field": {
+        "1B": [
+          5,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 504,
+      "name": "T. McCarver",
+      "pos": "C",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 471,
+      "h": 139,
+      "hr": 14,
+      "bb": 54,
+      "so": 32,
+      "d2": 26,
+      "d3": 3,
+      "sb": 8,
+      "speed": 3,
+      "rbi": 69,
+      "cs": 8,
+      "hbp": 5,
+      "field": {
+        "C": [
+          6,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "id": 505,
+      "name": "R. Maris",
+      "pos": "RF",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 410,
+      "h": 107,
+      "hr": 9,
+      "bb": 52,
+      "so": 61,
+      "d2": 18,
+      "d3": 7,
+      "sb": 0,
+      "speed": 3,
+      "rbi": 55,
+      "cs": 0,
+      "hbp": 4,
+      "field": {
+        "RF": [
+          6,
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "id": 506,
+      "name": "J. Javier",
+      "pos": "2B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 520,
+      "h": 146,
+      "hr": 14,
+      "bb": 25,
+      "so": 92,
+      "d2": 16,
+      "d3": 3,
+      "sb": 6,
+      "speed": 3,
+      "rbi": 64,
+      "cs": 7,
+      "hbp": 1,
+      "field": {
+        "2B": [
+          5,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": 507,
+      "name": "B. Tolan",
+      "pos": "DH",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 265,
+      "h": 67,
+      "hr": 6,
+      "bb": 19,
+      "so": 43,
+      "d2": 7,
+      "d3": 3,
+      "sb": 12,
+      "speed": 4,
+      "rbi": 32,
+      "cs": 7,
+      "hbp": 4,
+      "field": {
+        "1B": [
+          5,
+          3,
+          3
+        ],
+        "LF": [
+          4,
+          3,
+          3
+        ],
+        "CF": [
+          4,
+          3,
+          3
+        ],
+        "RF": [
+          4,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": 508,
+      "name": "M. Shannon",
+      "pos": "3B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 482,
+      "h": 118,
+      "hr": 12,
+      "bb": 37,
+      "so": 89,
+      "d2": 18,
+      "d3": 3,
+      "sb": 2,
+      "speed": 2,
+      "rbi": 77,
+      "cs": 4,
+      "hbp": 4,
+      "field": {
+        "3B": [
+          5,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": 509,
+      "name": "D. Maxvill",
+      "pos": "SS",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 476,
+      "h": 108,
+      "hr": 1,
+      "bb": 48,
+      "so": 66,
+      "d2": 14,
+      "d3": 4,
+      "sb": 0,
+      "speed": 2,
+      "rbi": 41,
+      "cs": 2,
+      "hbp": 1,
+      "field": {
+        "2B": [
+          4,
+          2,
+          3
+        ],
+        "SS": [
+          6,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 510,
+      "name": "P. Gagliano",
+      "pos": "3B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 217,
+      "h": 48,
+      "hr": 2,
+      "bb": 19,
+      "so": 26,
+      "d2": 7,
+      "d3": 0,
+      "sb": 0,
+      "speed": 1,
+      "rbi": 21,
+      "cs": 0,
+      "hbp": 1,
+      "field": {
+        "2B": [
+          4,
+          2,
+          2
+        ],
+        "3B": [
+          5,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": 511,
+      "name": "A. Johnson",
+      "pos": "RF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 175,
+      "h": 39,
+      "hr": 1,
+      "bb": 9,
+      "so": 26,
+      "d2": 9,
+      "d3": 2,
+      "sb": 6,
+      "speed": 3,
+      "rbi": 12,
+      "cs": 3,
+      "hbp": 3,
+      "field": {
+        "CF": [
+          5,
+          2,
+          5
+        ],
+        "RF": [
+          5,
+          2,
+          5
+        ]
+      }
+    },
+    {
+      "id": 512,
+      "name": "E. Spiezio",
+      "pos": "3B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 105,
+      "h": 22,
+      "hr": 3,
+      "bb": 7,
+      "so": 18,
+      "d2": 2,
+      "d3": 0,
+      "sb": 2,
+      "speed": 1,
+      "rbi": 10,
+      "cs": 1,
+      "hbp": 1,
+      "field": {
+        "3B": [
+          5,
+          2,
+          3
+        ],
+        "RF": [
+          5,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": 513,
+      "name": "D. Ricketts",
+      "pos": "C",
+      "bats": "Switch",
+      "throws": "Right",
+      "ab": 99,
+      "h": 27,
+      "hr": 1,
+      "bb": 4,
+      "so": 7,
+      "d2": 8,
+      "d3": 0,
+      "sb": 0,
+      "speed": 1,
+      "rbi": 14,
+      "cs": 0,
+      "hbp": 0,
+      "field": {
+        "C": [
+          5,
+          3,
+          3
+        ]
+      }
+    }
+  ],
+  "pitchers": [
+    {
+      "id": 550,
+      "name": "S. Carlton",
+      "throws": "Left",
+      "era": 2.98,
+      "ip": 193.0,
+      "h": 173,
+      "bb": 62,
+      "so": 168,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 14,
+      "losses": 9,
+      "saves": 1,
+      "cg": 11,
+      "hr": 10
+    },
+    {
+      "id": 551,
+      "name": "D. Hughes",
+      "throws": "Right",
+      "era": 2.67,
+      "ip": 222.3,
+      "h": 164,
+      "bb": 48,
+      "so": 161,
+      "tiringFactor": 2,
+      "role": "Starter",
+      "wins": 16,
+      "losses": 6,
+      "saves": 3,
+      "cg": 12,
+      "hr": 22
+    },
+    {
+      "id": 552,
+      "name": "R. Washburn",
+      "throws": "Right",
+      "era": 3.53,
+      "ip": 186.3,
+      "h": 190,
+      "bb": 42,
+      "so": 98,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 10,
+      "losses": 7,
+      "saves": 0,
+      "cg": 3,
+      "hr": 14
+    },
+    {
+      "id": 553,
+      "name": "B. Gibson",
+      "throws": "Right",
+      "era": 2.98,
+      "ip": 175.3,
+      "h": 151,
+      "bb": 40,
+      "so": 147,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 13,
+      "losses": 7,
+      "saves": 0,
+      "cg": 10,
+      "hr": 10
+    },
+    {
+      "id": 560,
+      "name": "J. Hoerner",
+      "throws": "Left",
+      "era": 2.59,
+      "ip": 66.0,
+      "h": 52,
+      "bb": 20,
+      "so": 50,
+      "tiringFactor": 5,
+      "role": "Closer",
+      "wins": 4,
+      "losses": 4,
+      "saves": 15,
+      "cg": 0,
+      "hr": 5
+    },
+    {
+      "id": 561,
+      "name": "N. Briles",
+      "throws": "Right",
+      "era": 2.43,
+      "ip": 155.3,
+      "h": 139,
+      "bb": 40,
+      "so": 94,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 14,
+      "losses": 5,
+      "saves": 6,
+      "cg": 4,
+      "hr": 8
+    },
+    {
+      "id": 562,
+      "name": "L. Jaster",
+      "throws": "Left",
+      "era": 3.01,
+      "ip": 152.3,
+      "h": 141,
+      "bb": 44,
+      "so": 87,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 9,
+      "losses": 7,
+      "saves": 3,
+      "cg": 2,
+      "hr": 12
+    }
+  ]
+}

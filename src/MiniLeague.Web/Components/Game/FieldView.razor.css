@@ -1,0 +1,107 @@
+.field-wrap {
+    width: 100%;
+    background: #15151b;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid #1f2f15;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+}
+
+.field-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* Fielder group — hover tooltip */
+.fielder-group {
+    cursor: pointer;
+}
+
+.fielder-group .fielder-name {
+    visibility: hidden;
+}
+
+.fielder-group:hover .fielder-name {
+    visibility: visible;
+}
+
+/* Highlighted fielder pulse */
+.fielder-active {
+    animation: fielder-pulse 0.5s ease-in-out 3;
+}
+
+@keyframes fielder-pulse {
+    0%   { r: 7; opacity: 1; }
+    50%  { r: 11; opacity: 0.7; }
+    100% { r: 7; opacity: 1; }
+}
+
+/* Ball fade-in so it doesn't flash before the motion starts */
+.ball-anim {
+    animation: ball-appear 0.1s ease-in forwards;
+}
+
+@keyframes ball-appear {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Broadcast-style trajectory tracer — draws along the flight path */
+.ball-tracer {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: tracer-draw linear forwards;
+}
+
+@keyframes tracer-draw {
+    to { stroke-dashoffset: 0; }
+}
+
+/* Outcome banner pops in, holds, then fades so it doesn't hide the infield */
+.banner-pop {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: banner-in 0.4s cubic-bezier(0.18, 1.25, 0.4, 1) both,
+               banner-out 0.6s ease 2.4s forwards;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
+    pointer-events: none;
+}
+
+@keyframes banner-in {
+    from { transform: scale(0.6); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes banner-out {
+    to { opacity: 0; }
+}
+
+/* Home-run burst in the seats — delayed until the ball lands */
+.hr-burst {
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: burst 0.7s ease-out forwards;
+}
+
+@keyframes burst {
+    0%   { opacity: 0; transform: scale(0.2); }
+    25%  { opacity: 1; }
+    100% { opacity: 0; transform: scale(1.8); }
+}
+
+/* Never taller than the screen: on a wide monitor the field would otherwise push everything below the fold */
+.field-wrap {
+    max-width: min(100%, max(360px, calc((100vh - 240px) * 1.5)));
+    margin-inline: auto;
+}
+
+/* The small labels need a boost on a phone, where the whole field is drawn about 60% size */
+@media (max-width: 599px) {
+    .field-svg text { font-size: 12px; }
+}

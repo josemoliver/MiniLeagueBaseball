@@ -1,0 +1,512 @@
+{
+  "id": 8,
+  "city": "Baltimore",
+  "nickname": "Orioles",
+  "abbreviation": "BAL",
+  "season": 1970,
+  "league": "AL",
+  "stadium": "memorial-1970",
+  "eraErrorsPerGame": 0.84,
+  "eraStrikeoutsPerGame": 5.63,
+  "batters": [
+    {
+      "id": 801,
+      "name": "D. Buford",
+      "pos": "LF",
+      "bats": "Switch",
+      "throws": "Right",
+      "ab": 504,
+      "h": 137,
+      "hr": 17,
+      "bb": 109,
+      "so": 55,
+      "d2": 15,
+      "d3": 2,
+      "sb": 16,
+      "speed": 3,
+      "rbi": 66,
+      "cs": 8,
+      "hbp": 8,
+      "field": {
+        "LF": [
+          5,
+          2,
+          5
+        ]
+      }
+    },
+    {
+      "id": 802,
+      "name": "F. Robinson",
+      "pos": "RF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 471,
+      "h": 144,
+      "hr": 25,
+      "bb": 69,
+      "so": 70,
+      "d2": 24,
+      "d3": 1,
+      "sb": 2,
+      "speed": 2,
+      "rbi": 78,
+      "cs": 1,
+      "hbp": 7,
+      "field": {
+        "1B": [
+          5,
+          1,
+          3
+        ],
+        "RF": [
+          5,
+          2,
+          4
+        ]
+      }
+    },
+    {
+      "id": 803,
+      "name": "B. Powell",
+      "pos": "1B",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 526,
+      "h": 156,
+      "hr": 35,
+      "bb": 104,
+      "so": 80,
+      "d2": 28,
+      "d3": 0,
+      "sb": 1,
+      "speed": 1,
+      "rbi": 114,
+      "cs": 1,
+      "hbp": 5,
+      "field": {
+        "1B": [
+          6,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 804,
+      "name": "M. Rettenmund",
+      "pos": "DH",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 338,
+      "h": 109,
+      "hr": 18,
+      "bb": 38,
+      "so": 59,
+      "d2": 17,
+      "d3": 2,
+      "sb": 13,
+      "speed": 3,
+      "rbi": 58,
+      "cs": 7,
+      "hbp": 3,
+      "field": {
+        "LF": [
+          7,
+          2,
+          3
+        ],
+        "CF": [
+          7,
+          2,
+          3
+        ],
+        "RF": [
+          7,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 805,
+      "name": "P. Blair",
+      "pos": "CF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 480,
+      "h": 128,
+      "hr": 18,
+      "bb": 56,
+      "so": 93,
+      "d2": 24,
+      "d3": 2,
+      "sb": 24,
+      "speed": 4,
+      "rbi": 65,
+      "cs": 11,
+      "hbp": 3,
+      "field": {
+        "CF": [
+          9,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "id": 806,
+      "name": "B. Robinson",
+      "pos": "3B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 608,
+      "h": 168,
+      "hr": 18,
+      "bb": 53,
+      "so": 53,
+      "d2": 31,
+      "d3": 4,
+      "sb": 1,
+      "speed": 2,
+      "rbi": 94,
+      "cs": 1,
+      "hbp": 4,
+      "field": {
+        "3B": [
+          6,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": 807,
+      "name": "D. Johnson",
+      "pos": "2B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 530,
+      "h": 149,
+      "hr": 10,
+      "bb": 66,
+      "so": 68,
+      "d2": 27,
+      "d3": 1,
+      "sb": 2,
+      "speed": 1,
+      "rbi": 53,
+      "cs": 1,
+      "hbp": 0,
+      "field": {
+        "2B": [
+          6,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": 808,
+      "name": "E. Hendricks",
+      "pos": "C",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 322,
+      "h": 78,
+      "hr": 12,
+      "bb": 33,
+      "so": 44,
+      "d2": 9,
+      "d3": 0,
+      "sb": 1,
+      "speed": 1,
+      "rbi": 41,
+      "cs": 0,
+      "hbp": 4,
+      "field": {
+        "C": [
+          5,
+          1,
+          4
+        ]
+      }
+    },
+    {
+      "id": 809,
+      "name": "M. Belanger",
+      "pos": "SS",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 459,
+      "h": 100,
+      "hr": 1,
+      "bb": 52,
+      "so": 65,
+      "d2": 6,
+      "d3": 5,
+      "sb": 13,
+      "speed": 4,
+      "rbi": 36,
+      "cs": 2,
+      "hbp": 5,
+      "field": {
+        "SS": [
+          5,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 810,
+      "name": "A. Etchebarren",
+      "pos": "C",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 230,
+      "h": 56,
+      "hr": 4,
+      "bb": 21,
+      "so": 41,
+      "d2": 10,
+      "d3": 1,
+      "sb": 4,
+      "speed": 2,
+      "rbi": 28,
+      "cs": 1,
+      "hbp": 3,
+      "field": {
+        "C": [
+          5,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": 811,
+      "name": "C. Salmon",
+      "pos": "SS",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 172,
+      "h": 43,
+      "hr": 7,
+      "bb": 8,
+      "so": 30,
+      "d2": 4,
+      "d3": 0,
+      "sb": 2,
+      "speed": 1,
+      "rbi": 22,
+      "cs": 2,
+      "hbp": 1,
+      "field": {
+        "2B": [
+          4,
+          0,
+          3
+        ],
+        "3B": [
+          4,
+          2,
+          3
+        ],
+        "SS": [
+          3,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "id": 812,
+      "name": "T. Crowley",
+      "pos": "1B",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 152,
+      "h": 39,
+      "hr": 5,
+      "bb": 35,
+      "so": 26,
+      "d2": 5,
+      "d3": 0,
+      "sb": 2,
+      "speed": 1,
+      "rbi": 20,
+      "cs": 0,
+      "hbp": 0,
+      "field": {
+        "1B": [
+          3,
+          2,
+          2
+        ],
+        "LF": [
+          4,
+          2,
+          1
+        ],
+        "RF": [
+          4,
+          2,
+          1
+        ]
+      }
+    },
+    {
+      "id": 813,
+      "name": "B. Grich",
+      "pos": "SS",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 95,
+      "h": 20,
+      "hr": 0,
+      "bb": 9,
+      "so": 21,
+      "d2": 1,
+      "d3": 3,
+      "sb": 1,
+      "speed": 3,
+      "rbi": 8,
+      "cs": 1,
+      "hbp": 0,
+      "field": {
+        "2B": [
+          6,
+          3,
+          3
+        ],
+        "SS": [
+          4,
+          0,
+          3
+        ]
+      }
+    }
+  ],
+  "pitchers": [
+    {
+      "id": 850,
+      "name": "M. Cuellar",
+      "throws": "Left",
+      "era": 3.48,
+      "ip": 297.7,
+      "h": 273,
+      "bb": 69,
+      "so": 190,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 24,
+      "losses": 8,
+      "saves": 0,
+      "cg": 21,
+      "hr": 34
+    },
+    {
+      "id": 851,
+      "name": "D. McNally",
+      "throws": "Left",
+      "era": 3.22,
+      "ip": 296.0,
+      "h": 277,
+      "bb": 78,
+      "so": 185,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 24,
+      "losses": 9,
+      "saves": 0,
+      "cg": 16,
+      "hr": 29
+    },
+    {
+      "id": 852,
+      "name": "J. Palmer",
+      "throws": "Right",
+      "era": 2.71,
+      "ip": 305.0,
+      "h": 263,
+      "bb": 100,
+      "so": 199,
+      "tiringFactor": 2,
+      "role": "Starter",
+      "wins": 20,
+      "losses": 10,
+      "saves": 0,
+      "cg": 17,
+      "hr": 21
+    },
+    {
+      "id": 853,
+      "name": "T. Phoebus",
+      "throws": "Right",
+      "era": 3.07,
+      "ip": 135.0,
+      "h": 106,
+      "bb": 62,
+      "so": 72,
+      "tiringFactor": 4,
+      "role": "Starter",
+      "wins": 5,
+      "losses": 5,
+      "saves": 0,
+      "cg": 3,
+      "hr": 11
+    },
+    {
+      "id": 860,
+      "name": "P. Richert",
+      "throws": "Left",
+      "era": 1.98,
+      "ip": 54.7,
+      "h": 36,
+      "bb": 24,
+      "so": 66,
+      "tiringFactor": 5,
+      "role": "Closer",
+      "wins": 7,
+      "losses": 2,
+      "saves": 13,
+      "cg": 0,
+      "hr": 5
+    },
+    {
+      "id": 861,
+      "name": "J. Hardin",
+      "throws": "Right",
+      "era": 3.53,
+      "ip": 145.3,
+      "h": 150,
+      "bb": 26,
+      "so": 78,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 6,
+      "losses": 5,
+      "saves": 1,
+      "cg": 3,
+      "hr": 13
+    },
+    {
+      "id": 862,
+      "name": "D. Hall",
+      "throws": "Right",
+      "era": 3.08,
+      "ip": 61.3,
+      "h": 51,
+      "bb": 6,
+      "so": 30,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 10,
+      "losses": 5,
+      "saves": 3,
+      "cg": 0,
+      "hr": 8
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+@* One side's batting order with fielding positions, plus its bench. *@
+
+@{
+    var s = State;
+    bool batting = s.IsTopOfInning == Visitor && s.Status == GameStatus.InProgress;
+    int atBat = s.BatterIndexFor(Visitor) % s.LineupFor(Visitor).Count;
+    var rows = s.LineupPlayers(Visitor).ToList();
+}
+
+<MudPaper Class="pa-3" Elevation="1">
+    <MudText Typo="Typo.overline">@s.TeamFor(Visitor).Abbreviation LINEUP</MudText>
+    <table class="lineup-table">
+        @for (int i = 0; i < rows.Count; i++)
+        {
+            var (p, pos) = rows[i];
+            <tr class="@(batting && i == atBat ? "lineup-current" : "")">
+                <td class="lineup-num">@(i + 1)</td>
+                <td class="lineup-pos">@LineupRules.Label(pos)</td>
+                <td class="lineup-warn" title="@(p.IsNaturalAt(pos) ? "" : PlayerLabels.Fielding(p, pos))">@(p.IsNaturalAt(pos) ? "" : "⚠")</td>
+                <td>@p.Name</td>
+                <td class="lineup-avg">@PlayerLabels.Average(p.Overall)</td>
+            </tr>
+        }
+    </table>
+    @{
+        var bench = s.Bench(Visitor).ToList();
+    }
+    <MudText Typo="Typo.caption" Class="mud-text-secondary" Style="display:block; margin-top:6px">
+        Bench: @(bench.Count == 0 ? "none" : string.Join(", ", bench.Select(b => b.Name)))
+    </MudText>
+    @{
+        var pitcher = s.PitcherFor(Visitor);
+        var pen = s.BullpenFor(Visitor);
+    }
+    <MudText Typo="Typo.caption" Class="mud-text-secondary" Style="display:block">
+        Pitching: <b>@pitcher.Player.Name</b> (@pitcher.PitchCount P, @pitcher.RunsAllowed R)
+    </MudText>
+    <MudText Typo="Typo.caption" Class="mud-text-secondary" Style="display:block" data-testid="bullpen">
+        Bullpen: @(pen.Count == 0 ? "empty" : string.Join(", ", pen.Select(w => $"{w.Player.Name} ({w.Status})")))
+    </MudText>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public GameState State { get; set; } = null!;
+    [Parameter] public bool Visitor { get; set; }
+}

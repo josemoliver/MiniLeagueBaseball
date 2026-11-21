@@ -1,0 +1,53 @@
+.pbp-log {
+    font-size: 0.82rem;
+    font-family: monospace;
+}
+
+.pbp-entry {
+    display: flex;
+    gap: 8px;
+    padding: 3px 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    align-items: baseline;
+}
+
+.pbp-entry:first-child {
+    background: rgba(0,0,0,0.04);
+}
+
+.pbp-inning {
+    min-width: 28px;
+    color: #546e7a;
+    font-size: 0.75rem;
+}
+
+.pbp-desc {
+    flex: 1;
+    color: #212121;
+}
+
+.pbp-score {
+    color: #00796b;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.pbp-empty {
+    color: #78909c;
+    padding: 8px 6px;
+    font-style: italic;
+}
+
+.pbp-log {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+/* a taller log where there is room for it */
+@media (min-width: 900px) {
+    .pbp-log { max-height: 340px; }
+}
+
+@media (min-width: 1700px) {
+    .pbp-log { max-height: 46vh; }
+}
