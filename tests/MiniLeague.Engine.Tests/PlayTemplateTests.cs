@@ -613,6 +613,34 @@ public class PlayTemplateTests
     }
 
     [Fact]
+    public void ClosePlayAtHome_WaitsForTheCatcherTagBeforeTheSafeCall()
+    {
+        var plays = Where((r, _) => r.Outcome is (OutcomeType.Single or OutcomeType.Double or OutcomeType.Triple)
+            && r.RunnerMoves.Any(m => m.Fate == RunnerFate.Scored && m.FromBase <= 2)).Take(60).ToList();
+        int closePlays = 0;
+        foreach (var (result, before) in plays)
+        {
+            var script = Script(result, before);
+            var call = script.Cues.FirstOrDefault(c => c.Kind == CueKind.Effect && c.Value == "platecall");
+            if (call is null) continue;
+            closePlays++;
+
+            double crossed = result.RunnerMoves.Where(m => m.Fate == RunnerFate.Scored && m.FromBase <= 2)
+                .Max(m => Arrival(script, IdOf(m), FieldGeometry.Home));
+            double received = KeysOf(script, "ball")[^1].T;
+            double tag = KeysOf(script, "catcher").First(k => k.Pose == Poses.Tag && k.T > received).T;
+            double description = script.Cues.First(c => c.Kind == CueKind.Banner && c.Value == result.Description).T;
+
+            Assert.True(crossed < received && received < tag && tag < call.T && call.T < description);
+            Assert.Contains(script.Cues, c => c.Kind == CueKind.Banner && c.Value == "HERE COMES THE THROW!"
+                && c.T < crossed);
+            Assert.Contains(script.Cues, c => c.Kind == CueKind.Banner && c.Value == "SAFE AT HOME!"
+                && c.T == call.T);
+        }
+        Assert.True(closePlays > 0);
+    }
+
+    [Fact]
     public void Triple_PutsTheBatterOnThird_AndTheThrowArrivesAfterHim()
     {
         var triples = Where((r, _) => r.Outcome == OutcomeType.Triple).Take(10).ToList();

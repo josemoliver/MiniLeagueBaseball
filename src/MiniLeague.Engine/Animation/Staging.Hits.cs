@@ -10,7 +10,7 @@ internal sealed partial class Staging
     // A runner scoring sometimes slides; a batter taking an extra base slides into it.
     private bool SlidesHome(RunnerMove m) => m.Fate == RunnerFate.Scored && m.FromBase > 0 && _rng.NextDouble() < 0.4;
 
-    private const double HomePlaySecondsPerBase = 1.10;
+    private const double HomePlaySecondsPerBase = 1.18;
 
     // WHY: A runner coming from first or second needs time to round third while the outfielder fields and throws.
     // The closer arrival also lets the decided safe result read as a real play at the plate.
@@ -60,20 +60,43 @@ internal sealed partial class Staging
         double arrive = ThrowTo(id, receiverPoint, tField + 0.25, arriveAfter);
         Receive(receiver, receiverPoint, arrive, facing: receiver == "catcher" ? (landing.X < 0 ? "left" : "right") : null);
         BackUpThrow(id, receiver, receiverPoint, arrive);
+        double? plateCall = ClosePlayAtHome(receiver, arrive, moves, times);
 
         _s.Cue(Contact, CueKind.Sound, "hit");
         _s.Cue(Contact + 0.12, CueKind.Banner, kind == Kind.Bloop ? "BALL IN THE AIR..." : "GROUND BALL IN PLAY...");
-        AnnounceHitAfterPlay(arrive, moves, times);
+        AnnounceHitAfterPlay(arrive, moves, times, plateCall);
         CheerForRuns(moves, times);
     }
 
-    private void AnnounceHitAfterPlay(double throwArrival, IReadOnlyList<RunnerMove> moves, Dictionary<int, double>[] times)
+    private void AnnounceHitAfterPlay(double throwArrival, IReadOnlyList<RunnerMove> moves,
+        Dictionary<int, double>[] times, double? plateCall = null)
     {
-        double resolved = throwArrival;
+        double resolved = Math.Max(throwArrival, plateCall ?? 0);
         for (int i = 0; i < moves.Count; i++)
             if (times[i].Count > 0) resolved = Math.Max(resolved, times[i].Values.Max());
         _s.Cue(resolved + 0.08, CueKind.Banner, _result.Description);
         _s.Cue(resolved + 0.08, CueKind.Hold, "0.55");
+    }
+
+    // WHY: the runner is safe when he touches home, but the visible call waits for the catcher to receive and swipe.
+    private double? ClosePlayAtHome(string receiver, double throwArrival,
+        IReadOnlyList<RunnerMove> moves, Dictionary<int, double>[] times)
+    {
+        if (receiver != "catcher") return null;
+        var crossings = moves.Select((m, i) => (Move: m, Index: i))
+            .Where(x => x.Move.Fate == RunnerFate.Scored && x.Move.FromBase <= 2
+                && times[x.Index].ContainsKey(4))
+            .Select(x => times[x.Index][4]).ToList();
+        if (crossings.Count == 0) return null;
+        double crossed = crossings.Max();
+        if (throwArrival - crossed > 0.85) return null;
+
+        double call = throwArrival + 0.24;
+        _s.Cue(Math.Max(Contact + 0.15, crossed - 0.38), CueKind.Banner, "HERE COMES THE THROW!");
+        _s.Cue(call, CueKind.Effect, "platecall", FieldGeometry.Home);
+        _s.Cue(call, CueKind.Banner, "SAFE AT HOME!");
+        _s.Cue(call, CueKind.Hold, "0.3");
+        return call;
     }
 
     private void CheerForRuns(IReadOnlyList<RunnerMove> moves, Dictionary<int, double>[] times)
@@ -207,10 +230,11 @@ internal sealed partial class Staging
             arrive = ThrowTo(id, targetPoint, tField + Transfer, arriveAfter);
         Receive(target, targetPoint, arrive, facing: target == "catcher" ? (rest.X < 0 ? "left" : "right") : null);
         BackUpThrow(finalThrower, target, targetPoint, arrive);
+        double? plateCall = ClosePlayAtHome(target, arrive, moves, times);
 
         _s.Cue(Contact, CueKind.Sound, "hit");
         _s.Cue(Contact + 0.12, CueKind.Banner, "DEEP TO THE OUTFIELD...");
-        AnnounceHitAfterPlay(arrive, moves, times);
+        AnnounceHitAfterPlay(arrive, moves, times, plateCall);
         CheerForRuns(moves, times);
     }
 

@@ -69,7 +69,7 @@
                 var align = a;
                 <MudButton Color="@(SelectedAlignment == align ? Color.Warning : Color.Default)"
                            Variant="@(SelectedAlignment == align ? Variant.Filled : Variant.Outlined)"
-                           Disabled="@AlignmentMoving" OnClick="@(() => SelectAlignment(align))">
+                           Disabled="@(AlignmentMoving || _choosingAlignment)" OnClick="@(() => SelectAlignment(align))">
                     @AlignmentLabel(align)<span class="key-hint">@DefenseHint(Shortcuts.KeyFor(align))</span>
                 </MudButton>
             }
@@ -78,13 +78,13 @@
 
     <MudStack Row="true" Spacing="2" Class="decision-actions">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Medium" Class="decision-commit"
-                   OnClick="OnCommit" Disabled="@(_committing || AlignmentMoving)">
+                   OnClick="OnCommit" Disabled="@(_committing || AlignmentMoving || _choosingAlignment)">
             PITCH<span class="key-hint">Enter</span>
         </MudButton>
         @if (ShowDefense)
         {
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Medium"
-                       OnClick="OnIntentionalWalk" Disabled="@AlignmentMoving">
+                       OnClick="OnIntentionalWalk" Disabled="@(AlignmentMoving || _choosingAlignment)">
                 IBB<span class="key-hint">@DefenseHint(Shortcuts.IntentionalWalkKey.ToString())</span>
             </MudButton>
         }
@@ -130,7 +130,7 @@
     [JSInvokable]
     public async Task OnKey(string code, bool shift)
     {
-        if (AlignmentMoving) return;
+        if (AlignmentMoving || _choosingAlignment) return;
         var action = Shortcuts.Resolve(code, shift, ShowOffense, ShowDefense);
         switch (action.Kind)
         {
@@ -160,13 +160,20 @@
     }
 
     private bool _committing;
+    private bool _choosingAlignment;
 
     private async Task SelectAlignment(DefensiveAlignment alignment)
     {
-        if (AlignmentMoving || SelectedAlignment == alignment) return;
+        if (AlignmentMoving || _choosingAlignment || SelectedAlignment == alignment) return;
         SelectedAlignment = alignment;
+        _choosingAlignment = true;
         StateHasChanged();
-        await OnAlignmentChanged.InvokeAsync(alignment);
+        try { await OnAlignmentChanged.InvokeAsync(alignment); }
+        finally
+        {
+            _choosingAlignment = false;
+            StateHasChanged();
+        }
     }
 
     private OffensiveStrategy  SelectedOffense   { get; set; } = OffensiveStrategy.SwingAway;

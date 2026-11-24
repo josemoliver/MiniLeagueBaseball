@@ -210,18 +210,31 @@ internal sealed partial class Staging
             Put("catcher", Contact + 0.4, catcherSpot, pose: Poses.Track);
             _s.Cue(Contact + 0.25, CueKind.Banner, "HIGH POP-UP!");
         }
-        // A fielder with a lot of range dives for more of them (display only: the result is what it is).
-        bool dive = kind != Catch.Pop && pos is not (Position.C or Position.P) && _rng.NextDouble() < DiveChance(pos);
-        var landing = platePop ? PlatePopPoint(pos) : dive ? DivePoint(pos, kind) : CatchPoint(pos, kind);
+        // WHY: only an outfield fly out can become a wall catch; the result and the credited fielder stay the same.
+        bool wallCatch = kind == Catch.Fly && pos is (Position.Left or Position.Center or Position.Right)
+            && _rng.NextDouble() < 0.18;
+        bool dive = !wallCatch && kind != Catch.Pop && pos is not (Position.C or Position.P)
+            && _rng.NextDouble() < DiveChance(pos);
+        var landing = wallCatch ? WallCatchPoint(pos)
+            : platePop ? PlatePopPoint(pos) : dive ? DivePoint(pos, kind) : CatchPoint(pos, kind);
         double d = landing.DistanceFromHome;
         double flight = kind switch { Catch.Fly => 0.6 + d / 170, Catch.Pop => 2.4 + d / 350, _ => 0.3 + d / 320 };
         double apex = kind switch { Catch.Fly => Math.Clamp(d * 0.4, 28, 80), Catch.Pop => 55, _ => 6 + d * 0.05 };
 
         // The ball comes down when the fielder can be there.
         double go = Math.Max(Contact + 0.1, _s.TimeOf(id));
-        double tCatch = Math.Max(Contact + flight, go + _s.PointOf(id).DistanceTo(landing) / FielderSpeed);
-        _s.Move("ball", tCatch, landing, dive ? 1.5 : 4, ease: Ease.Arc, apex: apex);
-        Fetch(pos, landing, tCatch, dive ? Poses.Dive : Poses.Catch);
+        double tCatch = Math.Max(Contact + flight, go + _s.PointOf(id).DistanceTo(landing) / FielderSpeed
+            + (wallCatch ? 0.28 : 0));
+        _s.Move("ball", tCatch, landing, wallCatch ? 8 : dive ? 1.5 : 4, ease: Ease.Arc, apex: apex);
+        if (wallCatch)
+        {
+            Fetch(pos, landing, tCatch - 0.28, Poses.Track);
+            Put(id, tCatch - 0.12, landing, z: 1.5, pose: Poses.Leap);
+            Put(id, tCatch, landing, z: 3.5);
+            Put(id, tCatch + 0.38, landing, pose: Poses.Catch);
+        }
+        else
+            Fetch(pos, landing, tCatch, dive ? Poses.Dive : Poses.Catch);
         if (platePop)
         {
             if (pos == Position.C)
@@ -243,8 +256,10 @@ internal sealed partial class Staging
             }
         }
         if (pos is Position.Left or Position.Center or Position.Right) SupportOutfielder(pos, landing, tCatch);
+        if (wallCatch) _s.Cue(Math.Max(Contact + 0.25, tCatch - 0.65), CueKind.Banner, "BACK TO THE WALL...");
         _s.Cue(Math.Max(Contact + 0.1, tCatch - 0.45), CueKind.Effect, "focus", landing);
         _s.Cue(tCatch, CueKind.Effect, "glove", landing);
+        if (wallCatch) _s.Cue(tCatch, CueKind.Effect, "wallcatch", landing);
 
         // The batter is out. A runner on third who scores tagged up and went after the catch.
         var moves = _result.RunnerMoves;
@@ -252,7 +267,7 @@ internal sealed partial class Staging
 
         // WHY: The fielder gathers himself on one knee before standing or transferring the ball to throw.
         if (dive) Put(id, tCatch + 0.42, landing, pose: Poses.Crouch);
-        double ready = dive ? 0.75 : Transfer;
+        double ready = dive ? 0.75 : wallCatch ? 0.55 : Transfer;
         bool threw = false;
         if (moves.Any(m => m.Fate == RunnerFate.Scored) && id != "catcher")
         {
@@ -261,7 +276,7 @@ internal sealed partial class Staging
             Receive("catcher", HomeCatcher, arrive);
             threw = true;
         }
-        if (dive && !threw) Put(id, tCatch + 0.7, landing, pose: Poses.Stand);
+        if ((dive || wallCatch) && !threw) Put(id, tCatch + 0.7, landing, pose: Poses.Stand);
 
         // A hit and run that ends on a line drive: the runner was already off the bag and is doubled off first.
         if (moves.FirstOrDefault(m => m.FromBase == 1 && m.ToBase == 1 && m.IsOut) is { } doubledOff)
@@ -269,6 +284,12 @@ internal sealed partial class Staging
 
         _s.Cue(tCatch, CueKind.Sound, "out");
         if (platePop) _s.Cue(tCatch, CueKind.Hold, "0.2");
+        if (wallCatch)
+        {
+            _s.Cue(tCatch, CueKind.Sound, "cheer");
+            _s.Cue(tCatch, CueKind.Banner, "CAUGHT AT THE WALL!");
+            _s.Cue(tCatch, CueKind.Hold, "0.3");
+        }
         if (dive)
         {
             _s.Cue(tCatch, CueKind.Sound, "cheer");
@@ -276,7 +297,7 @@ internal sealed partial class Staging
             if (pos is Position.Left or Position.Center or Position.Right)
                 _s.Cue(tCatch, CueKind.Hold, "0.3");
         }
-        _s.Cue(tCatch + (dive ? 0.9 : 0.1), CueKind.Banner, _result.Description);
+        _s.Cue(tCatch + (dive ? 0.9 : wallCatch ? 0.85 : 0.1), CueKind.Banner, _result.Description);
         CheerForRuns(moves, times);
     }
 
@@ -285,6 +306,12 @@ internal sealed partial class Staging
     {
         int range = _before.Fielders.TryGetValue(pos, out var who) ? who.FieldingAt(pos).Range : 5;
         return Math.Clamp(0.10 + 0.07 * (range - 5), 0.04, 0.45);
+    }
+
+    private FieldPoint WallCatchPoint(Position pos)
+    {
+        double angle = Math.Clamp(_spots[pos].AngleDegrees + Between(-4, 4), -40, 40);
+        return FieldPoint.FromPolar(angle, FieldGeometry.WallDistance(_before.Stadium, angle) - 5);
     }
 
     // Where a diving catch is made: well to one side of where he plays (a long way for an outfielder), and never in the stands.

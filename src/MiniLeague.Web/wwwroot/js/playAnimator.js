@@ -79,7 +79,8 @@ window.mlbAnimator = (() => {
             closeups: [homeCall(script, tracks, cues), distantDive(script.actors || [], tracks, cues),
                 script.outcome === 'Error' ? null : relayTurn(script.actors || [], tracks),
                 stealCall(script, tracks, cues), groundCall(script, cues),
-                errorCloseup(script, tracks, error, errorFielder), homeRunCloseup(script, tracks, cues)].filter(Boolean) };
+                errorCloseup(script, tracks, error, errorFielder), homeRunCloseup(script, tracks, cues),
+                wallCatchCloseup(script, tracks, cues)].filter(Boolean) };
     }
 
     const lerp = (a, b, f) => a + (b - a) * f;
@@ -162,18 +163,22 @@ window.mlbAnimator = (() => {
 
     function homeCall(script, tracks, cues) {
         if (!['Single', 'Double', 'Triple'].includes(script.outcome)) return null;
-        const call = cues.filter(c => c.kind === 'effect' && c.value === 'call' &&
+        const crossing = cues.filter(c => c.kind === 'effect' && c.value === 'call' &&
             Math.abs(c.x || 0) < 4 && Math.abs(c.y || 0) < 4).at(-1);
+        const plateDecision = cues.find(c => c.kind === 'effect' && c.value === 'platecall');
+        const call = plateDecision || crossing;
         const catcher = script.actors.find(a => a.id === 'catcher');
         const ball = tracks.get('ball');
-        if (!call || !catcher || !ball) return null;
-        const receive = ball.find(k => k.t >= call.t && Math.abs(k.x) < 4 && k.y < 0 && k.y > -4);
-        if (!receive || receive.t - call.t > 0.9) return null;
+        if (!crossing || !call || !catcher || !ball) return null;
+        const receive = ball.find(k => k.t >= crossing.t && Math.abs(k.x) < 4 && k.y < 0 && k.y > -4);
+        if (!receive || receive.t - crossing.t > 0.9 || (plateDecision && call.t < receive.t)) return null;
         const runner = script.actors.find(a => (a.kind === 'runner' || a.kind === 'batter') &&
-            tracks.get(a.id)?.some(k => Math.abs(k.t - call.t) < 0.005 && k.pose === 'safe' &&
+            tracks.get(a.id)?.some(k => Math.abs(k.t - crossing.t) < 0.005 && k.pose === 'safe' &&
                 Math.abs(k.x) < 4 && Math.abs(k.y) < 4));
         if (!runner) return null;
-        return { actor: catcher, other: runner, start: call.t - 0.38, end: receive.t + 0.55, callT: call.t,
+        return { actor: catcher, other: runner, start: crossing.t - 0.38,
+            end: (plateDecision ? call.t : receive.t) + 0.55,
+            callT: call.t, decision: !!plateDecision,
             x: 0, y: 0, scale: 1.55, centerY: 95, otherOffset: 25, title: 'PLAY AT HOME' };
     }
 
@@ -215,6 +220,16 @@ window.mlbAnimator = (() => {
         const ball = tracks.get('ball');
         return { actor, start: cue.t - 0.45, end: cue.t + 0.65, x: cue.x, y: cue.y,
             z: ball ? sample(ball, cue.t).z * 0.45 : 0, scale: 2.6, centerY: 64, title: 'OVER THE WALL' };
+    }
+
+    function wallCatchCloseup(script, tracks, cues) {
+        const cue = cues.find(c => c.kind === 'effect' && c.value === 'wallcatch');
+        if (!cue) return null;
+        const actor = script.actors.find(a => /^fielder-(Left|Center|Right)$/.test(a.id)
+            && tracks.get(a.id)?.some(k => k.pose === 'leap'));
+        if (!actor) return null;
+        return { actor, start: cue.t - 0.45, end: cue.t + 0.65, x: cue.x, y: cue.y,
+            z: 2, scale: 2.6, centerY: 64, title: 'CATCH AT THE WALL' };
     }
 
     // The newest banner at or before t (the message box line), or the starting message.
@@ -719,7 +734,7 @@ window.mlbAnimator = (() => {
             } else if (pose === 'reach') {
                 add(-4.6, -15, 2.2, 4.5, team.jersey); hand(-4.6, -15.5);
                 add(3, -11, 2, 3.2, team.jerseyShade); fist(3, -8);
-            } else if (pose === 'catch' || pose === 'dive') {
+            } else if (pose === 'catch' || pose === 'dive' || pose === 'leap') {
                 add(-4.6, -17.5, 1.6, 6.5, team.jersey); add(3, -17.5, 1.6, 6.5, team.jersey);
                 detail(-4.6, -12.6, 1.6, 0.65, team.capShade);
                 detail(3, -12.6, 1.6, 0.65, team.capShade);
@@ -861,6 +876,9 @@ window.mlbAnimator = (() => {
             add(0.2, -20, 1.7, 9, team.jersey); mitt(-0.4, -22, 3, 3);
             detail(0.2, -13, 1.7, 0.7, team.capShade);
             add(0.8, -11, 5, 1.2, team.jerseyShade); fist(5.4, -11);
+        } else if (pose === 'leap') {
+            add(-1.5, -20, 2, 9, team.jersey); mitt(-2, -22, 3, 3);
+            add(1, -18, 1.7, 7, team.jerseyShade); fist(1, -19);
         } else if (pose === 'catch') {
             add(0.8, -14, 4, 1.6, team.jersey); mitt(4.6, -15.4, 2.8, 3);
             detail(2.4, -14, 0.65, 1.6, team.capShade);
@@ -1567,7 +1585,8 @@ window.mlbAnimator = (() => {
             if (d === other && closeup.otherOffset) ctx.translate(closeup.otherOffset / (closeup.scale || 3.2), 0);
             // WHY: Keep the arriving runner down through the call so the glove swipe and slide read as one play.
             const arriving = closeup.title === 'PLAY AT HOME' && d === other && d.st.pose === 'safe' &&
-                d.st.previousPose === 'slide' && d.st.poseAge < 0.24;
+                d.st.previousPose === 'slide' && (d.st.poseAge < 0.24 ||
+                    (closeup.decision && t < closeup.callT + 0.2));
             drawFigure(ctx, d.actor, arriving ? { ...d.st, pose: 'slide' } : d.st, t);
             ctx.restore();
         }
@@ -1644,11 +1663,14 @@ window.mlbAnimator = (() => {
 
         // Flags for a runner who has just been called out or safe, and names for the people handling the ball.
         let tags = 0;
+        const plateDecision = p.cues.find(c => c.kind === 'effect' && c.value === 'platecall');
         for (const { actor, st } of drawn) {
             const top = project(st.x, st.y, 0);
             const head = top.y - FIGURE_FEET * top.s - 3;
             if (st.ended && st.since < 1.3 && st.pose === 'out' && actor.kind !== 'ball') drawTag(text, 'OUT', top.x, head, '#b71c1c');
-            else if (st.ended && st.since < 1.3 && st.pose === 'safe') drawTag(text, 'SAFE', top.x, head, '#2e7d32');
+            else if (st.ended && st.since < 1.3 && st.pose === 'safe' &&
+                !(plateDecision && t < plateDecision.t && Math.hypot(st.x, st.y) < 4))
+                drawTag(text, 'SAFE', top.x, head, '#2e7d32');
             else if (names && tags < 3 && actor.label && NAMED_POSES.has(st.pose) && !st.ended) {
                 drawTag(text, surname(actor.label), top.x, head, 'rgba(0,0,0,0.78)');
                 tags++;

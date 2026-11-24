@@ -1429,12 +1429,15 @@ test('a close scoring play shows the slide and catcher tag at home without repla
             { actorId: 'runner-3', keys: [{ t: 0, x: -63.6, y: 63.6, pose: 'run' },
                 { t: 1.1, x: -20, y: 20, pose: 'slide' }, { t: 1.4, x: 0, y: 0, pose: 'safe' }] },
         ], cues: [{ t: 0.8, kind: 'effect', value: 'call', x: 0, y: 0 },
-            { t: 1.4, kind: 'effect', value: 'call', x: 0, y: 0 }] };
+            { t: 1.4, kind: 'effect', value: 'call', x: 0, y: 0 },
+            { t: 1.84, kind: 'effect', value: 'platecall', x: 0, y: 0 }] };
     env.api.seek(script, park, 1.2, '');
     assert.ok(canvas.ctx.calls.some(([name, args]) => name === 'fillText' && args[0] === 'PLAY AT HOME'));
     assert.ok(!canvas.ctx.calls.some(([name, args]) => name === 'fillText' && args[0] === 'SAFE'));
     env.api.seek(script, park, 1.55, '');
     assert.ok(canvas.ctx.calls.some(([name, args]) => name === 'fillText' && args[0] === 'PLAY AT HOME'));
+    assert.ok(!canvas.ctx.calls.some(([name, args]) => name === 'fillText' && args[0] === 'SAFE'));
+    env.api.seek(script, park, 1.9, '');
     assert.ok(canvas.ctx.calls.some(([name, args]) => name === 'fillText' && args[0] === 'SAFE'));
     const before = canvas.ctx.calls.length;
     env.api.seek(script, park, 2.4, '');

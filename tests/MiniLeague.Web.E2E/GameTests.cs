@@ -21,6 +21,36 @@ public class GameTests(AppFixture app)
         Assert.Empty(player.Errors);
     }
 
+    [Fact]
+    public async Task ClassicFieldersMoveWhenTheDefenseChangesPosition()
+    {
+        await using var player = await GamePage.OpenAsync(app, "/game");
+        await player.StartGameAsync(manage: "Home team");
+        var firstBaseman = player.Page.Locator(".fielder-group").Nth(2);
+        string? before = await firstBaseman.GetAttributeAsync("style");
+
+        await player.Page.Locator(".decision-panel .mud-button-group-root").Last.Locator("button").Nth(1).ClickAsync();
+        await player.Page.WaitForFunctionAsync("old => document.querySelectorAll('.fielder-group')[2]?.getAttribute('style') !== old", before);
+        Assert.Equal(0, await player.Page.Locator(".g-log .pbp-entry").CountAsync());
+        Assert.NotEqual(before, await firstBaseman.GetAttributeAsync("style"));
+        Assert.Empty(player.Errors);
+    }
+
+    [Fact]
+    public async Task ComputerMovesTheInfieldInBeforeItsPitch()
+    {
+        await using var player = await GamePage.OpenAsync(app, "/game", detailed: true,
+            script: "localStorage.setItem('mlb-animspeed', 'slow');", savedGame: SavedGames.ComputerInfieldIn());
+        await player.Page.Locator("[data-testid=resume-card]").WaitForAsync();
+        await player.Page.Locator("button", new() { HasText = "RESUME" }).ClickAsync();
+
+        await player.Page.Locator("[data-testid=skip-play]").WaitForAsync();
+        Assert.Equal(0, await player.Page.Locator(".g-log .pbp-entry").CountAsync());
+        await player.Page.Locator("[data-testid=skip-play]").ClickAsync();
+        await player.Page.Locator(".g-log .pbp-entry").First.WaitForAsync();
+        Assert.Empty(player.Errors);
+    }
+
     [Theory]
     [InlineData("Shift Pull")]
     [InlineData("Shift Oppo")]

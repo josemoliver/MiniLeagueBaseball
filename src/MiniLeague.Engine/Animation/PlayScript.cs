@@ -30,6 +30,7 @@ public static class Poses
     public const string Run = "run";
     public const string Slide = "slide";
     public const string Catch = "catch";
+    public const string Leap = "leap";
     public const string Dive = "dive";
     public const string Tag = "tag";
     public const string Safe = "safe";

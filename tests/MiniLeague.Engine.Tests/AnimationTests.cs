@@ -486,9 +486,12 @@ public class AnimationTests
         foreach (var id in ids)
         {
             Assert.True(EndOf(s, id).DistanceTo(FieldGeometry.Home) < 0.01, id);
-            // Nobody leaves his base before the ball is hit.
             var track = TrackOf(s, id).Keys;
-            Assert.All(track.Where(k => k.Pose == Poses.Run), k => Assert.True(k.T >= contact, id));
+            // WHY: on a hit and run the first-base runner breaks with the pitch; everybody else waits for contact.
+            bool firstRunnerGoing = r.HitAndRun && r.RunnerMoves.Any(m => m.FromBase == 1 && RunnerId(m.Player) == id);
+            var early = track.Where(k => k.Pose == Poses.Run && k.T < contact).ToList();
+            if (firstRunnerGoing) Assert.NotEmpty(early);
+            else Assert.Empty(early);
         }
         // The batter runs out of the box and then to each of the four bases (the last key is him standing at home).
         Assert.Equal(4, TrackOf(s, "batter").Keys.Count(k => k.Pose == Poses.Run));
@@ -517,6 +520,41 @@ public class AnimationTests
                 return track.T < clear.T && stop.DistanceTo(atWall) <= from.DistanceTo(atWall) + 0.01
                     && keys.Any(k => k.Pose == Poses.Stand && k.T > clear.T && k.Facing == "back");
             });
+        }
+    }
+
+    [Fact]
+    public void FlyOut_SometimesEndsWithALeapingCatchInsideTheParkWall()
+    {
+        var (r, b) = Find((r, _) => r.Outcome == OutcomeType.FlyOut
+            && r.Fielder is Position.Left or Position.Center or Position.Right);
+        var parks = new[]
+        {
+            Stadium.Generic,
+            new Stadium { LeftField = 250, LeftCenter = 280, Center = 300, RightCenter = 280, RightField = 250 },
+            new Stadium { LeftField = 360, LeftCenter = 430, Center = 450, RightCenter = 430, RightField = 360 },
+        };
+
+        foreach (var park in parks)
+        {
+            int wallCatches = 0;
+            for (int seed = 0; seed < 80; seed++)
+            {
+                var s = Script(r, b with { Stadium = park }, seed);
+                var leap = TrackOf(s, $"fielder-{r.Fielder}").Keys.FirstOrDefault(k => k.Pose == Poses.Leap);
+                if (leap is null) continue;
+                wallCatches++;
+
+                var at = new FieldPoint(leap.X, leap.Y);
+                double wall = FieldGeometry.WallDistance(park, at.AngleDegrees);
+                Assert.True(FieldGeometry.IsFair(at));
+                Assert.InRange(wall - at.DistanceFromHome, 4.9, 5.1);
+                Assert.Contains(s.Cues, c => c.Kind == CueKind.Banner && c.Value == "CAUGHT AT THE WALL!");
+                Assert.Contains(s.Cues, c => c.Kind == CueKind.Effect && c.Value == "wallcatch"
+                    && c.X == leap.X && c.Y == leap.Y);
+                Assert.Contains(TrackOf(s, "ball").Keys, k => k.X == leap.X && k.Y == leap.Y && k.T > leap.T);
+            }
+            Assert.InRange(wallCatches, 1, 40);
         }
     }
 

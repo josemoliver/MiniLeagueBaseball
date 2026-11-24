@@ -18,7 +18,7 @@ MiniLeague Baseball is a **manager's game, not an arcade game**: you never swing
 It runs **entirely in the browser** (Blazor WebAssembly), so it needs no server, installs like an app, and works offline.
 
 <p align="center">
-  <img src="docs/images/detailed-gameplay.png" alt="A game in progress in the Detailed view: a home run leaves Ebbets Field, the runners trot around and teammates come out to meet them, with the scoreboard, the defensive strategy buttons and the batter's card beside the field" width="860" />
+  <img src="docs/images/detailed-gameplay.png" alt="A game in the Detailed view at Ebbets Field, with the scoreboard, animated field, at-bat summary and offense and defense decisions" width="860" />
 </p>
 
 ## Features
@@ -100,8 +100,23 @@ The **Detailed** view, from behind home plate. Every picture is drawn from what 
 The **Classic** view, the overhead diagram with the ball's path and the runners moving, is one click away:
 
 <p align="center">
-  <img src="docs/images/gameplay.png" alt="The Classic view: the overhead field with a fly out, the decision panel, the play-by-play log and both lineups" width="860" />
+  <img src="docs/images/gameplay.png" alt="The Classic view after a ground out, with the overhead field, scoreboard and offense and defense decisions" width="860" />
 </p>
+
+On a phone, setup opens with a matchup preview. During the game, the compact score stays in view while you browse the field and search or filter the play-by-play log.
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/setup-mobile.png" alt="Phone setup screen with a Yankees versus Dodgers matchup card, team and manager choices, collapsed game options and Play Ball button" width="280" /><br />
+      <sub>Matchup preview and quick setup</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/game-mobile.png" alt="Phone game screen with compact score, field, defensive decisions and a searchable play-by-play log with an inning filter" width="280" /><br />
+      <sub>Field and play-by-play on a phone</sub>
+    </td>
+  </tr>
+</table>
 
 ## The teams
 
