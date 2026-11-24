@@ -1,0 +1,527 @@
+{
+  "id": 7,
+  "city": "New York",
+  "nickname": "Mets",
+  "abbreviation": "NYM",
+  "season": 1969,
+  "league": "NL",
+  "stadium": "shea-1969",
+  "eraErrorsPerGame": 0.89,
+  "eraStrikeoutsPerGame": 5.98,
+  "batters": [
+    {
+      "id": 701,
+      "name": "K. Boswell",
+      "pos": "2B",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 362,
+      "h": 101,
+      "hr": 3,
+      "bb": 36,
+      "so": 47,
+      "d2": 14,
+      "d3": 7,
+      "sb": 7,
+      "speed": 4,
+      "rbi": 32,
+      "cs": 3,
+      "hbp": 2,
+      "field": {
+        "2B": [
+          5,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "id": 702,
+      "name": "T. Agee",
+      "pos": "CF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 565,
+      "h": 153,
+      "hr": 26,
+      "bb": 59,
+      "so": 137,
+      "d2": 23,
+      "d3": 4,
+      "sb": 12,
+      "speed": 3,
+      "rbi": 76,
+      "cs": 9,
+      "hbp": 3,
+      "field": {
+        "CF": [
+          8,
+          3,
+          2
+        ],
+        "RF": [
+          8,
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "id": 703,
+      "name": "C. Jones",
+      "pos": "LF",
+      "bats": "Right",
+      "throws": "Left",
+      "ab": 483,
+      "h": 164,
+      "hr": 12,
+      "bb": 64,
+      "so": 60,
+      "d2": 25,
+      "d3": 4,
+      "sb": 16,
+      "speed": 3,
+      "rbi": 75,
+      "cs": 8,
+      "hbp": 7,
+      "field": {
+        "1B": [
+          4,
+          3,
+          3
+        ],
+        "LF": [
+          6,
+          3,
+          1
+        ]
+      }
+    },
+    {
+      "id": 704,
+      "name": "A. Shamsky",
+      "pos": "DH",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 303,
+      "h": 91,
+      "hr": 14,
+      "bb": 36,
+      "so": 32,
+      "d2": 9,
+      "d3": 3,
+      "sb": 1,
+      "speed": 3,
+      "rbi": 47,
+      "cs": 2,
+      "hbp": 3,
+      "field": {
+        "1B": [
+          5,
+          1,
+          2
+        ],
+        "LF": [
+          4,
+          3,
+          1
+        ],
+        "RF": [
+          4,
+          3,
+          1
+        ]
+      }
+    },
+    {
+      "id": 705,
+      "name": "R. Swoboda",
+      "pos": "RF",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 327,
+      "h": 77,
+      "hr": 9,
+      "bb": 43,
+      "so": 90,
+      "d2": 10,
+      "d3": 2,
+      "sb": 1,
+      "speed": 2,
+      "rbi": 52,
+      "cs": 1,
+      "hbp": 2,
+      "field": {
+        "LF": [
+          5,
+          3,
+          3
+        ],
+        "RF": [
+          5,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": 706,
+      "name": "E. Kranepool",
+      "pos": "1B",
+      "bats": "Left",
+      "throws": "Left",
+      "ab": 353,
+      "h": 84,
+      "hr": 11,
+      "bb": 37,
+      "so": 32,
+      "d2": 9,
+      "d3": 2,
+      "sb": 3,
+      "speed": 2,
+      "rbi": 49,
+      "cs": 2,
+      "hbp": 0,
+      "field": {
+        "1B": [
+          4,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 707,
+      "name": "J. Grote",
+      "pos": "C",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 365,
+      "h": 92,
+      "hr": 6,
+      "bb": 32,
+      "so": 59,
+      "d2": 12,
+      "d3": 3,
+      "sb": 2,
+      "speed": 3,
+      "rbi": 40,
+      "cs": 1,
+      "hbp": 1,
+      "field": {
+        "C": [
+          6,
+          2,
+          4
+        ]
+      }
+    },
+    {
+      "id": 708,
+      "name": "B. Harrelson",
+      "pos": "SS",
+      "bats": "Switch",
+      "throws": "Right",
+      "ab": 395,
+      "h": 98,
+      "hr": 0,
+      "bb": 54,
+      "so": 54,
+      "d2": 11,
+      "d3": 6,
+      "sb": 1,
+      "speed": 3,
+      "rbi": 24,
+      "cs": 3,
+      "hbp": 2,
+      "field": {
+        "SS": [
+          6,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 709,
+      "name": "W. Garrett",
+      "pos": "3B",
+      "bats": "Left",
+      "throws": "Right",
+      "ab": 400,
+      "h": 87,
+      "hr": 1,
+      "bb": 40,
+      "so": 75,
+      "d2": 11,
+      "d3": 3,
+      "sb": 4,
+      "speed": 3,
+      "rbi": 39,
+      "cs": 2,
+      "hbp": 3,
+      "field": {
+        "2B": [
+          4,
+          2,
+          2
+        ],
+        "3B": [
+          4,
+          2,
+          3
+        ],
+        "SS": [
+          4,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": 710,
+      "name": "A. Weis",
+      "pos": "SS",
+      "bats": "Switch",
+      "throws": "Right",
+      "ab": 247,
+      "h": 53,
+      "hr": 2,
+      "bb": 15,
+      "so": 51,
+      "d2": 9,
+      "d3": 2,
+      "sb": 3,
+      "speed": 3,
+      "rbi": 23,
+      "cs": 3,
+      "hbp": 0,
+      "field": {
+        "2B": [
+          4,
+          2,
+          3
+        ],
+        "SS": [
+          4,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 711,
+      "name": "R. Gaspar",
+      "pos": "RF",
+      "bats": "Switch",
+      "throws": "Left",
+      "ab": 215,
+      "h": 49,
+      "hr": 1,
+      "bb": 25,
+      "so": 19,
+      "d2": 6,
+      "d3": 1,
+      "sb": 7,
+      "speed": 3,
+      "rbi": 14,
+      "cs": 3,
+      "hbp": 2,
+      "field": {
+        "LF": [
+          3,
+          2,
+          5
+        ],
+        "CF": [
+          3,
+          2,
+          5
+        ],
+        "RF": [
+          3,
+          2,
+          5
+        ]
+      }
+    },
+    {
+      "id": 712,
+      "name": "B. Pfeil",
+      "pos": "3B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 211,
+      "h": 49,
+      "hr": 0,
+      "bb": 7,
+      "so": 27,
+      "d2": 9,
+      "d3": 0,
+      "sb": 0,
+      "speed": 1,
+      "rbi": 10,
+      "cs": 1,
+      "hbp": 1,
+      "field": {
+        "2B": [
+          4,
+          2,
+          3
+        ],
+        "3B": [
+          5,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": 713,
+      "name": "D. Clendenon",
+      "pos": "1B",
+      "bats": "Right",
+      "throws": "Right",
+      "ab": 202,
+      "h": 51,
+      "hr": 12,
+      "bb": 19,
+      "so": 62,
+      "d2": 5,
+      "d3": 0,
+      "sb": 3,
+      "speed": 2,
+      "rbi": 37,
+      "cs": 2,
+      "hbp": 2,
+      "field": {
+        "1B": [
+          4,
+          0,
+          2
+        ]
+      }
+    }
+  ],
+  "pitchers": [
+    {
+      "id": 750,
+      "name": "T. Seaver",
+      "throws": "Right",
+      "era": 2.21,
+      "ip": 273.3,
+      "h": 202,
+      "bb": 82,
+      "so": 208,
+      "tiringFactor": 2,
+      "role": "Starter",
+      "wins": 25,
+      "losses": 7,
+      "saves": 0,
+      "cg": 18,
+      "hr": 24
+    },
+    {
+      "id": 751,
+      "name": "G. Gentry",
+      "throws": "Right",
+      "era": 3.43,
+      "ip": 233.7,
+      "h": 192,
+      "bb": 81,
+      "so": 154,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 13,
+      "losses": 12,
+      "saves": 0,
+      "cg": 6,
+      "hr": 24
+    },
+    {
+      "id": 752,
+      "name": "J. Koosman",
+      "throws": "Left",
+      "era": 2.28,
+      "ip": 241.0,
+      "h": 187,
+      "bb": 68,
+      "so": 180,
+      "tiringFactor": 2,
+      "role": "Starter",
+      "wins": 17,
+      "losses": 9,
+      "saves": 0,
+      "cg": 16,
+      "hr": 14
+    },
+    {
+      "id": 753,
+      "name": "D. Cardwell",
+      "throws": "Right",
+      "era": 3.01,
+      "ip": 152.3,
+      "h": 145,
+      "bb": 47,
+      "so": 60,
+      "tiringFactor": 3,
+      "role": "Starter",
+      "wins": 8,
+      "losses": 10,
+      "saves": 0,
+      "cg": 4,
+      "hr": 15
+    },
+    {
+      "id": 760,
+      "name": "R. Taylor",
+      "throws": "Right",
+      "era": 2.72,
+      "ip": 76.0,
+      "h": 61,
+      "bb": 24,
+      "so": 42,
+      "tiringFactor": 5,
+      "role": "Closer",
+      "wins": 9,
+      "losses": 4,
+      "saves": 13,
+      "cg": 0,
+      "hr": 7
+    },
+    {
+      "id": 761,
+      "name": "J. McAndrew",
+      "throws": "Right",
+      "era": 3.47,
+      "ip": 135.0,
+      "h": 112,
+      "bb": 44,
+      "so": 90,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 6,
+      "losses": 7,
+      "saves": 0,
+      "cg": 4,
+      "hr": 12
+    },
+    {
+      "id": 762,
+      "name": "T. McGraw",
+      "throws": "Left",
+      "era": 2.24,
+      "ip": 100.3,
+      "h": 89,
+      "bb": 47,
+      "so": 92,
+      "tiringFactor": 5,
+      "role": "Reliever",
+      "wins": 9,
+      "losses": 3,
+      "saves": 12,
+      "cg": 1,
+      "hr": 6
+    }
+  ]
+}

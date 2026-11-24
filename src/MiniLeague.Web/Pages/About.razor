@@ -1,0 +1,63 @@
+@page "/about"
+
+<PageTitle>About — MiniLeague Baseball</PageTitle>
+
+@* Keep this in step with the "Data, credits and disclaimer" part of README.md and wwwroot/data/ATTRIBUTION.md. *@
+<div class="about-page" data-testid="about">
+    <MudText Typo="Typo.h5" Class="mb-1">About MiniLeague Baseball</MudText>
+    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+        Historical baseball simulation powered by public historical statistics. Pick a classic team,
+        manage the game and watch it play out on the real numbers.
+    </MudText>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="1" data-testid="about-disclaimer">
+        <MudText Typo="Typo.subtitle1" Class="mb-2"><b>Disclaimer</b></MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            MiniLeague Baseball is an independent fan project. It is not affiliated with, authorized by or endorsed by
+            Major League Baseball, the Major League Baseball Players Association, or any club.
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Team, player and ballpark names appear only to identify the historical teams and players whose published
+            statistics the game uses. All trademarks and names belong to their owners. The game uses no team or league
+            logos, and the players you see on the field are generic figures, not likenesses of real people.
+        </MudText>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="1" data-testid="about-data">
+        <MudText Typo="Typo.subtitle1" Class="mb-2"><b>Statistics and data</b></MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Player and team statistics come from the
+            <MudLink Href="https://sabr.org/lahman-database/" Target="_blank" rel="noopener noreferrer">Lahman Baseball Database</MudLink>
+            by Sean Lahman, used under the
+            <MudLink Href="https://creativecommons.org/licenses/by-sa/3.0/" Target="_blank" rel="noopener noreferrer">Creative Commons Attribution-ShareAlike 3.0 license (CC BY-SA 3.0)</MudLink>.
+            The team data in this game was generated from it and is shared under the same license.
+        </MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            From Lahman: batting and pitching lines, fielding ratings (range, errors and arm, measured against the
+            league average at each position that season), each season's league error and strikeout rates, and each
+            ballpark's overall scoring factor.
+        </MudText>
+        <MudText Typo="Typo.body2">
+            Not from Lahman: the fence distances and wall heights of the ballparks were entered by hand from memory of
+            the real parks and are approximate.
+        </MudText>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="1" data-testid="about-music">
+        <MudText Typo="Typo.subtitle1" Class="mb-2"><b>Organ music</b></MudText>
+        <MudText Typo="Typo.body2">
+            The organ tunes are public-domain compositions: <em>Take Me Out to the Ball Game</em> (Albert Von Tilzer,
+            1908), <em>La Raspa</em> (traditional), <em>Hail to the Chief</em> (James Sanderson, 1812), Chopin's
+            <em>Funeral March</em> and the traditional cavalry charge call. All sounds are made in your browser.
+        </MudText>
+    </MudPaper>
+
+    <MudPaper Class="pa-4" Elevation="1" data-testid="about-code">
+        <MudText Typo="Typo.subtitle1" Class="mb-2"><b>Source code</b></MudText>
+        <MudText Typo="Typo.body2">
+            The game's code is open source under the MIT License and lives on
+            <MudLink Href="https://github.com/josemoliver/MiniLeagueBaseball" Target="_blank" rel="noopener noreferrer">GitHub</MudLink>.
+            Version @AppVersion.Current.
+        </MudText>
+    </MudPaper>
+</div>

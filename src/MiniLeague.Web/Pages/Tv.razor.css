@@ -1,0 +1,77 @@
+.tv {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5vh;
+    padding: 2vh 3vw;
+    background: #0d0d12;
+    color: #f2f2f5;
+    overflow: hidden;
+}
+
+.tv-wait {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.tv-wait h1 { font-size: 6vh; margin: 0; letter-spacing: 0.05em; }
+.tv-wait p { font-size: 3vh; opacity: 0.7; max-width: 40ch; }
+
+.tv-score {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 3vw;
+}
+
+.tv-team { display: flex; align-items: baseline; gap: 1.5vw; }
+.tv-team:first-child { justify-content: flex-end; }
+.tv-team:last-child { justify-content: flex-start; }
+.tv-abbr { font-size: 7vh; font-weight: 700; letter-spacing: 0.04em; }
+.tv-runs { font-size: 11vh; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.tv-inning {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1vh;
+    font-size: 6vh;
+    font-weight: 700;
+}
+
+.tv-outs { display: flex; gap: 1vh; }
+.tv-outs i {
+    width: 2.4vh;
+    height: 2.4vh;
+    border-radius: 50%;
+    border: 0.3vh solid #ffd54f;
+}
+.tv-outs i.on { background: #ffd54f; }
+
+.tv-field {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* WHY: the field's own CSS caps its width using a fixed 240px for the page chrome around it (right for the game
+   page). Here the score and the footer take a share of the height instead, so the cap is set from the viewport:
+   33vh is about what those two use, found by eye on 720p and 1080p screenshots. */
+.tv-field ::deep .field-wrap { max-width: calc((100vh - 33vh) * 1.5); }
+.tv-field ::deep .detailed-field { max-width: calc((100vh - 33vh) * 1.6); }
+
+.tv-info {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 2vw;
+    align-items: center;
+    font-size: 3.2vh;
+}
+
+.tv-info small { display: block; font-size: 1.8vh; opacity: 0.6; letter-spacing: 0.1em; }
+.tv-info div:last-child { text-align: right; }
+.tv-last { text-align: center; font-size: 3.4vh; }

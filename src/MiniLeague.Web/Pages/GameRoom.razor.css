@@ -1,0 +1,315 @@
+/* Classic ballpark scoreboard look */
+.linescore {
+    display: grid;
+    grid-template-columns: 60px repeat(9, minmax(1.5rem, 1fr)) 40px;
+    gap: 0;
+    font-size: 0.78rem;
+    font-family: 'Consolas', 'Courier New', monospace;
+    text-align: center;
+    align-items: center;
+    background: #0c1a0a;
+    color: #e8c558;
+    border: 1px solid #1f3318;
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+.ls-team {
+    text-align: left;
+    font-weight: 600;
+    padding: 3px 6px;
+    color: #f5f5f5;
+    letter-spacing: 1px;
+}
+
+.ls-inn {
+    padding: 3px 2px;
+    border-left: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.ls-inn.active-inn {
+    background: rgba(255, 213, 79, 0.16);
+    font-weight: 700;
+    color: #ffd54f;
+}
+
+.ls-tot {
+    font-weight: 700;
+    padding: 3px 4px;
+    border-left: 2px solid rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+}
+
+/* A run has just scored: the new element flashes once (its key changes with the score, so the animation restarts). */
+.ls-flash {
+    animation: ls-flash 1.6s ease-out 1;
+}
+
+@keyframes ls-flash {
+    0%, 30% { background: #ffd54f; color: #0c1a0a; }
+    100% { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ls-flash { animation: none; }
+}
+
+/* ── Page layout ────────────────────────────────────────────────────────────
+   Phone (default): one column, in the order you play: scoreboard, your decision,
+   the field, the log, the situation, the lineups, the line score.
+   900px and up: the field and lineups on the left, the decision column on the right.
+   1700px and up (wide monitors): field | decisions | lineups side by side. */
+.game-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    max-width: 2300px;
+    margin: 0 auto;
+}
+
+/* On a phone the wrappers dissolve so every card can be ordered individually */
+.g-main, .g-side { display: contents; }
+
+.g-score     { order: 0; }
+.g-decision  { order: 1; }
+.g-field     { order: 2; }
+.g-log       { order: 3; }
+.g-situation { order: 4; }
+.g-lineups   { order: 6; }
+.g-line      { order: 7; }
+
+.g-situation {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.g-lineups {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+}
+
+.mobile-score, .mobile-pitching-toggle, .mobile-lineup-tabs { display: none; }
+
+@media (max-width: 599px) {
+    .mobile-score {
+        position: fixed;
+        top: 48px;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 44px;
+        padding: 6px max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
+        background: #0c1a0a;
+        color: #fffdf8;
+        border-bottom: 2px solid #c8323a;
+        box-shadow: 0 2px 7px rgba(0, 0, 0, 0.25);
+        font-size: 0.78rem;
+        font-variant-numeric: tabular-nums;
+        visibility: hidden;
+        pointer-events: none;
+    }
+    .mobile-score.visible { visibility: visible; }
+    .mobile-score-teams { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+    .mobile-score-teams strong { color: #e8c558; font-size: 1rem; }
+    .mobile-score-divider { opacity: 0.6; margin: 0 2px; }
+    .mobile-score-inning { white-space: nowrap; }
+    .mobile-score-bases { display: grid; grid-template-columns: repeat(3, 9px); grid-template-rows: repeat(2, 9px); gap: 0; font-size: 0.85rem; line-height: 9px; color: #687465; }
+    .mobile-score-bases span:nth-child(1) { grid-column: 1; grid-row: 2; }
+    .mobile-score-bases span:nth-child(2) { grid-column: 2; grid-row: 1; }
+    .mobile-score-bases span:nth-child(3) { grid-column: 3; grid-row: 2; }
+    .mobile-score-bases .occupied { color: #e8c558; }
+
+    .mobile-pitching-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 16px;
+        border: 1px solid var(--mud-palette-lines-default);
+        border-radius: 4px;
+        background: var(--mud-palette-surface);
+        color: var(--mud-palette-text-primary);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+    .pitching-details:not(.expanded) { display: none; }
+
+    .mobile-lineup-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+    .mobile-lineup-tabs button {
+        min-height: 44px;
+        border: 0;
+        border-bottom: 3px solid transparent;
+        background: transparent;
+        color: var(--mud-palette-text-secondary);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .mobile-lineup-tabs button[aria-selected="true"] {
+        border-bottom-color: var(--mud-palette-secondary);
+        color: var(--mud-palette-primary);
+    }
+    .lineup-panel:not(.selected) { display: none; }
+}
+
+/* WHY: a TV shows the field, so it takes no room here. The animated field is parked off-screen at a real size, not
+   display:none: a 0x0 canvas could break its drawing and the plays it passes on to the TV (and the visibility:hidden
+   keeps it out of sight and out of the tab order). */
+.g-field.cast-away {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: 960px;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.linescore-scroll { overflow-x: auto; }
+
+@media (min-width: 600px) {
+    .g-lineups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 900px) {
+    .game-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
+        grid-template-areas:
+            "score   score"
+            "line    line"
+            "main    side"
+            "lineups side";
+        align-items: start;
+    }
+
+    .g-score   { grid-area: score; }
+    .g-line    { grid-area: line; }
+    .g-main    { grid-area: main; }
+    .g-side    { grid-area: side; }
+    .g-lineups { grid-area: lineups; }
+
+    .g-main, .g-side {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+    }
+
+    .g-decision { order: 0; }
+    .g-log { order: 1; }
+    .g-situation { order: 2; }
+
+    /* WHY: no field on this screen, so the lineups take its place beside the decisions; the grid would otherwise keep
+       its empty "main" row and leave a hole where the field was. */
+    .game-layout:has(.g-field.cast-away) {
+        grid-template-areas:
+            "score   score"
+            "line    line"
+            "lineups side";
+    }
+    /* NOTE: the field's wrapper is empty then (it only holds the parked canvas) but cannot be hidden, so it shares a
+       cell that exists; a grid-area name that is no longer in grid-template-areas would add stray tracks. */
+    .game-layout:has(.g-field.cast-away) .g-main { grid-area: lineups; }
+}
+
+.matchup-preview {
+    padding: 20px 24px 18px;
+    color: #fffdf8;
+    background: linear-gradient(145deg, #0b4ea2, #0a3f85);
+    border-bottom: 4px solid #c8323a;
+}
+
+.matchup-eyebrow, .matchup-side, .pitch-context-top {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+}
+
+.matchup-eyebrow { text-align: center; opacity: 0.85; }
+.matchup-teams { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: center; margin: 12px 0; }
+.matchup-team { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.matchup-team strong { font-size: 1.7rem; line-height: 1.1; }
+.matchup-team small { opacity: 0.82; }
+.matchup-home { text-align: right; }
+.matchup-vs { color: #ffe0a0; font-family: 'Consolas', 'Courier New', monospace; font-weight: 700; }
+.matchup-park { text-align: center; font-size: 0.8rem; border-top: 1px solid rgba(255,255,255,0.28); padding-top: 10px; }
+
+.setup-options {
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 6px;
+    background: var(--mud-palette-surface);
+}
+.setup-options summary {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 52px;
+    padding: 9px 44px 9px 14px;
+    list-style: none;
+    cursor: pointer;
+    font-weight: 700;
+}
+.setup-options summary::-webkit-details-marker { display: none; }
+.setup-options summary::after {
+    content: '⌄';
+    position: absolute;
+    right: 16px;
+    top: 10px;
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--mud-palette-primary);
+}
+.setup-options[open] summary::after { transform: rotate(180deg); }
+.setup-options summary:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
+.setup-options small { color: var(--mud-palette-text-secondary); font-size: 0.74rem; font-weight: 400; }
+.setup-options-content { padding: 12px 14px 16px; border-top: 1px solid var(--mud-palette-lines-default); }
+
+.pitch-context {
+    border-left: 3px solid var(--mud-palette-secondary);
+    background: rgba(11, 78, 162, 0.055);
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+}
+.pitch-context-top { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; color: var(--mud-palette-primary); }
+.pitch-context-matchup { display: flex; flex-wrap: wrap; gap: 5px 9px; align-items: baseline; margin-top: 5px; }
+.pitch-context-matchup span { color: var(--mud-palette-text-secondary); font-size: 0.8rem; }
+.pitch-context-bases { color: var(--mud-palette-text-secondary); font-size: 0.82rem; margin-top: 4px; }
+
+@media (max-width: 480px) {
+    .matchup-preview { padding: 16px; }
+    .matchup-teams { gap: 6px; }
+    .matchup-team strong { font-size: 1.35rem; }
+    .matchup-team { font-size: 0.82rem; }
+}
+
+@media (min-width: 1700px) {
+    .game-layout {
+        grid-template-columns: minmax(0, 1.7fr) minmax(380px, 1fr) minmax(300px, 0.8fr);
+        grid-template-areas:
+            "score score   score"
+            "line  line    line"
+            "main  side    lineups";
+        gap: 20px;
+    }
+
+    .g-lineups { grid-template-columns: minmax(0, 1fr); align-content: start; }
+
+    /* WHY: no field on this screen, so the decisions and the lineups share the width instead of leaving the wide
+       first column blank. (:has() because the cast state is a class on a descendant, not on .game-layout.) */
+    .game-layout:has(.g-field.cast-away) {
+        grid-template-columns: minmax(380px, 1fr) minmax(300px, 1fr);
+        grid-template-areas:
+            "score score"
+            "line  line"
+            "side  lineups";
+    }
+}

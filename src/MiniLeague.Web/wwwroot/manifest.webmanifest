@@ -1,0 +1,23 @@
+{
+  "name": "MiniLeague Baseball",
+  "short_name": "MiniLeague",
+  "description": "Historical baseball simulation powered by public historical statistics. Manage classic teams from 1927 to 1982.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b4ea2",
+  "theme_color": "#0b4ea2",
+  "categories": ["games", "sports"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Play Ball", "url": "/game", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Keyboard Cards", "url": "/shortcuts", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

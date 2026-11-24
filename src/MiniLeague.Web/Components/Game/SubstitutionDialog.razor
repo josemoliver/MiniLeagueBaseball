@@ -1,0 +1,269 @@
+@* In-game moves for a human manager: pinch hit, pinch run, replace a fielder, swap
+   fielding positions, and manage the pitching staff. A removed player cannot return. *@
+
+@{
+    var s = Game.State!;
+    var team = s.TeamFor(_visitor);
+    bool batting = s.IsTopOfInning == _visitor;
+    var bench = s.Bench(_visitor).ToList();
+    var lineup = s.LineupPlayers(_visitor).ToList();
+    var pitcher = s.PitcherFor(_visitor);
+    var pen = s.BullpenFor(_visitor);
+}
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Substitutions</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.subtitle1" Align="Align.Center"><b>@team.DisplayName</b></MudText>
+
+            @if (AllowSideChoice)
+            {
+                <MudStack Row="true" Spacing="2" Justify="Justify.Center">
+                    <MudButton Size="Size.Small" Variant="@(_visitor ? Variant.Filled : Variant.Outlined)"
+                               OnClick="@(() => SwitchSide(true))">@s.VisitorTeam.Abbreviation</MudButton>
+                    <MudButton Size="Size.Small" Variant="@(!_visitor ? Variant.Filled : Variant.Outlined)"
+                               OnClick="@(() => SwitchSide(false))">@s.HomeTeam.Abbreviation</MudButton>
+                </MudStack>
+            }
+
+            @if (_message is not null)
+            {
+                <MudAlert Severity="@(_isError ? Severity.Error : Severity.Success)" Dense="true">@_message</MudAlert>
+            }
+
+            @if (bench.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true">The bench is empty.</MudAlert>
+            }
+
+            <MudTabs Rounded="true" Centered="true">
+
+                <MudTabPanel Text="Pinch Hit">
+                    @if (!batting)
+                    {
+                        <MudText Class="mud-text-secondary">Your team is in the field. Pinch hit when you are batting.</MudText>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="2">
+                            <MudText>At bat: <b>@s.CurrentBatter.Name</b> (@LineupRules.Label(s.CurrentBatterPosition))</MudText>
+                            <MudSelect T="int" Label="Pinch hitter" Dense="true" Variant="Variant.Outlined"
+                                       @bind-Value="_phBench">
+                                @foreach (var p in bench)
+                                {
+                                    <MudSelectItem T="int" Value="@p.Id">@PlayerLabels.Line(p)</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_phBench == 0)"
+                                       OnClick="@(() => Apply(() => Game.PinchHit(_phBench), "Pinch hitter in."))">
+                                Pinch hit
+                            </MudButton>
+                        </MudStack>
+                    }
+                </MudTabPanel>
+
+                <MudTabPanel Text="Pinch Run">
+                    @if (!batting)
+                    {
+                        <MudText Class="mud-text-secondary">Your team is in the field. Pinch run when you are batting.</MudText>
+                    }
+                    else if (s.RunnerOnFirst is null && s.RunnerOnSecond is null && s.RunnerOnThird is null)
+                    {
+                        <MudText Class="mud-text-secondary">There are no runners on base.</MudText>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="2">
+                            <MudSelect T="int" Label="Runner to replace" Dense="true" Variant="Variant.Outlined"
+                                       @bind-Value="_prBase">
+                                @if (s.RunnerOnFirst is not null)
+                                {
+                                    <MudSelectItem T="int" Value="1">1st — @s.RunnerOnFirst.Player.Name (SPD @s.RunnerOnFirst.Player.SpeedRating)</MudSelectItem>
+                                }
+                                @if (s.RunnerOnSecond is not null)
+                                {
+                                    <MudSelectItem T="int" Value="2">2nd — @s.RunnerOnSecond.Player.Name (SPD @s.RunnerOnSecond.Player.SpeedRating)</MudSelectItem>
+                                }
+                                @if (s.RunnerOnThird is not null)
+                                {
+                                    <MudSelectItem T="int" Value="3">3rd — @s.RunnerOnThird.Player.Name (SPD @s.RunnerOnThird.Player.SpeedRating)</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudSelect T="int" Label="Pinch runner" Dense="true" Variant="Variant.Outlined"
+                                       @bind-Value="_prBench">
+                                @foreach (var p in bench.OrderByDescending(p => p.SpeedRating))
+                                {
+                                    <MudSelectItem T="int" Value="@p.Id">@PlayerLabels.Line(p)</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       Disabled="@(_prBase == 0 || _prBench == 0)"
+                                       OnClick="@(() => Apply(() => Game.PinchRun(_prBase, _prBench), "Pinch runner in."))">
+                                Pinch run
+                            </MudButton>
+                        </MudStack>
+                    }
+                </MudTabPanel>
+
+                <MudTabPanel Text="Replace Fielder">
+                    <MudStack Spacing="2">
+                        <MudText Class="mud-text-secondary">
+                            The replacement takes the batting spot and position of the player who leaves.
+                        </MudText>
+                        <MudSelect T="int" Label="Player leaving" Dense="true" Variant="Variant.Outlined"
+                                   @bind-Value="_repOut">
+                            @foreach (var (p, pos) in lineup)
+                            {
+                                <MudSelectItem T="int" Value="@p.Id">@LineupRules.Label(pos) — @p.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="int" Label="Replacement" Dense="true" Variant="Variant.Outlined"
+                                   @bind-Value="_repIn">
+                            @foreach (var p in bench)
+                            {
+                                <MudSelectItem T="int" Value="@p.Id">@PlayerLabels.Line(p)</MudSelectItem>
+                            }
+                        </MudSelect>
+                        @if (_repOut != 0 && _repIn != 0)
+                        {
+                            var leaving = lineup.First(x => x.Player.Id == _repOut);
+                            var incoming = bench.First(b => b.Id == _repIn);
+                            <MudText Typo="Typo.caption" Class="@(incoming.IsNaturalAt(leaving.Position) ? "mud-text-secondary" : "mud-warning-text")">
+                                At @LineupRules.Label(leaving.Position): @leaving.Player.Name — @PlayerLabels.Fielding(leaving.Player, leaving.Position)
+                                · @incoming.Name — @PlayerLabels.Fielding(incoming, leaving.Position)
+                            </MudText>
+                        }
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   Disabled="@(_repOut == 0 || _repIn == 0)"
+                                   OnClick="@(() => Apply(() => Game.Replace(_visitor, _repOut, _repIn), "Substitution made."))">
+                            Replace
+                        </MudButton>
+                    </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Swap Positions">
+                    <MudStack Spacing="2">
+                        <MudSelect T="int" Label="First player" Dense="true" Variant="Variant.Outlined" @bind-Value="_swapA">
+                            @foreach (var (p, pos) in lineup)
+                            {
+                                <MudSelectItem T="int" Value="@p.Id">@LineupRules.Label(pos) — @p.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect T="int" Label="Second player" Dense="true" Variant="Variant.Outlined" @bind-Value="_swapB">
+                            @foreach (var (p, pos) in lineup)
+                            {
+                                <MudSelectItem T="int" Value="@p.Id">@LineupRules.Label(pos) — @p.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        @if (_swapA != 0 && _swapB != 0 && _swapA != _swapB)
+                        {
+                            var a = lineup.First(x => x.Player.Id == _swapA);
+                            var b = lineup.First(x => x.Player.Id == _swapB);
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                @a.Player.Name at @LineupRules.Label(b.Position): @PlayerLabels.Fielding(a.Player, b.Position)<br />
+                                @b.Player.Name at @LineupRules.Label(a.Position): @PlayerLabels.Fielding(b.Player, a.Position)
+                            </MudText>
+                        }
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   Disabled="@(_swapA == 0 || _swapB == 0 || _swapA == _swapB)"
+                                   OnClick="@(() => Apply(() => Game.SwapPositions(_visitor, _swapA, _swapB), "Positions swapped."))">
+                            Swap positions
+                        </MudButton>
+                    </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Pitching">
+                    <MudStack Spacing="2">
+                        <MudText>
+                            On the mound: <b>@pitcher.Player.Name</b>
+                            <span class="mud-text-secondary">
+                                · @pitcher.PitchCount pitches · @pitcher.BattersFaced BF · @pitcher.RunsAllowed R ·
+                                @pitcher.Condition.ToString().ToUpperInvariant()
+                            </span>
+                        </MudText>
+
+                        @if (pen.Count == 0)
+                        {
+                            <MudText Class="mud-text-secondary">No relievers are left in the bullpen.</MudText>
+                        }
+                        @foreach (var w in pen)
+                        {
+                            var id = w.Player.Id;
+                            <MudPaper Outlined="true" Class="pa-2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                                    <div>
+                                        <MudText><b>@w.Player.Name</b> <span class="mud-text-secondary">(@w.Player.Role, @(w.Player.ThrowHand == ThrowHand.Left ? "L" : "R"))</span></MudText>
+                                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                            ERA @(w.Player.PitchingOverall?.ERA.ToString("F2") ?? "-") · @w.Status
+                                        </MudText>
+                                    </div>
+                                    <MudStack Row="true" Spacing="1">
+                                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@w.IsWarming"
+                                                   OnClick="@(() => Apply(() => Game.StartWarming(_visitor, id), $"{w.Player.Name} is warming up."))">
+                                            Warm up
+                                        </MudButton>
+                                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                                   OnClick="@(() => Apply(() => Game.ChangePitcher(_visitor, id), $"{w.Player.Name} is in."))">
+                                            Bring in
+                                        </MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            A reliever needs 4–10 batters of warm-up. Coming in cold or overwarmed costs him effectiveness
+                            for his first few batters, and the pitcher he replaces cannot return.
+                        </MudText>
+                    </MudStack>
+                </MudTabPanel>
+            </MudTabs>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="@(() => MudDialog.Close())">Done</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter, EditorRequired] public GameService Game { get; set; } = null!;
+    /// <summary>True when the acting manager runs the visitors.</summary>
+    [Parameter] public bool Visitor { get; set; }
+    /// <summary>Two humans share the game, so let them choose which team they are managing.</summary>
+    [Parameter] public bool AllowSideChoice { get; set; }
+
+    private bool _visitor;
+
+    protected override void OnInitialized() => _visitor = Visitor;
+
+    private void SwitchSide(bool visitor)
+    {
+        _visitor = visitor;
+        _message = null;
+        _phBench = _prBase = _prBench = _repOut = _repIn = _swapA = _swapB = 0;
+    }
+
+    private int _phBench, _prBase, _prBench, _repOut, _repIn, _swapA, _swapB;
+    private string? _message;
+    private bool _isError;
+
+    private void Apply(Action action, string success)
+    {
+        try
+        {
+            action();
+            _message = success;
+            _isError = false;
+            _phBench = _prBase = _prBench = _repOut = _repIn = _swapA = _swapB = 0;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _message = ex.Message;
+            _isError = true;
+        }
+    }
+}

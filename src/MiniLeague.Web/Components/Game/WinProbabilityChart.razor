@@ -1,0 +1,86 @@
+@using System.Globalization
+@* How the game swung: the home team's chance of winning after every play. Home is at the top. *@
+
+@{
+    var track = State.Recap;
+    int n = track.Count;
+    var points = new List<double> { GameRecaps.StartingWinProbability(State) };
+    points.AddRange(track.Select(p => p.HomeWinProbability));
+
+    const double left = 40, right = 628, top = 14, bottom = 194;
+    double width = right - left, height = bottom - top, mid = (top + bottom) / 2;
+    double X(int i) => left + (n == 0 ? 0 : i * width / n);
+    double Y(double wp) => top + (1 - wp) * height;
+    string F(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+
+    string line = string.Join(" ", points.Select((wp, i) => $"{F(X(i))},{F(Y(wp))}"));
+    string area = $"M {F(X(0))},{F(mid)} " + string.Join(" ", points.Select((wp, i) => $"L {F(X(i))},{F(Y(wp))}"))
+                  + $" L {F(X(n))},{F(mid)} Z";
+    var key = KeyPlays.Select(k => (Play: k, Index: track.ToList().IndexOf(k) + 1)).Where(k => k.Index > 0).ToList();
+
+    // a tick at the start of each inning
+    var innings = new List<(int Inning, int Index)>();
+    for (int i = 0; i < n; i++)
+        if (track[i].IsTop && (i == 0 || !track[i - 1].IsTop || track[i - 1].Inning != track[i].Inning))
+            innings.Add((track[i].Inning, i));
+}
+
+<svg class="wp-chart" viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" role="img"
+     data-testid="wp-chart" data-points="@points.Count"
+     aria-label="Win probability for @State.HomeTeam.Abbreviation over the game">
+    <defs>
+        <clipPath id="wp-home"><rect x="@F(left)" y="@F(top)" width="@F(width)" height="@F(mid - top)" /></clipPath>
+        <clipPath id="wp-visitor"><rect x="@F(left)" y="@F(mid)" width="@F(width)" height="@F(bottom - mid)" /></clipPath>
+    </defs>
+
+    @if (n > 0)
+    {
+        <path d="@area" class="wp-area-home" clip-path="url(#wp-home)" />
+        <path d="@area" class="wp-area-visitor" clip-path="url(#wp-visitor)" />
+    }
+
+    @foreach (var pct in new[] { 0.25, 0.5, 0.75 })
+    {
+        <line x1="@F(left)" x2="@F(right)" y1="@F(Y(pct))" y2="@F(Y(pct))" class="@(pct == 0.5 ? "wp-mid" : "wp-grid")" />
+    }
+
+    @foreach (var (inning, index) in innings)
+    {
+        <line x1="@F(X(index))" x2="@F(X(index))" y1="@F(top)" y2="@F(bottom)" class="wp-grid" />
+        @((MarkupString)Label(X(index) + 3, bottom + 14, "wp-label", inning.ToString()))
+    }
+
+    @if (n > 0)
+    {
+        <polyline points="@line" class="wp-line" fill="none" />
+    }
+
+    @foreach (var (play, index) in key)
+    {
+        <circle cx="@F(X(index))" cy="@F(Y(play.HomeWinProbability))" r="4.5" class="wp-key" data-testid="wp-key-play">
+            <title>@KeyTitle(play)</title>
+        </circle>
+    }
+
+    @((MarkupString)Label(4, top + 9, "wp-team wp-team-home", State.HomeTeam.Abbreviation))
+    @((MarkupString)Label(4, bottom - 2, "wp-team wp-team-visitor", State.VisitorTeam.Abbreviation))
+    @((MarkupString)Label(left - 4, mid + 3, "wp-label", "50%", "end"))
+</svg>
+
+@code {
+    [Parameter, EditorRequired] public GameState State { get; set; } = null!;
+
+    /// <summary>Plays to mark on the chart (their descriptions appear as tooltips).</summary>
+    [Parameter] public IReadOnlyList<RecapPlay> KeyPlays { get; set; } = [];
+
+    // SVG text is written as raw markup because Razor reserves the <text> tag
+    private static string Label(double x, double y, string css, string content, string anchor = "start") =>
+        $"<text x=\"{x.ToString("0.#", CultureInfo.InvariantCulture)}\" y=\"{y.ToString("0.#", CultureInfo.InvariantCulture)}\" " +
+        $"class=\"{css}\" text-anchor=\"{anchor}\">{System.Net.WebUtility.HtmlEncode(content)}</text>";
+
+    private string KeyTitle(RecapPlay p)
+    {
+        var team = (p.Swing > 0 ? State.HomeTeam : State.VisitorTeam).Abbreviation;
+        return $"{p.Half}: {p.Description} ({(p.Swing > 0 ? "+" : "-")}{MiniLeague.Engine.Services.GameRecaps.Percent(Math.Abs(p.Swing))} {team})";
+    }
+}

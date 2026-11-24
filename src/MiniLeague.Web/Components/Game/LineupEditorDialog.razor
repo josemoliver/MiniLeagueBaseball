@@ -1,0 +1,123 @@
+@using FieldPosition = MiniLeague.Engine.Models.Position
+@* Pre-game batting order editor. Picking a player or position that is already used
+   swaps it with the other row, so the lineup stays valid while editing. *@
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Team.DisplayName — Lineup</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="1">
+            @for (int i = 0; i < _rows.Count; i++)
+            {
+                int idx = i;
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudText Style="width:1.4rem; text-align:right" Class="mud-text-secondary">@(idx + 1)</MudText>
+
+                    <MudSelect T="int" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined"
+                               Style="min-width:260px"
+                               Value="@_rows[idx].PlayerId"
+                               ValueChanged="@((int id) => SetPlayer(idx, id))">
+                        @foreach (var p in _candidates)
+                        {
+                            <MudSelectItem T="int" Value="@p.Id">@PlayerLabels.Line(p)</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudSelect T="FieldPosition" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined"
+                               Style="width:90px"
+                               Value="@_rows[idx].Position"
+                               ValueChanged="@((FieldPosition pos) => SetPosition(idx, pos))">
+                        @foreach (var pos in LineupRules.RequiredPositions)
+                        {
+                            <MudSelectItem T="FieldPosition" Value="@pos">@LineupRules.Label(pos)</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudText Typo="Typo.caption" Style="min-width:120px"
+                             Class="@(Player(_rows[idx].PlayerId).IsNaturalAt(_rows[idx].Position) ? "mud-text-secondary" : "mud-warning-text")">
+                        @PlayerLabels.Fielding(Player(_rows[idx].PlayerId), _rows[idx].Position)
+                    </MudText>
+
+                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp" Size="Size.Small"
+                                   Disabled="@(idx == 0)" OnClick="@(() => Move(idx, -1))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small"
+                                   Disabled="@(idx == _rows.Count - 1)" OnClick="@(() => Move(idx, 1))" />
+                </MudStack>
+            }
+
+            @if (_errors.Count > 0)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@string.Join(" ", _errors)</MudAlert>
+            }
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                Bench: @(string.Join(", ", _candidates.Where(c => _rows.All(r => r.PlayerId != c.Id)).Select(c => c.Name)))
+            </MudText>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="ResetToDefault">Reset</MudButton>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@(_errors.Count > 0)" OnClick="Save">OK</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter, EditorRequired] public Team Team { get; set; } = null!;
+    [Parameter, EditorRequired] public IReadOnlyList<LineupSlot> Current { get; set; } = [];
+
+    private sealed class Row { public int PlayerId; public FieldPosition Position; }
+
+    private List<Row> _rows = [];
+    private List<Player> _candidates = [];
+    private IReadOnlyList<string> _errors = [];
+
+    protected override void OnInitialized()
+    {
+        _candidates = [.. Team.Batters];
+        Load(Current);
+    }
+
+    private void Load(IEnumerable<LineupSlot> slots)
+    {
+        _rows = [.. slots.Select(s => new Row { PlayerId = s.PlayerId, Position = s.Position })];
+        Revalidate();
+    }
+
+    private Player Player(int id) => _candidates.First(p => p.Id == id);
+
+    private void SetPlayer(int idx, int playerId)
+    {
+        int other = _rows.FindIndex(r => r.PlayerId == playerId);
+        if (other >= 0 && other != idx)
+            _rows[other].PlayerId = _rows[idx].PlayerId;
+        _rows[idx].PlayerId = playerId;
+        Revalidate();
+    }
+
+    private void SetPosition(int idx, FieldPosition pos)
+    {
+        int other = _rows.FindIndex(r => r.Position == pos);
+        if (other >= 0 && other != idx)
+            _rows[other].Position = _rows[idx].Position;
+        _rows[idx].Position = pos;
+        Revalidate();
+    }
+
+    private void Move(int idx, int delta)
+    {
+        (_rows[idx], _rows[idx + delta]) = (_rows[idx + delta], _rows[idx]);
+        Revalidate();
+    }
+
+    private void ResetToDefault() => Load(LineupRules.Default(Team));
+
+    private void Revalidate() => _errors = LineupRules.Validate(Team, ToSlots());
+
+    private List<LineupSlot> ToSlots() => _rows.Select(r => new LineupSlot(r.PlayerId, r.Position)).ToList();
+
+    private void Save() => MudDialog.Close(DialogResult.Ok(ToSlots()));
+}

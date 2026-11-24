@@ -1,0 +1,81 @@
+.pbp-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; margin-bottom: 8px; }
+.pbp-tools input, .pbp-tools select, .pbp-tools button {
+    min-width: 0;
+    min-height: 36px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 4px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: 0.78rem;
+}
+.pbp-tools input { width: 100%; padding: 0 9px; }
+.pbp-tools select { max-width: 120px; padding: 0 5px; }
+.pbp-tools button { padding: 0 9px; color: var(--mud-palette-primary); font-weight: 700; cursor: pointer; }
+.pbp-tools :is(input, select, button):focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 1px; }
+
+.pbp-log { font-size: 0.82rem; font-family: monospace; }
+
+.pbp-half {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 4px 6px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-primary);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.pbp-entry {
+    display: flex;
+    gap: 8px;
+    padding: 3px 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    align-items: baseline;
+}
+
+.pbp-half:first-child + .pbp-entry {
+    background: rgba(11, 78, 162, 0.08);
+}
+
+.pbp-desc {
+    flex: 1;
+    color: var(--mud-palette-text-primary);
+}
+
+.pbp-score {
+    color: var(--mud-palette-primary);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.pbp-empty {
+    color: var(--mud-palette-text-secondary);
+    padding: 8px 6px;
+    font-style: italic;
+}
+
+.pbp-log {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+    .pbp-tools { grid-template-columns: minmax(0, 1fr) auto; }
+    .pbp-tools input { grid-column: 1 / -1; }
+    .pbp-tools select { max-width: none; }
+    .pbp-tools :is(input, select, button) { min-height: 44px; }
+}
+
+/* a taller log where there is room for it */
+@media (min-width: 900px) {
+    .pbp-log { max-height: 340px; }
+}
+
+@media (min-width: 1700px) {
+    .pbp-log { max-height: 46vh; }
+}

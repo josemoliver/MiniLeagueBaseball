@@ -1,0 +1,19 @@
+{
+  "teams": [
+    "teams/1927-nyy.json",
+    "teams/1955-bro.json",
+    "teams/1961-nyy.json",
+    "teams/1963-lad.json",
+    "teams/1967-stl.json",
+    "teams/1968-det.json",
+    "teams/1969-nym.json",
+    "teams/1970-bal.json",
+    "teams/1973-oak.json",
+    "teams/1975-cin.json",
+    "teams/1975-bos.json",
+    "teams/1979-pit.json",
+    "teams/1980-phi.json",
+    "teams/1980-kc.json",
+    "teams/1982-mil.json"
+  ]
+}

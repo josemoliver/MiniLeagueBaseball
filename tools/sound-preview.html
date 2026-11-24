@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MiniLeague Baseball — sound preview</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; background: #0b4ea2; color: #fff; }
+        h1 { font-size: 1.4rem; }
+        p { opacity: 0.85; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin: 1.2rem 0; }
+        button { padding: 12px 10px; font-size: 1rem; border: 0; border-radius: 8px; cursor: pointer; background: #fff; color: #0b4ea2; font-weight: 600; }
+        button:hover { background: #ffd54f; }
+        button.theme { grid-column: 1 / -1; background: #ffd54f; font-size: 1.15rem; }
+        h2 { font-size: 1rem; margin: 1.4rem 0 0; opacity: 0.8; letter-spacing: 0.06em; text-transform: uppercase; }
+        label { display: block; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>Sound preview</h1>
+    <p>
+        Every sound the game can make, played by the same code the game uses. Click a button to hear it.
+        (Open this file directly in your browser; no server is needed.)
+    </p>
+
+    <div class="grid">
+        <button class="theme" data-sound="organ">🎹 Startup theme — ballpark organ “Charge!”</button>
+    </div>
+
+    <h2>Organ tunes</h2>
+    <p>The ballpark organist plays these at the right moments in a game.</p>
+    <div class="grid">
+        <button data-sound="stretch">Seventh-inning stretch — Take Me Out to the Ball Game</button>
+        <button data-sound="rally">Rally (3 runs in an inning) — Mexican Hat Dance</button>
+        <button data-sound="entrance">New pitcher — Hail to the Chief</button>
+        <button data-sound="funeral">Manager ejected — Chopin's Funeral March</button>
+    </div>
+
+    <h2>Plays</h2>
+    <div class="grid">
+        <button data-sound="hit">Single / double / triple</button>
+        <button data-sound="homerun">Home run</button>
+        <button data-sound="out">Out</button>
+        <button data-sound="strikeout">Strikeout</button>
+        <button data-sound="walk">Walk</button>
+        <button data-sound="doubleplay">Double play</button>
+        <button data-sound="steal">Stolen base</button>
+        <button data-sound="caught">Caught stealing</button>
+        <button data-sound="error">Error</button>
+        <button data-sound="cheer">Crowd cheer</button>
+    </div>
+
+    <h2>Game moments</h2>
+    <div class="grid">
+        <button data-sound="playball">Play ball jingle</button>
+        <button data-sound="gameover">Game over</button>
+        <button data-sound="blip">Menu blip</button>
+    </div>
+
+    <label><input type="checkbox" id="mute" /> Muted (the same setting the game uses)</label>
+
+    <script src="../src/MiniLeague.Web/wwwroot/js/sound.js"></script>
+    <script>
+        const mute = document.getElementById('mute');
+        mute.checked = window.mlbSound.isMuted();
+        mute.addEventListener('change', () => window.mlbSound.setMuted(mute.checked));
+        document.querySelectorAll('button[data-sound]').forEach(b =>
+            b.addEventListener('click', () => window.mlbSound.play(b.dataset.sound)));
+    </script>
+</body>
+</html>

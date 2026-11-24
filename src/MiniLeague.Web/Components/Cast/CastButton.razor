@@ -1,0 +1,39 @@
+@* App-bar button that casts the game to a TV. Hidden where the browser cannot cast. *@
+@implements IDisposable
+@inject CastService Cast
+@inject ISnackbar Snackbar
+
+@if (Cast.IsSupported)
+{
+    <MudIconButton Icon="@(Cast.IsCasting ? Icons.Material.Filled.CastConnected : Icons.Material.Filled.Cast)"
+                   Color="@(Cast.IsCasting ? Color.Warning : Color.Inherit)"
+                   OnClick="Toggle" data-testid="cast-button"
+                   title="@(Cast.IsCasting ? "Stop casting to the TV" : "Show the game on a TV")" />
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Cast.Changed += OnChanged;
+        await Cast.InitAsync();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private async Task Toggle()
+    {
+        if (Cast.IsCasting)
+        {
+            await Cast.StopAsync();
+            return;
+        }
+
+        var result = await Cast.StartAsync();
+        if (result == CastStartResult.NoDevices)
+            Snackbar.Add("No Cast screens found. Check that the Chromecast is on and on the same Wi-Fi network, or open the TV view from the menu and cast that tab from the browser.", Severity.Warning);
+        else if (result == CastStartResult.Failed)
+            Snackbar.Add("Casting could not start. The TV view is now in the menu: open it and cast that tab from the browser.", Severity.Warning);
+    }
+
+    public void Dispose() => Cast.Changed -= OnChanged;
+}

@@ -1,0 +1,8 @@
+/* The version number sits at the bottom of the menu, however few items there are above it. */
+.drawer-version {
+    margin-top: auto;
+    padding: 12px 16px;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    opacity: 0.7;
+}

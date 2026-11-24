@@ -1,0 +1,1132 @@
+@page "/game"
+@using MiniLeague.Engine.Services
+@using MiniLeague.Engine.Animation
+@inject AtBatResolver Resolver
+@inject ComputerManager CpuManager
+@inject SoundService Sound
+@inject FieldViewPreferences ViewPrefs
+@inject TeamRepository Teams
+@inject IDialogService DialogService
+@inject IGameSaveStore Saves
+@inject CastService Cast
+@inject Random Dice
+@inject IJSRuntime JS
+
+@implements IDisposable
+
+<PageTitle>Game Room — MiniLeague Baseball</PageTitle>
+
+@if (_game.State is null)
+{
+    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="min-height:60vh" Class="game-setup">
+        <MudText Typo="Typo.h4" Align="Align.Center">MiniLeague Baseball</MudText>
+        <MudText Typo="Typo.subtitle1" Class="mud-text-secondary" Align="Align.Center">
+            Select a matchup to begin
+        </MudText>
+
+        @if (_resumeError is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" data-testid="resume-error">@_resumeError</MudAlert>
+        }
+
+        @if (_saved is not null && _teamOptions.Length > 0)
+        {
+            <MudCard Style="max-width:440px; width:100%" data-testid="resume-card">
+                <MudCardContent>
+                    <MudText Typo="Typo.overline">SAVED GAME</MudText>
+                    <MudText Typo="Typo.h6">@_saved.Description</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="ResumeGame">RESUME</MudButton>
+                    <MudButton OnClick="DiscardSave">DISCARD</MudButton>
+                </MudCardActions>
+            </MudCard>
+        }
+
+        @if (_loadError is not null)
+        {
+            <MudAlert Severity="Severity.Error">@_loadError</MudAlert>
+        }
+        else if (_teamOptions.Length == 0)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else
+        {
+        <MudCard Class="game-setup-card" Style="max-width:620px; width:100%">
+            <div class="matchup-preview" data-testid="matchup-preview">
+                <div class="matchup-eyebrow">MATCHUP CARD</div>
+                <div class="matchup-teams">
+                    <div class="matchup-team">
+                        <span class="matchup-side">VISITORS</span>
+                        <strong>@_teamOptions[_visitorIdx].Abbreviation</strong>
+                        <span>@_teamOptions[_visitorIdx].DisplayName</span>
+                        <small>Starter: @_teamOptions[_visitorIdx].Pitchers.First(p => p.Id == StarterFor(_teamOptions[_visitorIdx], true)).Name</small>
+                    </div>
+                    <span class="matchup-vs">VS</span>
+                    <div class="matchup-team matchup-home">
+                        <span class="matchup-side">HOME</span>
+                        <strong>@_teamOptions[_homeIdx].Abbreviation</strong>
+                        <span>@_teamOptions[_homeIdx].DisplayName</span>
+                        <small>Starter: @_teamOptions[_homeIdx].Pitchers.First(p => p.Id == StarterFor(_teamOptions[_homeIdx], false)).Name</small>
+                    </div>
+                </div>
+                <div class="matchup-park">@ChosenPark().Name · @(ViewPrefs.View == FieldViewMode.Classic ? "Classic field" : "Detailed field")</div>
+            </div>
+            <MudCardContent>
+                <MudStack Spacing="3">
+                    <MudSelect T="int" Label="Visitor Team" @bind-Value="_visitorIdx"
+                               ToStringFunc="@(i => _teamOptions[i].DisplayName)">
+                        @for (int i = 0; i < _teamOptions.Length; i++)
+                        {
+                            int idx = i;
+                            <MudSelectItem Value="idx">@_teamOptions[idx].DisplayName</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="int" Label="Home Team" @bind-Value="_homeIdx"
+                               ToStringFunc="@(i => _teamOptions[i].DisplayName)">
+                        @for (int i = 0; i < _teamOptions.Length; i++)
+                        {
+                            int idx = i;
+                            <MudSelectItem Value="idx">@_teamOptions[idx].DisplayName</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="HumanSide" Label="You manage" @bind-Value="_humanSide">
+                        <MudSelectItem Value="HumanSide.Visitor">Visitors (bat first)</MudSelectItem>
+                        <MudSelectItem Value="HumanSide.Home">Home team</MudSelectItem>
+                        <MudSelectItem Value="HumanSide.Both">Both teams (two players)</MudSelectItem>
+                        <MudSelectItem Value="HumanSide.None">Neither (watch the computer)</MudSelectItem>
+                    </MudSelect>
+                    <details class="setup-options" data-testid="setup-options">
+                        <summary>
+                            <span>Game options</span>
+                            <small>Ballpark · starters · field · events · lineups</small>
+                        </summary>
+                        <div class="setup-options-content">
+                            <MudStack Spacing="3">
+                                <MudSelect T="string" Label="Ballpark" @bind-Value="_stadiumChoice">
+                                    <MudSelectItem Value="@HomePark">Home team's park (@ParkNameOf(_teamOptions[_homeIdx]))</MudSelectItem>
+                                    @foreach (var park in _stadiums)
+                                    {
+                                        <MudSelectItem Value="@park.Id">@park.Name</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                @foreach (var (label, visitorSide, team) in new[]
+                                {
+                                    ("Visitor starting pitcher", true, _teamOptions[_visitorIdx]),
+                                    ("Home starting pitcher", false, _teamOptions[_homeIdx]),
+                                })
+                                {
+                                    bool side = visitorSide;
+                                    var club = team;
+                                    <MudSelect T="int" Label="@label" data-testid="@(side ? "visitor-starter" : "home-starter")"
+                                               ToStringFunc="@(id => PlayerLabels.Pitcher(club.Pitchers.First(p => p.Id == id)))"
+                                               Value="@StarterFor(club, side)"
+                                               ValueChanged="@((int id) => _starters[(side, club.Id)] = id)">
+                                        @foreach (var p in club.StartingPitcherChoices)
+                                        {
+                                            <MudSelectItem T="int" Value="@p.Id">@PlayerLabels.Pitcher(p)</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                                <MudSelect T="FieldViewMode" Label="Field view" data-testid="field-view-select"
+                                           Value="@ViewPrefs.View" ValueChanged="SetView">
+                                    <MudSelectItem Value="FieldViewMode.Classic">Classic (overhead)</MudSelectItem>
+                                    <MudSelectItem Value="FieldViewMode.Detailed">Detailed (animated plays)</MudSelectItem>
+                                </MudSelect>
+                                <MudSwitch T="bool" @bind-Value="_randomEvents" Color="Color.Primary"
+                                           Label="Random events: injuries, rain delays, ejections" />
+                                <MudStack Row="true" Spacing="2">
+                                    <MudButton Variant="Variant.Outlined" FullWidth="true" Size="Size.Small"
+                                               OnClick="@(() => EditLineup(_teamOptions[_visitorIdx]))">
+                                        Visitor lineup
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" FullWidth="true" Size="Size.Small"
+                                               OnClick="@(() => EditLineup(_teamOptions[_homeIdx]))">
+                                        Home lineup
+                                    </MudButton>
+                                </MudStack>
+                            </MudStack>
+                        </div>
+                    </details>
+                </MudStack>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           FullWidth="true" OnClick="StartGame">
+                    PLAY BALL
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+        }
+    </MudStack>
+}
+else
+{
+    var s = _game.State!;
+
+    @* Phone: one column in the order you play. Desktop: the field on the left, decisions on the right.
+       Very wide screens: field | decisions | lineups. (See GameRoom.razor.css.) *@
+    <div class="game-layout">
+
+        <div class="mobile-score" @ref="_mobileScore" data-testid="mobile-score" aria-label="Current score">
+            <span class="mobile-score-teams">@s.VisitorTeam.Abbreviation <strong>@s.VisitorTotalScore</strong><span class="mobile-score-divider">–</span>@s.HomeTeam.Abbreviation <strong>@s.HomeTotalScore</strong></span>
+            <span class="mobile-score-inning">@(s.Status == GameStatus.Final ? "FINAL" : $"{InningLabel(s)} · {s.Outs} out{(s.Outs == 1 ? "" : "s")}")</span>
+            <span class="mobile-score-bases" role="img" aria-label="@BaseSituation(s)">
+                <span class="@(s.RunnerOnThird is null ? "" : "occupied")" aria-hidden="true">◆</span>
+                <span class="@(s.RunnerOnSecond is null ? "" : "occupied")" aria-hidden="true">◆</span>
+                <span class="@(s.RunnerOnFirst is null ? "" : "occupied")" aria-hidden="true">◆</span>
+            </span>
+        </div>
+
+        @* ── Scoreboard ─────────────────────────────────────────────────────── *@
+        <div class="g-score" @ref="_fullScore">
+            <MudPaper Class="pa-3" Elevation="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <div>
+                        <MudText Typo="Typo.h6">@s.VisitorTeam.Abbreviation</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary team-full">@s.VisitorTeam.DisplayName</MudText>
+                    </div>
+                    <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                        <MudText Typo="Typo.h4" Style="font-variant-numeric: tabular-nums; font-weight:700">
+                            @s.VisitorTotalScore &nbsp;–&nbsp; @s.HomeTotalScore
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            @InningLabel(s) @(s.Status == GameStatus.Final ? (s.EndedByRain ? "• FINAL (rain)" : "• FINAL") : "")
+                        </MudText>
+                    </MudStack>
+                    <div style="text-align:right">
+                        <MudText Typo="Typo.h6">@s.HomeTeam.Abbreviation</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary team-full">@s.HomeTeam.DisplayName</MudText>
+                    </div>
+                </MudStack>
+                <div class="sb-extra">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary" data-testid="park-name">@s.Stadium.Name</MudText>
+                    @if (Cast.IsCasting)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Warning" data-testid="casting-note">The field is on the TV</MudText>
+                    }
+                    @if (s.Status != GameStatus.Final)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary" data-testid="win-prob">@WinProbabilityLabel(s)</MudText>
+                    }
+                    <MudStack Row="true" Spacing="1">
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="OpenBoxScore">Box score</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="OpenRecap">Recap</MudButton>
+                    </MudStack>
+                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" data-testid="view-switch">
+                        <MudButton Size="Size.Small" Color="Color.Primary" data-testid="view-classic"
+                                   Variant="@(ViewPrefs.View == FieldViewMode.Classic ? Variant.Filled : Variant.Text)"
+                                   OnClick="@(() => SetView(FieldViewMode.Classic))">Classic</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Primary" data-testid="view-detailed"
+                                   Variant="@(ViewPrefs.View == FieldViewMode.Detailed ? Variant.Filled : Variant.Text)"
+                                   OnClick="@(() => SetView(FieldViewMode.Detailed))">Detailed</MudButton>
+                        @if (ViewPrefs.View == FieldViewMode.Detailed)
+                        {
+                            @foreach (var speed in Enum.GetValues<AnimationSpeed>())
+                            {
+                                var chosen = speed;
+                                <MudButton Size="Size.Small" Color="Color.Secondary" data-testid="@($"speed-{chosen.ToString().ToLowerInvariant()}")"
+                                           Variant="@(ViewPrefs.Speed == chosen ? Variant.Filled : Variant.Text)"
+                                           OnClick="@(() => SetSpeed(chosen))">@chosen</MudButton>
+                            }
+                        }
+                    </MudStack>
+                </div>
+            </MudPaper>
+        </div>
+
+        @* ── Inning-by-inning line score ──────────────────────────────────── *@
+        <div class="g-line">
+            <MudPaper Class="pa-2" Elevation="1">
+                @{
+                    int innings = Math.Max(9, s.CurrentInning);
+                    bool live = s.Status != GameStatus.Final;
+                }
+                <div class="linescore-scroll">
+                    <div class="linescore" data-testid="linescore"
+                         style="@($"grid-template-columns: 60px repeat({innings}, minmax(1.5rem, 1fr)) 40px")">
+                    <span class="ls-team">TEAM</span>
+                    @for (int i = 1; i <= innings; i++) { <span class="ls-inn">@i</span> }
+                    <span class="ls-tot">R</span>
+
+                    @* A run flashes the total and the inning it came in: a changed @key makes a new element, which restarts the animation. *@
+                    <span class="ls-team">@s.VisitorTeam.Abbreviation</span>
+                    @for (int inning = 1; inning <= innings; inning++)
+                    {
+                        bool active = live && inning == s.CurrentInning && s.IsTopOfInning;
+                        string cell = s.LineScoreCell(true, inning);
+                        <span class="ls-inn @(active ? "active-inn" : "") @(active && cell is not ("0" or "-" or "X") ? "ls-flash" : "")" @key="@($"v{inning}-{cell}")">
+                            @cell
+                        </span>
+                    }
+                    <span class="ls-tot @(s.VisitorTotalScore > 0 ? "ls-flash" : "")" @key="@($"vt{s.VisitorTotalScore}")">@s.VisitorTotalScore</span>
+
+                    <span class="ls-team">@s.HomeTeam.Abbreviation</span>
+                    @for (int inning = 1; inning <= innings; inning++)
+                    {
+                        bool active = live && inning == s.CurrentInning && !s.IsTopOfInning;
+                        string cell = s.LineScoreCell(false, inning);
+                        <span class="ls-inn @(active ? "active-inn" : "") @(active && cell is not ("0" or "-" or "X") ? "ls-flash" : "")" @key="@($"h{inning}-{cell}")">
+                            @cell
+                        </span>
+                    }
+                    <span class="ls-tot @(s.HomeTotalScore > 0 ? "ls-flash" : "")" @key="@($"ht{s.HomeTotalScore}")">@s.HomeTotalScore</span>
+                    </div>
+                </div>
+            </MudPaper>
+        </div>
+
+        <div class="g-main">
+            @* ── Field view ─────────────────────────────────────────────────── *@
+            @* WHY: while a TV shows the field, this page gives up the space. The animated field stays mounted (parked
+               off-screen, see .cast-away) instead of being removed: it still draws the plays that js/cast.js passes on to
+               the TV, and its animations set the pace of the game. Removing it would stall the TV and speed the game up.
+               NOTE: the Classic field has nothing to relay, so it is simply not drawn while casting. *@
+            <div class="g-field @(Cast.IsCasting ? "cast-away" : "")" data-testid="field-region">
+                @if (ViewPrefs.View == FieldViewMode.Detailed)
+                {
+                    <DetailedFieldView @ref="_detailed" Game="@s" Stadium="@s.Stadium" OnReady="OnDetailedReady"
+                                       CanReplay="@(_replay is not null && !_animating)" OnReplay="ReplayAsync" />
+                }
+                else if (!Cast.IsCasting)
+                {
+                    <FieldView LastResult="@_lastResult"
+                               RunnerOnFirst="@s.RunnerOnFirst"
+                               RunnerOnSecond="@s.RunnerOnSecond"
+                               RunnerOnThird="@s.RunnerOnThird"
+                               Game="@s"
+                               Alignment="@(_previewAlignment ?? (s.IsTopOfInning ? s.HomeAlignment : s.VisitorAlignment))"
+                               Stadium="@s.Stadium"
+                               CurrentPitcher="@s.CurrentPitcher.Player" />
+                }
+
+            </div>
+        </div>
+
+        <div class="g-side">
+            @* ── Decision panel (or final, injury, computer thinking) ────────── *@
+            <div class="g-decision">
+                @if (s.Status == GameStatus.Final)
+                {
+                    <MudPaper Class="pa-4" Elevation="3">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                            <MudText Typo="Typo.h5">FINAL</MudText>
+                            <MudText Typo="Typo.h4" Style="font-weight:700">
+                                @s.VisitorTeam.Abbreviation @s.VisitorTotalScore,
+                                @s.HomeTeam.Abbreviation @s.HomeTotalScore
+                            </MudText>
+                            @if (s.EndedByRain)
+                            {
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">Called because of rain</MudText>
+                            }
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary" data-testid="decisions">@Decisions(s)</MudText>
+                            <MudStack Row="true" Spacing="2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenRecap">Game recap</MudButton>
+                                <MudButton Variant="Variant.Outlined" OnClick="OpenBoxScore">Box score</MudButton>
+                                <MudButton Variant="Variant.Outlined" OnClick="ResetGame">New Game</MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                }
+                else if (s.PendingInjury is not null)
+                {
+                    <MudPaper Class="pa-3" Elevation="1" data-testid="injury-prompt">
+                        <MudStack Spacing="2">
+                            <MudAlert Severity="Severity.Warning" Dense="true">
+                                @InjuredName(s) is injured and has to leave the game.
+                            </MudAlert>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenInjury">Choose a replacement</MudButton>
+                        </MudStack>
+                    </MudPaper>
+                }
+                else if (_game.IsHumanTurn)
+                {
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <div class="pitch-context" data-testid="pitch-context">
+                            <div class="pitch-context-top">
+                                <span>AT THIS PITCH</span>
+                                <strong>@(s.IsTopOfInning ? "TOP" : "BOTTOM") @s.CurrentInning · @s.Outs OUT@((s.Outs == 1) ? "" : "S")</strong>
+                            </div>
+                            <div class="pitch-context-matchup">
+                                <strong>@s.CurrentBatter.Name</strong><span>vs</span><strong>@s.CurrentPitcher.Player.Name</strong>
+                            </div>
+                            <div class="pitch-context-bases">@BaseSituation(s)</div>
+                        </div>
+                        <DecisionPanel ShowOffense="@_game.OffenseIsHuman"
+                                       ShowDefense="@_game.DefenseIsHuman"
+                                       CanSteal="@(s.RunnerOnFirst is not null && s.RunnerOnSecond is null)"
+                                       AlignmentMoving="@_animating"
+                                       OnAlignmentChanged="PreviewAlignmentAsync"
+                                       OnDecision="HandleDecision"
+                                       OnSubstitutions="OpenSubstitutions"
+                                       OnBoxScore="OpenBoxScore" />
+                    </MudPaper>
+                }
+                else
+                {
+                    <MudPaper Class="pa-4" Elevation="1">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">Computer deciding…</MudText>
+                        </MudStack>
+                    </MudPaper>
+                }
+            </div>
+
+            @* ── Diamond, at bat, pitching ──────────────────────────────────── *@
+            <div class="g-situation">
+                <MudPaper Class="pa-3" Elevation="1">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                        <DiamondView RunnerOnFirst="@(s.RunnerOnFirst is not null)"
+                                     RunnerOnSecond="@(s.RunnerOnSecond is not null)"
+                                     RunnerOnThird="@(s.RunnerOnThird is not null)"
+                                     Outs="@s.Outs" />
+                    </MudStack>
+                </MudPaper>
+
+                <MudPaper Class="pa-3" Elevation="1">
+                    <MudText Typo="Typo.overline">AT BAT</MudText>
+                    <MudText Typo="Typo.h6" data-testid="at-bat-name">@s.CurrentBatter.Name</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        @LineupRules.Label(s.CurrentBatterPosition)
+                        &nbsp;·&nbsp; @BatHandLabel(s.CurrentBatter.BatHand)
+                    </MudText>
+                    @if (s.CurrentBatter.Overall is BatterStats bs)
+                    {
+                        <MudText Typo="Typo.body2" Style="margin-top:4px">
+                            .@Avg(bs) / @bs.HomeRuns HR / @bs.RBI RBI
+                        </MudText>
+                    }
+                </MudPaper>
+
+                <button type="button" class="mobile-pitching-toggle" aria-expanded="@_mobilePitchingExpanded"
+                        aria-controls="pitching-details" @onclick="() => _mobilePitchingExpanded = !_mobilePitchingExpanded"
+                        data-testid="mobile-pitching-toggle">
+                    <span>Pitching · @s.CurrentPitcher.Player.Name</span><span aria-hidden="true">@(_mobilePitchingExpanded ? "−" : "+")</span>
+                </button>
+                <div id="pitching-details" class="pitching-details @(_mobilePitchingExpanded ? "expanded" : "")">
+                <MudPaper Class="pa-3" Elevation="1">
+                    <MudText Typo="Typo.overline">PITCHING</MudText>
+                    <MudText Typo="Typo.h6">@s.CurrentPitcher.Player.Name</MudText>
+                    @if (s.CurrentPitcher.Player.PitchingOverall is PitcherStats ps)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            ERA @ps.ERA.ToString("F2") · @s.CurrentPitcher.PitchCount PC · @s.CurrentPitcher.RunsAllowed R
+                        </MudText>
+                    }
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@ConditionColor(s.CurrentPitcher.Condition)"
+                             Style="margin-top:4px">
+                        @s.CurrentPitcher.Condition.ToString().ToUpperInvariant()
+                    </MudChip>
+                </MudPaper>
+                </div>
+
+            </div>
+
+            @* ── Play-by-play log ───────────────────────────────────────────── *@
+            <div class="g-log">
+                <MudPaper Class="pa-3" Elevation="1">
+                    <MudText Typo="Typo.overline" Style="margin-bottom:6px;display:block">LAST CALLS · PLAY BY PLAY</MudText>
+                    @* WHY: the game records a play before its Detailed animation finishes. Give the log a snapshot so
+                       a child render cannot reveal the new entry ahead of the field. *@
+                    <PlayByPlayLog Events="@s.PlayByPlay.ToArray()" />
+                </MudPaper>
+                @if (ViewPrefs.View == FieldViewMode.Classic && _lastResult is not null)
+                {
+                    <div class="sr-only" role="status">@_lastResult.Description</div>
+                }
+            </div>
+        </div>
+
+        @* ── Lineups and benches ──────────────────────────────────────────── *@
+        <div class="g-lineups">
+            <div class="mobile-lineup-tabs" role="tablist" aria-label="Team lineups">
+                <button type="button" role="tab" id="lineup-visitor-tab" aria-controls="lineup-visitor-panel"
+                        aria-selected="@_mobileLineupVisitor" @onclick="() => _mobileLineupVisitor = true">@s.VisitorTeam.Abbreviation lineup</button>
+                <button type="button" role="tab" id="lineup-home-tab" aria-controls="lineup-home-panel"
+                        aria-selected="@(!_mobileLineupVisitor)" @onclick="() => _mobileLineupVisitor = false">@s.HomeTeam.Abbreviation lineup</button>
+            </div>
+            <div class="lineup-panel @(_mobileLineupVisitor ? "selected" : "")" id="lineup-visitor-panel" role="tabpanel" aria-labelledby="lineup-visitor-tab">
+                <LineupCard State="@s" Visitor="true" />
+            </div>
+            <div class="lineup-panel @(!_mobileLineupVisitor ? "selected" : "")" id="lineup-home-panel" role="tabpanel" aria-labelledby="lineup-home-tab">
+                <LineupCard State="@s" Visitor="false" />
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    private Team[] _teamOptions = [];
+    private string? _loadError;
+    private int _visitorIdx = 0;
+    private int _homeIdx = 1;
+    private enum HumanSide { Visitor, Home, Both, None }
+    private HumanSide _humanSide = HumanSide.Visitor;
+    private IReadOnlyList<Stadium> _stadiums = [];
+    private const string HomePark = "home";
+    private string _stadiumChoice = HomePark;
+    private bool _randomEvents = true;
+    private bool _mobileLineupVisitor = true;
+    private bool _mobilePitchingExpanded;
+    private bool _scoreObserved;
+    private ElementReference _fullScore;
+    private ElementReference _mobileScore;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_game?.State is not null && !_scoreObserved)
+        {
+            await JS.InvokeVoidAsync("mlbMobileScore.observe", _fullScore, _mobileScore);
+            _scoreObserved = true;
+        }
+    }
+
+    // Starting pitchers picked before the game, by side and team (anyone not picked starts the ace)
+    private readonly Dictionary<(bool Visitor, int TeamId), int> _starters = [];
+
+    private int StarterFor(Team team, bool visitor) =>
+        _starters.TryGetValue((visitor, team.Id), out var id) && team.Pitchers.Any(p => p.Id == id)
+            ? id
+            : team.DefaultStarter.Id;
+
+    private static string BaseSituation(GameState s)
+    {
+        var runners = new List<string>();
+        if (s.RunnerOnFirst is { } first) runners.Add($"1B {first.Player.Name}");
+        if (s.RunnerOnSecond is { } second) runners.Add($"2B {second.Player.Name}");
+        if (s.RunnerOnThird is { } third) runners.Add($"3B {third.Player.Name}");
+        return runners.Count == 0 ? "Bases empty" : string.Join(" · ", runners);
+    }
+    private GameSnapshot? _saved;
+    private string? _resumeError;
+    private GameService _game = null!;
+    private PlayResult? _lastResult;
+    private PlayScript? _replay;   // the last play as it was shown, for the Replay button (never saved with the game)
+    private CancellationTokenSource? _cpuCts;
+
+    // The animated field (Detailed view only). While it plays a play, the page keeps showing the situation
+    // from before it: the game state has already moved on, so the page is not redrawn until the play is over.
+    private DetailedFieldView? _detailed;
+    private bool _animating;
+    private DefensiveAlignment? _previewAlignment;
+    private bool _holdRender;
+    private bool _injuryShown;                // the injury scene has already shown a hurt man leaving; the replacement just appears
+    private bool _pendingIntro;                 // a new game waits for the field to come up before it starts
+    private PrePlaySnapshot? _shown;            // the situation the animated field last showed (for scenes between plays)
+
+    protected override bool ShouldRender() => !_holdRender;
+
+    // Lineups edited before the game, by team ID (teams without an entry use their default)
+    private readonly Dictionary<int, List<LineupSlot>> _customLineups = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Cast.Changed += OnCastChanged;
+        _game = new GameService(Resolver, CpuManager, Dice);
+        await ViewPrefs.InitAsync();
+        try
+        {
+            _teamOptions = [.. await Teams.GetTeamsAsync()];
+            _homeIdx = Math.Min(1, _teamOptions.Length - 1);
+            _stadiums = await Teams.GetStadiumsAsync();
+            _saved = await Saves.LoadAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException)
+        {
+            _loadError = "Could not load team data.";
+        }
+    }
+
+    private async Task StartGame()
+    {
+        _previewAlignment = null;
+        _scoreObserved = false;
+        _lastResult = null;
+        _replay = null;
+        bool visitorHuman = _humanSide is HumanSide.Visitor or HumanSide.Both;
+        bool homeHuman = _humanSide is HumanSide.Home or HumanSide.Both;
+        _game.StartGame(
+            _teamOptions[_visitorIdx],
+            _teamOptions[_homeIdx],
+            visitorHuman ? ManagerControl.Human : ManagerControl.Computer,
+            homeHuman ? ManagerControl.Human : ManagerControl.Computer,
+            stadium: ChosenPark(),
+            visitorLineupSlots: LineupFor(_teamOptions[_visitorIdx]),
+            homeLineupSlots: LineupFor(_teamOptions[_homeIdx]),
+            options: _randomEvents ? GameOptions.Standard : GameOptions.None,
+            visitorStarterId: StarterFor(_teamOptions[_visitorIdx], visitor: true),
+            homeStarterId: StarterFor(_teamOptions[_homeIdx], visitor: false));
+        bool detailed = ViewPrefs.View == FieldViewMode.Detailed;
+        if (detailed)
+        {
+            // NOTE: the animated field introduces the game (and plays the sound) once it is up; play starts after that.
+            // WHY: set before the first await. The field can come up, and ask for the introduction, while the game is
+            // still being saved; if the flag is not set by then the introduction is skipped, nothing schedules the
+            // computer's first turn, and a game with no human to act sits on "Computer deciding..." for ever.
+            _pendingIntro = true;
+            _shown = null;
+        }
+        await SaveGame();
+        if (detailed) return;
+        _ = Sound.PlayAsync("playball");
+        ScheduleComputerTurnIfNeeded();
+    }
+
+    private Stadium ChosenPark() =>
+        Teams.FindStadium(_stadiumChoice == HomePark ? _teamOptions[_homeIdx].StadiumId : _stadiumChoice);
+
+    private string ParkNameOf(Team team) => Teams.FindStadium(team.StadiumId).Name;
+
+    // ── Save and resume ──────────────────────────────────────────────────────
+
+    // WHY: every change to the game passes through here (start, each play, substitutions, injuries), so this is also
+    // where the TV is kept up to date: one place to hook instead of one per change.
+    // NOTE: ResumeGame does not call this, so it tells the TV itself.
+    private async Task SaveGame()
+    {
+        if (_game.State is null) return;
+        await Saves.SaveAsync(_game.State);
+        await PublishToTv();
+    }
+
+    private async Task PublishToTv()
+    {
+        if (_game.State is { } state)
+            await Cast.PublishAsync(state, ViewPrefs.View == FieldViewMode.Detailed);
+    }
+
+    private async Task ResumeGame()
+    {
+        if (_saved is null) return;
+        try
+        {
+            _game.Resume(_saved, id => _teamOptions.FirstOrDefault(t => t.Id == id), id => Teams.FindStadium(id));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _resumeError = ex.Message + " It has been discarded.";
+            await Saves.ClearAsync();
+            _saved = null;
+            return;
+        }
+
+        _lastResult = null;
+        _replay = null;
+        _saved = null;
+        _resumeError = null;
+        _shown = null;
+        await PublishToTv();   // WHY: a resumed game changes nothing here yet, so SaveGame has not run; the TV would stay blank
+        await OfferInjuryReplacement();
+        ScheduleComputerTurnIfNeeded();
+    }
+
+    private async Task DiscardSave()
+    {
+        await Saves.ClearAsync();
+        _saved = null;
+        _resumeError = null;
+    }
+
+    private IReadOnlyList<LineupSlot> LineupFor(Team team) =>
+        _customLineups.TryGetValue(team.Id, out var custom) ? custom : LineupRules.Default(team);
+
+    private async Task EditLineup(Team team)
+    {
+        var parameters = new DialogParameters<LineupEditorDialog>
+        {
+            { x => x.Team, team },
+            { x => x.Current, LineupFor(team) },
+        };
+        var dialog = await DialogService.ShowAsync<LineupEditorDialog>(
+            "Lineup", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: List<LineupSlot> slots })
+            _customLineups[team.Id] = slots;
+    }
+
+    private bool TwoHumans =>
+        _game.State is { VisitorControl: ManagerControl.Human, HomeControl: ManagerControl.Human };
+
+    // With one human it is their team; with two, start on the team that is batting.
+    private bool HumanIsVisitor =>
+        _game.State!.VisitorControl == ManagerControl.Human
+        && (_game.State.HomeControl != ManagerControl.Human || _game.State.IsTopOfInning);
+
+    private async Task OpenSubstitutions()
+    {
+        var parameters = new DialogParameters<SubstitutionDialog>
+        {
+            { x => x.Game, _game },
+            { x => x.Visitor, HumanIsVisitor },
+            { x => x.AllowSideChoice, TwoHumans },
+        };
+        var dialog = await DialogService.ShowAsync<SubstitutionDialog>(
+            "Substitutions", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        await dialog.Result;
+        await Sound.PlayMomentsAsync(_game.TakeMoments());
+        await SaveGame();
+        await ShowChangesAsync();
+        StateHasChanged();
+    }
+
+    private void ResetGame()
+    {
+        _previewAlignment = null;
+        _cpuCts?.Cancel();
+        _game = new GameService(Resolver, CpuManager, Dice);
+        _lastResult = null;
+        _replay = null;
+        _shown = null;
+        _pendingIntro = false;
+    }
+
+    // ── Decision handlers ────────────────────────────────────────────────────
+
+    // Humans supply the decision for each side they manage; the computer fills in the rest.
+    private async Task HandleDecision((OffensiveDecision? Offense, DefensiveDecision? Defense) decision)
+    {
+        if (_animating) return;   // a play is still being shown
+        try
+        {
+            var defense = decision.Defense ?? CpuManager.MakeDefensiveDecision(_game.State!);
+            await PreviewAlignmentAsync(defense.Alignment);
+            _lastResult = _game.ExecutePlay(decision.Offense, defense);
+            _previewAlignment = null;
+        }
+        catch (InvalidOperationException)
+        {
+            return;  // e.g. a double click after the game ended
+        }
+
+        bool animated = await AnimateLastPlayAsync();
+        StateHasChanged();
+        await PlayResultSounds(animated);
+        await OfferInjuryReplacement();
+        await SaveGame();
+        await Task.Yield();
+        ScheduleComputerTurnIfNeeded();
+    }
+
+    // WHY: alignment is chosen between plate appearances. Show the fielders moving before the pitch is resolved,
+    // whether the choice came from a person or the computer manager.
+    private async Task PreviewAlignmentAsync(DefensiveAlignment alignment)
+    {
+        if (_game.State is not { Status: GameStatus.InProgress } state || _animating) return;
+        var current = _previewAlignment ?? (state.IsTopOfInning ? state.HomeAlignment : state.VisitorAlignment);
+        if (current == alignment) return;
+
+        PrePlaySnapshot before;
+        try { before = (_shown ?? PrePlaySnapshot.Capture(state)) with { Alignment = current }; }
+        catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException) { return; }
+
+        _previewAlignment = alignment;
+        _animating = true;
+        StateHasChanged();
+        try
+        {
+            if (ViewPrefs.View == FieldViewMode.Detailed && _detailed is not null)
+                await _detailed.RepositionAsync(before, alignment, ViewPrefs.SpeedFactor);
+            else if (ViewPrefs.View == FieldViewMode.Classic)
+            {
+                await Task.Yield();
+                await Task.Delay(700);
+            }
+            _shown = before with { Alignment = alignment };
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException) { }
+        finally
+        {
+            _animating = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── Box score and injuries ───────────────────────────────────────────────
+
+    private async Task OpenRecap()
+    {
+        var parameters = new DialogParameters<RecapDialog> { { x => x.State, _game.State! } };
+        await DialogService.ShowAsync<RecapDialog>("Game recap", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+    }
+
+    // "Win probability: BOS 62%", for whichever team is ahead in the odds
+    private static string WinProbabilityLabel(GameState s)
+    {
+        double home = s.HomeWinProbability;
+        var team = home >= 0.5 ? s.HomeTeam : s.VisitorTeam;
+        return $"Win probability: {team.Abbreviation} {GameRecaps.Percent(Math.Max(home, 1 - home))}";
+    }
+
+    private async Task OpenBoxScore()
+    {
+        var parameters = new DialogParameters<BoxScoreDialog> { { x => x.State, _game.State! } };
+        await DialogService.ShowAsync<BoxScoreDialog>("Box Score", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+    }
+
+    // After a play, a hurt player on a human-managed team must be replaced before anything else happens.
+    private async Task OfferInjuryReplacement()
+    {
+        if (_game.State is not { PendingInjury: not null }) return;
+        await OpenInjury();
+    }
+
+    private async Task OpenInjury()
+    {
+        var parameters = new DialogParameters<InjuryDialog> { { x => x.Game, _game } };
+        var dialog = await DialogService.ShowAsync<InjuryDialog>("Injury", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
+        await dialog.Result;
+        await Sound.PlayMomentsAsync(_game.TakeMoments());
+        await SaveGame();
+        await ShowChangesAsync(quiet: _injuryShown);
+        _injuryShown = false;
+        StateHasChanged();
+        ScheduleComputerTurnIfNeeded();
+    }
+
+    private static string InjuredName(GameState s)
+    {
+        var n = s.PendingInjury!;
+        var player = s.TeamFor(n.Visitor).Roster.First(p => p.Id == n.PlayerId);
+        return $"{s.TeamFor(n.Visitor).Abbreviation} {player.Name}";
+    }
+
+    private static string Decisions(GameState s)
+    {
+        string Who(string decision) => string.Join(", ",
+            new[] { s.Box.Visitor, s.Box.Home }
+                .SelectMany(b => b.Pitchers).Where(p => p.Decision == decision).Select(p => p.Name));
+        var parts = new List<string>();
+        foreach (var (code, label) in new[] { ("W", "Win"), ("L", "Loss"), ("S", "Save") })
+        {
+            var who = Who(code);
+            if (who.Length > 0) parts.Add($"{label}: {who}");
+        }
+        return string.Join(" · ", parts);
+    }
+
+    // ── Computer auto-play ───────────────────────────────────────────────────
+
+    // Pause before each computer turn. A game with humans in it moves quickly; when the computer plays
+    // both sides, each plate appearance gets a longer pause so the action can be followed.
+    private static readonly TimeSpan HumanGamePause = TimeSpan.FromMilliseconds(600);
+    private static readonly TimeSpan ComputerVsComputerPause = TimeSpan.FromSeconds(3);
+
+    private static readonly TimeSpan DetailedGap = TimeSpan.FromMilliseconds(400);
+
+    private bool ComputerVsComputer =>
+        _game.State is { VisitorControl: ManagerControl.Computer, HomeControl: ManagerControl.Computer };
+
+    /// <param name="songHold">How long a song from the previous play still has to run; the next turn waits for it.</param>
+    private void ScheduleComputerTurnIfNeeded(TimeSpan songHold = default)
+    {
+        if (_game.State?.Status != GameStatus.InProgress) return;
+        if (_game.IsHumanTurn || _game.State.PendingInjury is not null) return;
+        if (_animating) return;   // a replay is on: it starts the next turn itself when it is over
+
+        _cpuCts?.Cancel();
+        _cpuCts = new CancellationTokenSource();
+        var token = _cpuCts.Token;
+        // The animated view paces itself (the play takes a few seconds), so it only needs a short gap.
+        var pause = (ViewPrefs.View == FieldViewMode.Detailed ? DetailedGap
+                        : ComputerVsComputer ? ComputerVsComputerPause : HumanGamePause) + songHold;
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(pause, token);
+            if (token.IsCancellationRequested) return;
+            await InvokeAsync(async () =>
+            {
+                if (_game.State is not { Status: GameStatus.InProgress } state || _game.IsHumanTurn) return;
+                var defense = CpuManager.MakeDefensiveDecision(state);
+                await PreviewAlignmentAsync(defense.Alignment);
+                if (token.IsCancellationRequested) return;
+                _lastResult = _game.ExecutePlay(null, defense);
+                _previewAlignment = null;
+                bool animated = await AnimateLastPlayAsync();
+                if (token.IsCancellationRequested) return;
+                StateHasChanged();
+                var song = await PlayResultSounds(animated);
+                _ = SaveGame();
+                if (_game.State?.PendingInjury is not null)
+                    _ = OpenInjury();
+                else
+                    ScheduleComputerTurnIfNeeded(song);
+            });
+        }, token);
+    }
+
+    /// <summary>Plays the sounds for the last play. Returns how long any organ tune will run.</summary>
+    private async Task<TimeSpan> PlayResultSounds(bool animated = false)
+    {
+        if (_lastResult is null) return TimeSpan.Zero;
+        _game.TakeEvents();   // the Classic view has no pictures for these (the animated view has already shown them)
+        if (!animated) await Sound.PlayForResultAsync(_lastResult);   // an animated play plays its own sounds
+        var moments = _game.TakeMoments();
+        if (_game.State?.Status == GameStatus.Final)
+        {
+            await Sound.PlayAsync("gameover");
+            return TimeSpan.Zero;
+        }
+        var song = await Sound.PlayMomentsAsync(moments);
+        // A third run in the inning sends the catcher and the infield to the mound (unless a new pitcher comes in).
+        if (animated && moments.Contains(GameMoment.Rally) && !moments.Contains(GameMoment.PitchingChange))
+            await VisitMoundAsync();
+        return song;
+    }
+
+    // ── Detailed field view ──────────────────────────────────────────────────
+
+    private async Task SetView(FieldViewMode mode)
+    {
+        if (_animating) return;
+        await ViewPrefs.SetViewAsync(mode);
+        await PublishToTv();   // the TV changes field with it
+    }
+
+    private async Task SetSpeed(AnimationSpeed speed) => await ViewPrefs.SetSpeedAsync(speed);
+
+    /// <summary>
+    /// Shows the last play again, as it was and at the chosen speed. Nothing in the game changes: when it is over
+    /// the field goes back to the situation as it stands. A computer turn that was waiting starts after it.
+    /// </summary>
+    private async Task ReplayAsync()
+    {
+        if (_animating || _replay is not { } play || _detailed is null || ViewPrefs.View != FieldViewMode.Detailed) return;
+
+        _cpuCts?.Cancel();
+        _animating = true;
+        StateHasChanged();
+        try
+        {
+            await _detailed.PlayAsync(play with { Cues = [new Cue(0, CueKind.Banner, "REPLAY"), .. play.Cues] }, ViewPrefs.SpeedFactor);
+        }
+        finally
+        {
+            _animating = false;
+        }
+        StateHasChanged();
+        ScheduleComputerTurnIfNeeded();
+    }
+
+    /// <summary>
+    /// In the Detailed view, shows the play that was just made and waits until it is over.
+    /// Returns false (having done nothing) in the Classic view, or if the play cannot be shown.
+    /// </summary>
+    private async Task<bool> AnimateLastPlayAsync()
+    {
+        if (ViewPrefs.View != FieldViewMode.Detailed || _detailed is null
+            || _lastResult is null || _game.LastPrePlay is null || _game.State is null)
+            return false;
+
+        PlayScript script;
+        try
+        {
+            script = PlayChoreographer.Build(_game.LastPrePlay, _lastResult, _game.State.PlayByPlay.Count);
+        }
+        catch (Exception)
+        {
+            return false;   // showing a play is best effort: fall back to the plain update
+        }
+
+        _replay = script;
+        _animating = true;
+        _holdRender = true;
+        try
+        {
+            // The play is already part of the game, so save it now rather than after the animation.
+            await SaveGame();
+
+            // Anyone the managers brought in before the pitch (a reliever, a pinch hitter) walks out first.
+            await PlaySceneStepAsync(() => Between(_shown, _game.LastPrePlay));
+
+            bool hasSound = script.Cues.Any(c => c.Kind == CueKind.Sound);
+            if (!hasSound) _ = Sound.PlayForResultAsync(_lastResult);   // no template yet: the usual sound
+
+            await _detailed.PlayAsync(script, ViewPrefs.SpeedFactor);
+
+            bool cheered = script.Cues.Any(c => c.Kind == CueKind.Sound && c.Value == "cheer");
+            if (hasSound && !cheered && _lastResult.RunsScored > 0 && _lastResult.Outcome != OutcomeType.HomeRun)
+                await Sound.PlayAsync("cheer");
+
+            // What happens around the play: the winners' celebration, or a new half-inning and a new pitcher.
+            var state = _game.State;
+            var happenings = _game.TakeEvents();
+            _injuryShown = state.PendingInjury is not null && happenings.Any(e => e.Kind == GameEventKind.Injury);
+            if (state.Status == GameStatus.Final)
+            {
+                if (SceneChoreographer.IsWalkOff(state) && _game.LastPrePlay is { } last)
+                    await PlaySceneStepAsync(() => [SceneChoreographer.WalkOff(last, state)]);
+                _shown = null;
+            }
+            else
+            {
+                try
+                {
+                    var now = PrePlaySnapshot.Capture(state);
+                    // A manager thrown out and a player hurt come first (they belong to the play), then the change of
+                    // innings or pitcher, and a rain delay last (it comes at the start of the new half-inning).
+                    await PlaySceneStepAsync(() => _game.LastPrePlay is not { } last ? [] :
+                        [.. happenings.Where(e => e.Kind == GameEventKind.Ejection).Select(e => SceneChoreographer.Ejection(last, e)),
+                         .. happenings.Where(e => e.Kind == GameEventKind.Injury).Select(e => SceneChoreographer.Injury(last, e, now))]);
+                    await PlaySceneStepAsync(() => _game.LastPrePlay is { } last ? SceneChoreographer.AfterPlay(last, now) : []);
+                    await PlaySceneStepAsync(() =>
+                        [.. happenings.Where(e => e.Kind == GameEventKind.RainDelay).Select(e => SceneChoreographer.RainDelay(now, e))]);
+                    _shown = now;
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException)
+                {
+                    _shown = null;
+                }
+            }
+        }
+        finally
+        {
+            _holdRender = false;
+            _animating = false;
+        }
+        return true;
+    }
+
+    // ── Scenes around the plays ──────────────────────────────────────────────
+
+    private static IReadOnlyList<PlayScript> Between(PrePlaySnapshot? from, PrePlaySnapshot? to) =>
+        from is null || to is null ? [] : SceneChoreographer.Between(from, to);
+
+    // Builds and plays some scenes. Showing a scene is best effort: one that cannot be built is left out.
+    private async Task PlaySceneStepAsync(Func<IReadOnlyList<PlayScript>> build)
+    {
+        if (_detailed is null) return;
+        IReadOnlyList<PlayScript> scenes;
+        try { scenes = build(); }
+        catch (Exception) { return; }
+        foreach (var scene in scenes)
+            await _detailed.PlayAsync(scene, ViewPrefs.SpeedFactor);
+    }
+
+    // After the managers made changes outside a play (the substitutions or injury windows): show who walks on and off.
+    private async Task ShowChangesAsync(bool quiet = false)
+    {
+        if (ViewPrefs.View != FieldViewMode.Detailed || _detailed is null || _game.State is not { Status: GameStatus.InProgress } state)
+            return;
+        PrePlaySnapshot now;
+        try { now = PrePlaySnapshot.Capture(state); }
+        catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException) { return; }
+        var before = _shown;
+        _shown = now;
+        if (before is null || _animating || quiet) return;
+
+        _animating = true;
+        _holdRender = true;
+        try { await PlaySceneStepAsync(() => Between(before, now)); }
+        finally
+        {
+            _holdRender = false;
+            _animating = false;
+        }
+    }
+
+    private async Task VisitMoundAsync()
+    {
+        if (ViewPrefs.View != FieldViewMode.Detailed || _detailed is null || _animating
+            || _game.State is not { Status: GameStatus.InProgress } state || _game.LastPrePlay is not { } last
+            || state.CurrentInning != last.Inning || state.IsTopOfInning != last.IsTop)
+            return;
+
+        _animating = true;
+        try { await PlaySceneStepAsync(() => [SceneChoreographer.MoundVisit(PrePlaySnapshot.Capture(state))]); }
+        finally { _animating = false; }
+    }
+
+    // The new game: the teams come out, the lineups are announced and the home team takes the field.
+    private async Task OnDetailedReady()
+    {
+        if (_game.State is not { } state) return;
+        if (!_pendingIntro)
+        {
+            // The animated view was switched on in the middle of a game.
+            try { _shown = PrePlaySnapshot.Capture(state); }
+            catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException) { }
+            return;
+        }
+
+        _pendingIntro = false;
+        _animating = true;
+        _holdRender = true;
+        try
+        {
+            await PlaySceneStepAsync(() => [SceneChoreographer.PlayBall(state)]);
+            try { _shown = PrePlaySnapshot.Capture(state); }
+            catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException) { }
+        }
+        finally
+        {
+            _holdRender = false;
+            _animating = false;
+        }
+        StateHasChanged();
+        ScheduleComputerTurnIfNeeded();
+    }
+
+    // WHY: a TV was connected or disconnected: the field moves there or comes back here.
+    // NOTE: ShouldRender() is false while a play is shown, so a change during an animation takes effect when it ends.
+    private void OnCastChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        _ = JS.InvokeVoidAsync("mlbMobileScore.disconnect");
+        Cast.Changed -= OnCastChanged;
+        _cpuCts?.Cancel();
+    }
+
+    // ── Display helpers ──────────────────────────────────────────────────────
+
+    private static string InningLabel(GameState s)
+    {
+        string half = s.IsTopOfInning ? "▲" : "▼";
+        return $"{half} {s.CurrentInning}";
+    }
+
+    private static string Avg(BatterStats b)
+    {
+        string raw = b.BattingAverage.ToString("F3");
+        return raw.StartsWith("0") ? raw[1..] : raw;  // strip leading 0 → .320
+    }
+
+    private static string PositionLabel(MiniLeague.Engine.Models.Position p) => p switch
+    {
+        MiniLeague.Engine.Models.Position.P      => "P",
+        MiniLeague.Engine.Models.Position.C      => "C",
+        MiniLeague.Engine.Models.Position.First  => "1B",
+        MiniLeague.Engine.Models.Position.Second => "2B",
+        MiniLeague.Engine.Models.Position.Third  => "3B",
+        MiniLeague.Engine.Models.Position.Short  => "SS",
+        MiniLeague.Engine.Models.Position.Left   => "LF",
+        MiniLeague.Engine.Models.Position.Center => "CF",
+        MiniLeague.Engine.Models.Position.Right  => "RF",
+        MiniLeague.Engine.Models.Position.DH     => "DH",
+        _ => p.ToString()
+    };
+
+    private static string BatHandLabel(BatHand b) => b switch
+    {
+        BatHand.Left => "L", BatHand.Right => "R", _ => "S"
+    };
+
+    private static Color ConditionColor(PitcherCondition c) => c switch
+    {
+        PitcherCondition.Fresh     => Color.Success,
+        PitcherCondition.Ok        => Color.Info,
+        PitcherCondition.Tiring    => Color.Warning,
+        PitcherCondition.Tired     => Color.Error,
+        PitcherCondition.Exhausted => Color.Dark,
+        _ => Color.Default
+    };
+
+}

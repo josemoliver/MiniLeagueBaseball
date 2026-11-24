@@ -1,0 +1,86 @@
+@* The game's story: headline, how the win probability swung, the highlights and the standout players. *@
+@inject ExportService Export
+
+@{
+    var s = State;
+    var recap = GameRecaps.Build(s);
+}
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Game recap</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div data-testid="recap">
+            <MudText Typo="Typo.subtitle1" data-testid="recap-headline"><b>@recap.Headline</b></MudText>
+
+            @if (recap.Track.Count == 0)
+            {
+                <MudText Class="mud-text-secondary mt-2">No plays yet. Come back once the game is under way.</MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.overline" Class="mt-3" Style="display:block">
+                    WIN PROBABILITY, @s.HomeTeam.Abbreviation (HOME) AT THE TOP
+                </MudText>
+                <WinProbabilityChart State="@s" KeyPlays="@recap.KeyPlays" />
+
+                @if (recap.Story.Count > 0)
+                {
+                    <ul class="recap-list" data-testid="recap-story">
+                        @foreach (var line in recap.Story)
+                        {
+                            <li>@line</li>
+                        }
+                    </ul>
+                }
+
+                @if (recap.KeyPlays.Count > 0)
+                {
+                    <MudText Typo="Typo.overline" Style="display:block">HIGHLIGHTS</MudText>
+                    <ol class="recap-plays" data-testid="recap-highlights">
+                        @foreach (var p in recap.KeyPlays)
+                        {
+                            bool home = p.Swing > 0;
+                            <li>
+                                <span class="recap-when">@p.Half</span>
+                                <span class="recap-score">@s.VisitorTeam.Abbreviation @p.VisitorScore, @s.HomeTeam.Abbreviation @p.HomeScore</span>
+                                <span class="recap-desc">@p.Description</span>
+                                <span class="recap-swing @(home ? "recap-swing-home" : "recap-swing-visitor")">
+                                    @(home ? "+" : "−")@(MiniLeague.Engine.Services.GameRecaps.Percent(Math.Abs(p.Swing))) @(home ? s.HomeTeam.Abbreviation : s.VisitorTeam.Abbreviation)
+                                </span>
+                            </li>
+                        }
+                    </ol>
+                }
+
+                @if (recap.Performers.Count > 0)
+                {
+                    <MudText Typo="Typo.overline" Style="display:block">TOP PERFORMERS</MudText>
+                    <ul class="recap-list" data-testid="recap-performers">
+                        @foreach (var line in recap.Performers)
+                        {
+                            <li>@line</li>
+                        }
+                    </ul>
+                }
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary" data-testid="recap-status">@_status</MudText>
+        <MudSpacer />
+        <MudButton OnClick="Copy">Copy recap</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@(() => MudDialog.Close())">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public GameState State { get; set; } = null!;
+
+    private string _status = "";
+
+    private async Task Copy() =>
+        _status = await Export.CopyAsync(GameRecaps.ToText(State)) ? "Copied to the clipboard." : "Could not copy.";
+}

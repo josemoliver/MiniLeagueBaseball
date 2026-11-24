@@ -1,0 +1,487 @@
+@* Overhead stadium view — crowd, wall, warning track, mow stripes, animated ball flight *@
+@using System.Globalization
+@using MiniLeague.Engine.Animation
+@using EngineModels = MiniLeague.Engine.Models
+
+<div class="field-wrap">
+    <svg class="field-svg" viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+
+        <defs>
+            @* Fair territory: home plate (300,350), foul poles (45,95)/(555,95), wall arc R675 centered (300,720) *@
+            <clipPath id="fair-territory">
+                <path d="M 300 350 L 45 95 A 675 675 0 0 1 555 95 Z" />
+            </clipPath>
+        </defs>
+
+        @* ── Stands + crowd ──────────────────────────────────────────────── *@
+        <rect x="0" y="0" width="600" height="400" fill="#23232b" />
+        @foreach (var c in _crowd)
+        {
+            <circle cx="@c.X" cy="@c.Y" r="@c.R" fill="@c.Color" opacity="0.85" />
+        }
+
+        @* ── Grass: foul territory (darker), then fair territory ─────────── *@
+        <path d="M 0 400 L 0 95 L 45 95 A 675 675 0 0 1 555 95 L 600 95 L 600 400 Z" fill="#24521a" />
+        <path d="M 300 350 L 45 95 A 675 675 0 0 1 555 95 Z" fill="#2e6a1c" />
+
+        @* ── Mowing stripes — concentric arcs centered on home plate ─────── *@
+        <g clip-path="url(#fair-territory)">
+            @foreach (var r in StripeRadii)
+            {
+                <circle cx="300" cy="350" r="@r" fill="none" stroke="#ffffff" stroke-width="32" opacity="0.045" />
+            }
+        </g>
+
+        @* ── Warning track + outfield wall + HR line ─────────────────────── *@
+        <path d="M 56 106 A 661 661 0 0 1 544 106"
+              fill="none" stroke="#a9794f" stroke-width="17" clip-path="url(#fair-territory)" />
+        <line x1="0" y1="95" x2="47" y2="95" stroke="#1b3a5c" stroke-width="7" />
+        <line x1="553" y1="95" x2="600" y2="95" stroke="#1b3a5c" stroke-width="7" />
+        <path d="M 45 95 A 675 675 0 0 1 555 95" fill="none" stroke="#1b3a5c" stroke-width="7" />
+        <path d="M 45 92 A 678 678 0 0 1 555 92" fill="none" stroke="#ffd54f" stroke-width="1.6" opacity="0.9" />
+
+        @* ── Wall distance markers ───────────────────────────────────────── *@
+        @((MarkupString)SvgDistance(Park.LeftField.ToString(), -18))
+        @((MarkupString)SvgDistance(Park.LeftCenter.ToString(), -9))
+        @((MarkupString)SvgDistance(Park.Center.ToString(), 0))
+        @((MarkupString)SvgDistance(Park.RightCenter.ToString(), 9))
+        @((MarkupString)SvgDistance(Park.RightField.ToString(), 18))
+        @((MarkupString)SvgParkName(Park.Name))
+
+        @* ── Infield dirt: arc behind 2B + foul-side skirts + home circle ── *@
+        <path d="M 300 368 L 185 250 A 115 115 0 0 1 415 250 Z" fill="#9a6b44" />
+        <circle cx="300" cy="352" r="26" fill="#9a6b44" />
+
+        @* ── Infield grass diamond (inset leaves dirt basepaths visible) ─── *@
+        <path d="M 300 332 L 218 250 L 300 168 L 382 250 Z" fill="#2f6f1e" />
+
+        @* ── Foul lines — chalk from plate to the corners ────────────────── *@
+        <line x1="300" y1="350" x2="45"  y2="95" stroke="#f0f0f0" stroke-width="2" opacity="0.85" />
+        <line x1="300" y1="350" x2="555" y2="95" stroke="#f0f0f0" stroke-width="2" opacity="0.85" />
+
+        @* ── Pitcher's mound + rubber ────────────────────────────────────── *@
+        <circle cx="300" cy="255" r="13" fill="#a9794f" />
+        <rect x="296" y="253.6" width="8" height="2.4" rx="0.6" fill="white" opacity="0.9" />
+
+        @* ── Home plate area: batter's boxes, catcher's box, the plate ───── *@
+        <rect x="282" y="342" width="9"  height="15" fill="rgba(255,255,255,0.07)" stroke="#f0f0f0" stroke-width="1" opacity="0.6" />
+        <rect x="309" y="342" width="9"  height="15" fill="rgba(255,255,255,0.07)" stroke="#f0f0f0" stroke-width="1" opacity="0.6" />
+        <rect x="293" y="361" width="14" height="8"  fill="none" stroke="#f0f0f0" stroke-width="1" opacity="0.45" />
+        <polygon points="294,346 306,346 306,351 300,356 294,351" fill="white" stroke="#999" stroke-width="0.8" />
+
+        @* ── On-deck circles ─────────────────────────────────────────────── *@
+        <circle cx="232" cy="366" r="8" fill="none" stroke="#f0f0f0" stroke-width="1.2" opacity="0.3" />
+        <circle cx="368" cy="366" r="8" fill="none" stroke="#f0f0f0" stroke-width="1.2" opacity="0.3" />
+
+        @* ── Bases — squares aligned with the basepaths ──────────────────── *@
+        <rect x="-6.5" y="-6.5" width="13" height="13" rx="1.5" transform="translate(400,250) rotate(45)"
+              fill="white" stroke="#999" stroke-width="1" />
+        <rect x="-6.5" y="-6.5" width="13" height="13" rx="1.5" transform="translate(300,150) rotate(45)"
+              fill="white" stroke="#999" stroke-width="1" />
+        <rect x="-6.5" y="-6.5" width="13" height="13" rx="1.5" transform="translate(200,250) rotate(45)"
+              fill="white" stroke="#999" stroke-width="1" />
+
+        @* ── Per-play layer — keyed so animations restart on every play ──── *@
+        <g @key="_playSeq">
+
+            @* Fielders *@
+            @foreach (var f in _fielders)
+            {
+                <g class="fielder-group" style="@($"transform:translate({f.X}px,{f.Y}px)")">
+                    <ellipse cx="0" cy="6" rx="6" ry="2" fill="#000" opacity="0.25" />
+                    <circle cx="0" cy="0" r="7"
+                            fill="@(f.Active ? "#e53935" : "#1565c0")"
+                            stroke="white" stroke-width="1.5"
+                            class="@(f.Active ? "fielder-active" : "")" />
+                    @((MarkupString)SvgLabel(f.Label, 0, 4))
+                    <g class="fielder-name" transform="translate(0, -14)">
+                        <rect x="@(-(f.Name.Length * 5 / 2 + 4))" y="-9"
+                              width="@(f.Name.Length * 5 + 8)" height="11" rx="2"
+                              fill="#000000" fill-opacity="0.8" />
+                        @((MarkupString)$"""<text x="0" y="0" text-anchor="middle" dominant-baseline="middle" font-size="7" fill="white" style="pointer-events:none">{f.Name}</text>""")
+                    </g>
+                </g>
+            }
+
+            @* Batter at the plate *@
+            <circle cx="287" cy="349" r="5.5" fill="#ffb300" stroke="white" stroke-width="1.5" />
+
+            @* Base runners — animate along the basepaths; scoring runners fade at home *@
+            @foreach (var t in _runnerTokens)
+            {
+                @if (t.Path is null)
+                {
+                    <circle cx="@t.X" cy="@t.Y" r="6" fill="#ffb300" stroke="white" stroke-width="1.5" />
+                }
+                else
+                {
+                    <circle cx="@t.X" cy="@t.Y" r="6" fill="#ffb300" stroke="white" stroke-width="1.5">
+                        <animateMotion id="@t.MotionId" dur="@t.Dur" fill="freeze" path="@t.Path" />
+                        @if (t.Scores)
+                        {
+                            <animate attributeName="opacity" to="0" begin="@(t.MotionId + ".end")" dur="0.4s" fill="freeze" />
+                        }
+                    </circle>
+                }
+            }
+
+            @* Broadcast-style trajectory tracer *@
+            @if (_showTracer)
+            {
+                <path class="ball-tracer" d="@_ballPath" pathLength="100"
+                      style="animation-duration:@_ballDuration" />
+            }
+
+            @* Ball — grows mid-flight on fly balls to suggest height *@
+            @if (_showBall)
+            {
+                <circle cx="0" cy="0" r="@(_flight == Flight.Ground ? "3.5" : "4")"
+                        fill="white" stroke="#ccc" stroke-width="1" class="ball-anim">
+                    <animateMotion dur="@_ballDuration" fill="freeze" path="@_ballPath" />
+                    @if (_flight == Flight.Fly)
+                    {
+                        <animate attributeName="r" values="4;8;4.5" dur="@_ballDuration" fill="freeze" />
+                    }
+                    else if (_flight == Flight.Line)
+                    {
+                        <animate attributeName="r" values="4;5.5;4" dur="@_ballDuration" fill="freeze" />
+                    }
+                </circle>
+            }
+
+            @* Home-run burst where the ball lands in the seats *@
+            @if (_showBurst)
+            {
+                <g class="hr-burst" transform="translate(300,26)" style="animation-delay:@_ballDuration">
+                    <path d="M0,-10 L2.5,-2.5 L10,0 L2.5,2.5 L0,10 L-2.5,2.5 L-10,0 L-2.5,-2.5 Z" fill="#ffd54f" />
+                    <circle r="3" fill="#fff" />
+                </g>
+            }
+
+            @* Outcome banner *@
+            @if (!string.IsNullOrEmpty(_bannerText))
+            {
+                <g class="banner-pop">
+                    <rect x="160" y="170" width="280" height="44" rx="8"
+                          fill="@_bannerFill" opacity="0.94"
+                          stroke="rgba(255,255,255,0.35)" stroke-width="1" />
+                    @((MarkupString)SvgBanner(_bannerText))
+                </g>
+            }
+
+        </g>
+    </svg>
+</div>
+
+@code {
+    [Parameter] public PlayResult? LastResult       { get; set; }
+    [Parameter] public BaseRunner? RunnerOnFirst    { get; set; }
+    [Parameter] public BaseRunner? RunnerOnSecond   { get; set; }
+    [Parameter] public BaseRunner? RunnerOnThird    { get; set; }
+    [Parameter] public GameState? Game               { get; set; }
+    [Parameter] public DefensiveAlignment Alignment  { get; set; }
+    [Parameter] public Stadium? Stadium              { get; set; }
+
+    private Stadium Park => Stadium ?? Stadium.Generic;
+    [Parameter] public Player? CurrentPitcher       { get; set; }
+
+    private enum Flight { None, Ground, Line, Fly }
+
+    private static readonly int[] StripeRadii = [120, 184, 248, 312, 376];
+
+    // ── Crowd dots — deterministic, generated once ────────────────────────
+
+    private record CrowdDot(string X, string Y, string R, string Color);
+
+    private static readonly CrowdDot[] _crowd = BuildCrowd();
+
+    private static CrowdDot[] BuildCrowd()
+    {
+        // Band just beyond the wall arc (center 300,720 / R 675)
+        var rng = new Random(11);
+        string[] palette = ["#cfd3da", "#aab1bd", "#8d949f", "#d9c6a5", "#b85c5c", "#5c84b8", "#c9a44e", "#7fa66a"];
+        var dots = new List<CrowdDot>();
+        while (dots.Count < 230)
+        {
+            double ang = (rng.NextDouble() * 44.0 - 22.0) * Math.PI / 180.0;
+            double rad = 684 + rng.NextDouble() * 78;
+            double x = 300 + rad * Math.Sin(ang);
+            double y = 720 - rad * Math.Cos(ang);
+            if (y < 4) continue;
+            string size = (1.1 + rng.NextDouble() * 1.1).ToString("F1", CultureInfo.InvariantCulture);
+            dots.Add(new CrowdDot(
+                x.ToString("F1", CultureInfo.InvariantCulture),
+                y.ToString("F1", CultureInfo.InvariantCulture),
+                size, palette[rng.Next(palette.Length)]));
+        }
+        return [.. dots];
+    }
+
+    // ── Fielder positions ─────────────────────────────────────────────────
+
+    private record Fielder(string Label, string Name, int X, int Y, bool Active = false);
+
+    private Fielder[] _fielders = [];
+
+    // Diamond: home (300,350), 1B (400,250), 2B (300,150), 3B (200,250), mound (300,255)
+    private Fielder[] BuildFielders()
+    {
+        Fielder[] fielders =
+        [
+            Mk("P",  "Pitcher",      EngineModels.Position.P,      300, 250),
+            Mk("C",  "Catcher",      EngineModels.Position.C,      300, 374),
+            Mk("1B", "First Base",   EngineModels.Position.First,  418, 258),
+            Mk("2B", "Second Base",  EngineModels.Position.Second, 358, 195),
+            Mk("SS", "Shortstop",    EngineModels.Position.Short,  242, 195),
+            Mk("3B", "Third Base",   EngineModels.Position.Third,  182, 258),
+            Mk("LF", "Left Field",   EngineModels.Position.Left,   135, 140),
+            Mk("CF", "Center Field", EngineModels.Position.Center, 300, 105),
+            Mk("RF", "Right Field",  EngineModels.Position.Right,  465, 140),
+        ];
+        // WHY: the shifts depend on which side the batter pulls to, so use the real batter (switch hitters
+        // follow the pitcher's hand). Without a game in progress, assume a right-hander.
+        var hand = BatHand.Right;
+        if (Game?.CurrentBatter is { } batter && Game.CurrentPitcher?.Player is { } pitcher)
+            hand = batter.BatsAgainst(pitcher.ThrowHand);
+        var normal = FieldGeometry.FielderSpots(DefensiveAlignment.Standard, hand, Park);
+        var shifted = FieldGeometry.FielderSpots(Alignment, hand, Park);
+        EngineModels.Position[] positions =
+        [
+            EngineModels.Position.First, EngineModels.Position.Second, EngineModels.Position.Short,
+            EngineModels.Position.Third, EngineModels.Position.Left, EngineModels.Position.Center,
+            EngineModels.Position.Right,
+        ];
+        for (int i = 2; i < fielders.Length; i++)
+        {
+            var pos = positions[i - 2];
+            fielders[i] = fielders[i] with
+            {
+                X = fielders[i].X + (int)Math.Round((shifted[pos].X - normal[pos].X) * 1.2),
+                Y = fielders[i].Y - (int)Math.Round((shifted[pos].Y - normal[pos].Y) * 0.9),
+            };
+        }
+        for (int i = 0; i < fielders.Length; i++)
+            if (_activeIdx.Contains(i))
+                fielders[i] = fielders[i] with { Active = true };
+        return fielders;
+    }
+
+    private Fielder Mk(string label, string fallback, EngineModels.Position pos, int x, int y)
+    {
+        string name;
+        if (pos == EngineModels.Position.P && CurrentPitcher is not null)
+            name = CurrentPitcher.Name;
+        else
+            name = Game?.DefenderAt(pos)?.Name ?? fallback;
+        return new(label, name, x, y);
+    }
+
+    // ── Play animation state ──────────────────────────────────────────────
+
+    private PlayResult? _lastApplied;
+    private int    _playSeq;
+    private bool   _showBall;
+    private bool   _showTracer;
+    private bool   _showBurst;
+    private Flight _flight = Flight.None;
+    private string _ballPath     = "";
+    private string _ballDuration = "0.7s";
+    private string _bannerText   = "";
+    private string _bannerFill   = "#1565c0";
+    private int[]  _activeIdx    = [];
+
+    protected override void OnParametersSet()
+    {
+        // NOTE: animations restart only when a genuinely new play arrives.
+        // WHY: `LastResult is null` must not be skipped: with no play to show (a resumed game, the TV view) the
+        // runner tokens are only built by ResetPlay, so without it the bases were drawn empty.
+        if (LastResult is null || !ReferenceEquals(LastResult, _lastApplied))
+        {
+            _lastApplied = LastResult;
+            if (LastResult is null)
+            {
+                ResetPlay();
+            }
+            else
+            {
+                _playSeq++;
+                ApplyResult(LastResult);
+                ComputeRunnerTokens(LastResult);
+            }
+            // Snapshot base occupants so the next play can derive movement
+            _snapFirst  = RunnerOnFirst?.Player;
+            _snapSecond = RunnerOnSecond?.Player;
+            _snapThird  = RunnerOnThird?.Player;
+        }
+        _fielders = BuildFielders();
+    }
+
+    private void ResetPlay()
+    {
+        _showBall   = false;
+        _showTracer = false;
+        _showBurst  = false;
+        _bannerText = "";
+        _activeIdx  = [];
+        _flight     = Flight.None;
+        _runnerTokens = [];
+        if (RunnerOnFirst  is not null) _runnerTokens.Add(StaticToken(1));
+        if (RunnerOnSecond is not null) _runnerTokens.Add(StaticToken(2));
+        if (RunnerOnThird  is not null) _runnerTokens.Add(StaticToken(3));
+    }
+
+    // ── Runner movement — diff previous base occupants against current ────
+
+    private record RunnerToken(string? Path, int X, int Y, string Dur, string MotionId, bool Scores);
+
+    // Index 0 = home, then 1B, 2B, 3B
+    private static readonly (int X, int Y)[] BasePts = [(300, 350), (400, 250), (300, 150), (200, 250)];
+
+    private List<RunnerToken> _runnerTokens = [];
+    private Player? _snapFirst, _snapSecond, _snapThird;
+
+    private void ComputeRunnerTokens(PlayResult r)
+    {
+        var tokens = new List<RunnerToken>();
+        int seq = 0;
+
+        // Lead runner first so scoring credit goes to the runner closest to home
+        var prev = new List<(int Base, Player P)>();
+        if (_snapThird  is not null) prev.Add((3, _snapThird));
+        if (_snapSecond is not null) prev.Add((2, _snapSecond));
+        if (_snapFirst  is not null) prev.Add((1, _snapFirst));
+
+        var consumed = new HashSet<int>();
+        (int Base, Player? P)[] cur = [(1, RunnerOnFirst?.Player), (2, RunnerOnSecond?.Player), (3, RunnerOnThird?.Player)];
+        foreach (var (b, p) in cur)
+        {
+            if (p is null) continue;
+            int from = 0;  // not on base before → batter coming from home
+            foreach (var pr in prev)
+            {
+                if (ReferenceEquals(pr.P, p)) { from = pr.Base; consumed.Add(pr.Base); break; }
+            }
+            tokens.Add(from == b ? StaticToken(b) : MovingToken(from, b, false, seq++));
+        }
+
+        // Previous runners no longer on base either scored or were put out.
+        // Credit runs lead-runner-first; outs simply leave the field.
+        int runs = r.RunsScored;
+        foreach (var (b, _) in prev)
+        {
+            if (consumed.Contains(b)) continue;
+            if (runs > 0) { tokens.Add(MovingToken(b, 4, true, seq++)); runs--; }
+        }
+        if (runs > 0) tokens.Add(MovingToken(0, 4, true, seq));  // batter rounds the bases
+
+        _runnerTokens = tokens;
+    }
+
+    private static RunnerToken StaticToken(int b) => new(null, BasePts[b].X, BasePts[b].Y, "", "", false);
+
+    private RunnerToken MovingToken(int from, int to, bool scores, int seq)
+    {
+        string dur = (0.45 * (to - from)).ToString("0.##", CultureInfo.InvariantCulture) + "s";
+        return new(RunPath(from, to), BasePts[from].X, BasePts[from].Y, dur, $"rm{_playSeq}x{seq}", scores);
+    }
+
+    // Piecewise path through each intermediate base, relative to the start base
+    private static string RunPath(int from, int to)
+    {
+        var (sx, sy) = BasePts[from];
+        var path = "M 0,0";
+        for (int b = from + 1; b <= to; b++)
+        {
+            var (px, py) = BasePts[b % 4];
+            path += $" L {px - sx},{py - sy}";
+        }
+        return path;
+    }
+
+    private void ApplyResult(PlayResult r)
+    {
+        (string banner, string fill, string path, string dur, int[] active, Flight flight) result =
+            r.Outcome switch
+            {
+                OutcomeType.HomeRun    => ("HOME RUN!",       "#e65100", HRPath(),      "1.2s",  new[]{6,7,8}, Flight.Fly),
+                OutcomeType.Triple     => ("TRIPLE",          "#1565c0", TriplePath(),  "1.0s",  new[]{6,7,8}, Flight.Fly),
+                OutcomeType.Double     => ("DOUBLE",          "#1565c0", DoublePath(),  "0.9s",  new[]{6,7,8}, Flight.Fly),
+                OutcomeType.Single when r.IsBunt
+                                       => ("BUNT SINGLE",     "#2e7d32", BuntPath(),    "0.8s",  new[]{0,1,5}, Flight.Ground),
+                OutcomeType.SacrificeBunt
+                                       => ("SAC BUNT",        "#4e342e", BuntPath(),    "0.8s",  new[]{0,1,5}, Flight.Ground),
+                OutcomeType.FieldersChoice
+                                       => ("FIELDER'S CHOICE", "#4e342e", BuntPath(),   "0.8s",  new[]{0,1,5}, Flight.Ground),
+                OutcomeType.GroundOut when r.IsBunt
+                                       => ("BUNT OUT",        "#4e342e", BuntPath(),    "0.8s",  new[]{0,1,5}, Flight.Ground),
+                OutcomeType.Single     => ("SINGLE",          "#2e7d32", SinglePath(),  "0.65s", System.Array.Empty<int>(), Flight.Line),
+                OutcomeType.Walk or OutcomeType.HitByPitch
+                    or OutcomeType.IntentionalWalk
+                                       => ("WALK",            "#1976d2", "",            "0s",    new[]{1}, Flight.None),
+                OutcomeType.Strikeout  => ("STRIKE OUT",      "#b71c1c", PitchPath(),   "0.3s",  new[]{1}, Flight.Ground),
+                OutcomeType.GroundOut  => ("GROUND OUT",      "#4e342e", GroundPath(),  "0.55s", new[]{3,4,5}, Flight.Ground),
+                OutcomeType.FlyOut     => ("FLY OUT",         "#4e342e", FlyPath(),     "0.8s",  new[]{6,7,8}, Flight.Fly),
+                OutcomeType.LineOut    => ("LINE OUT",        "#4e342e", LineOutPath(), "0.45s", new[]{2,3,4,5}, Flight.Line),
+                OutcomeType.PopOut     => ("POP OUT",         "#4e342e", PopPath(),     "0.6s",  new[]{3,4}, Flight.Fly),
+                OutcomeType.DoublePlay => ("DOUBLE PLAY",     "#4e342e", GroundPath(),  "0.55s", new[]{2,3,4,5}, Flight.Ground),
+                OutcomeType.TriplePlay => ("TRIPLE PLAY",     "#4e342e", GroundPath(),  "0.55s", new[]{2,3,4,5}, Flight.Ground),
+                OutcomeType.StolenBase => ("STOLEN BASE",     "#6a1b9a", "",            "0s",    new[]{1}, Flight.None),
+                OutcomeType.CaughtStealing
+                                       => ("CAUGHT STEALING", "#b71c1c", "",            "0s",    new[]{1}, Flight.None),
+                OutcomeType.WildPitch  => ("WILD PITCH",      "#6a1b9a", "",            "0s",    new[]{0,1}, Flight.None),
+                OutcomeType.PassedBall => ("PASSED BALL",     "#6a1b9a", "",            "0s",    new[]{1}, Flight.None),
+                OutcomeType.Balk       => ("BALK",            "#6a1b9a", "",            "0s",    new[]{0}, Flight.None),
+                OutcomeType.Error      => ("ERROR",           "#b71c1c", GroundPath(),  "0.55s", new[]{3,4,5}, Flight.Ground),
+                _                      => (r.Outcome.ToString(), "#546e7a", "",         "0s",    System.Array.Empty<int>(), Flight.None)
+            };
+
+        _bannerText   = result.banner;
+        _bannerFill   = result.fill;
+        _ballPath     = result.path;
+        _ballDuration = result.dur;
+        _flight       = result.flight;
+        _activeIdx    = result.active;
+        _showBall     = !string.IsNullOrEmpty(result.path);
+        _showTracer   = _showBall && r.Outcome != OutcomeType.Strikeout;
+        _showBurst    = r.Outcome == OutcomeType.HomeRun;
+    }
+
+    // ── Raw SVG string helpers (sidestep Razor <text> parsing) ────────────
+
+    private static string SvgLabel(string label, int x, int y) =>
+        $"""<text x="{x}" y="{y}" text-anchor="middle" font-size="6" fill="white" font-weight="bold" style="pointer-events:none">{label}</text>""";
+
+    private static string SvgParkName(string name) =>
+        string.IsNullOrEmpty(name) ? "" :
+        $"""<text x="10" y="392" font-size="9" fill="rgba(255,255,255,0.45)" font-family="sans-serif">{System.Net.WebUtility.HtmlEncode(name)}</text>""";
+
+    private static string SvgBanner(string text) =>
+        $"""<text x="300" y="199" text-anchor="middle" font-size="22" font-weight="bold" fill="white" font-family="monospace" letter-spacing="2">{text}</text>""";
+
+    // Placed on the warning track (R 661 about the wall's center 300,720): baseline just
+    // inside the track midline so the 9px digits sit centered on it, rotated to the wall's
+    // tangent. angleDeg is measured from straightaway center (+ = right field).
+    private static string SvgDistance(string text, double angleDeg)
+    {
+        const double baselineRadius = 658;
+        double rad = angleDeg * Math.PI / 180.0;
+        string x = (300 + baselineRadius * Math.Sin(rad)).ToString("F1", CultureInfo.InvariantCulture);
+        string y = (720 - baselineRadius * Math.Cos(rad)).ToString("F1", CultureInfo.InvariantCulture);
+        string rot = angleDeg.ToString("F1", CultureInfo.InvariantCulture);
+        return $"""<text x="{x}" y="{y}" text-anchor="middle" font-size="9" font-weight="bold" fill="rgba(255,255,255,0.7)" font-family="monospace" transform="rotate({rot} {x} {y})">{text}</text>""";
+    }
+
+    // ── Ball flight paths — plate ≈ (300,348); CF wall ≈ (300,45) ─────────
+
+    private static string HRPath()      => "M 300,348 C 288,270 280,140 300,28";
+    private static string TriplePath()  => "M 300,348 C 275,280 210,190 115,95";
+    private static string DoublePath()  => "M 300,348 C 318,280 400,200 478,112";
+    private static string SinglePath()  => "M 300,348 C 312,300 360,250 402,222";
+    private static string GroundPath()  => "M 300,348 C 295,320 270,250 252,212";
+    // A bunt dies a few feet in front of the plate, down the third-base side: the pitcher, catcher and third baseman come in.
+    private static string BuntPath()    => "M 300,348 C 292,336 280,322 266,306";
+    private static string FlyPath()     => "M 300,348 C 296,290 296,190 300,108";
+    private static string LineOutPath() => "M 300,348 C 340,310 390,260 408,235";
+    private static string PopPath()     => "M 300,348 C 308,315 322,270 330,232";
+    private static string PitchPath()   => "M 300,250 L 300,344";
+}

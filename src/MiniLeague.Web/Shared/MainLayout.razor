@@ -1,0 +1,106 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject SoundService Sound
+@inject PwaService Pwa
+@inject CastService Cast
+@inject IDialogService DialogService
+
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit"
+                       Edge="Edge.Start" OnClick="@ToggleDrawer" />
+        <MudText Typo="Typo.h6" Class="app-title" Style="font-weight:700; letter-spacing:0.05em">
+            MINILEAGUE<span class="app-title-tail"> BASEBALL</span>
+        </MudText>
+        <MudSpacer />
+        <CastButton />
+        <MudIconButton Icon="@Icons.Material.Filled.HelpOutline" Color="Color.Inherit"
+                       OnClick="OpenHelp" title="Game help" aria-label="Game help" data-testid="game-help" />
+        <MudIconButton Icon="@(_muted ? Icons.Material.Filled.VolumeOff : Icons.Material.Filled.VolumeUp)"
+                       Color="Color.Inherit" OnClick="ToggleMute"
+                       title="@(_muted ? "Unmute sound" : "Mute sound")" />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" Variant="DrawerVariant.Temporary">
+        <MudDrawerHeader>
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">Navigation</MudText>
+        </MudDrawerHeader>
+        <MudNavMenu>
+            <MudNavLink Href="" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+            <MudNavLink Href="game"
+                        Icon="@Icons.Material.Filled.SportsBaseball">Play Ball</MudNavLink>
+            <MudNavLink Href="shortcuts"
+                        Icon="@Icons.Material.Filled.Keyboard">Keyboard Cards</MudNavLink>
+            @* Only after casting has failed (see CastService.ShowTvFallback): then it is the way to cast a tab by hand. *@
+            @if (Cast.ShowTvFallback)
+            {
+                <MudNavLink Href="tv" Target="_blank"
+                            Icon="@Icons.Material.Filled.Tv"
+                            data-testid="tv-link">TV view</MudNavLink>
+            }
+            <MudNavLink Href="about"
+                        Icon="@Icons.Material.Filled.Info"
+                        data-testid="about-link">About</MudNavLink>
+            <MudNavLink Href="https://github.com/josemoliver/MiniLeagueBaseball" Target="_blank"
+                        Icon="@Icons.Custom.Brands.GitHub"
+                        data-testid="github-link">GitHub Repository</MudNavLink>
+            @if (_canInstall)
+            {
+                <MudNavLink OnClick="InstallApp" Icon="@Icons.Material.Filled.InstallDesktop"
+                            data-testid="install-app">Install app</MudNavLink>
+            }
+        </MudNavMenu>
+        <div class="drawer-version" data-testid="app-version">Version @AppVersion.Current</div>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False" Class="pt-4 pb-8 app-container">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen;
+    private bool _muted;
+    private bool _canInstall;
+
+    private async Task OpenHelp() => await DialogService.ShowAsync<HelpDialog>("Game help",
+        options: new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+
+    protected override void OnInitialized() => Cast.Changed += OnCastChanged;
+
+    private void OnCastChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Cast.Changed -= OnCastChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Sound.InitAsync();
+        _muted = Sound.Muted;
+        StateHasChanged();
+    }
+
+    private async Task ToggleMute()
+    {
+        _muted = !_muted;
+        await Sound.SetMutedAsync(_muted);
+        if (!_muted) await Sound.PlayAsync("blip");
+    }
+
+    // The browser decides when the game can be installed, so ask each time the menu opens.
+    private async Task ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+        if (_drawerOpen) _canInstall = await Pwa.CanInstallAsync();
+    }
+
+    private async Task InstallApp()
+    {
+        await Pwa.InstallAsync();
+        _canInstall = await Pwa.CanInstallAsync();
+        _drawerOpen = false;
+    }
+}

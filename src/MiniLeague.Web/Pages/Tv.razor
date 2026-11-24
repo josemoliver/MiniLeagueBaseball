@@ -1,0 +1,125 @@
+@page "/tv"
+@layout TvLayout
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject TeamRepository Teams
+
+@* WHY: the game for a big screen: score, the field, who is up and the last play. It only shows what the controlling
+   page sends (see CastService), so it needs no controls and never runs a game of its own.
+   NOTE: it rebuilds the game from a trimmed save (GameSnapshots.Restore), so what it can show is limited to what
+   CastService.Encode keeps: no box score, no recap, one line of play-by-play. *@
+
+<PageTitle>TV view — MiniLeague Baseball</PageTitle>
+
+@if (_game is null)
+{
+    <div class="tv tv-wait" data-testid="tv-waiting">
+        <h1>MiniLeague Baseball</h1>
+        <p>@_message</p>
+    </div>
+}
+else
+{
+    var s = _game;
+    <div class="tv" data-testid="tv">
+        <header class="tv-score">
+            <div class="tv-team">
+                <span class="tv-abbr">@s.VisitorTeam.Abbreviation</span>
+                <span class="tv-runs" data-testid="tv-visitor-runs">@s.VisitorTotalScore</span>
+            </div>
+            <div class="tv-inning">
+                <span data-testid="tv-inning">@(s.Status == GameStatus.Final ? "FINAL" : $"{(s.IsTopOfInning ? "▲" : "▼")} {s.CurrentInning}")</span>
+                <span class="tv-outs" aria-label="@s.Outs outs">
+                    @for (int i = 0; i < 3; i++)
+                    {
+                        <i class="@(i < s.Outs ? "on" : "")"></i>
+                    }
+                </span>
+            </div>
+            <div class="tv-team">
+                <span class="tv-runs" data-testid="tv-home-runs">@s.HomeTotalScore</span>
+                <span class="tv-abbr">@s.HomeTeam.Abbreviation</span>
+            </div>
+        </header>
+
+        <div class="tv-field">
+            @if (_detailed)
+            {
+                @* WHY: the plays are not run here: they arrive from the controlling page and js/cast.js plays them on this
+                   canvas, in order. This component only draws the field as it stands (DetailedFieldView redraws it
+                   whenever a new state arrives, which cast.js delivers after the play before it has finished). *@
+                <DetailedFieldView Game="@s" Stadium="@s.Stadium" OnReady="OnDetailedReady" />
+            }
+            else
+            {
+                <FieldView RunnerOnFirst="@s.RunnerOnFirst"
+                           RunnerOnSecond="@s.RunnerOnSecond"
+                           RunnerOnThird="@s.RunnerOnThird"
+                           Game="@s"
+                           Stadium="@s.Stadium"
+                           CurrentPitcher="@s.CurrentPitcher.Player" />
+            }
+        </div>
+
+        <footer class="tv-info">
+            <div><small>AT BAT</small> <b data-testid="tv-batter">@s.CurrentBatter.Name</b></div>
+            <div class="tv-last" data-testid="tv-last-play">@s.PlayByPlay.FirstOrDefault()?.Description</div>
+            <div><small>PITCHING</small> <b data-testid="tv-pitcher">@s.CurrentPitcher.Player.Name</b></div>
+        </footer>
+    </div>
+}
+
+@code {
+    private GameState? _game;
+    private bool _detailed;
+    private string _message = "Waiting for a game. Start one in MiniLeague Baseball on your phone or computer.";
+    private Team[] _teams = [];
+    private DotNetObjectReference<Tv>? _self;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _teams = [.. await Teams.GetTeamsAsync()];
+            await Teams.GetStadiumsAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException)
+        {
+            _message = "Could not load team data.";
+            return;
+        }
+
+        // WHY: listen only after the teams are loaded: the first message can arrive at once (the page announces itself and
+        // is answered with the current game), and OnState needs the teams to rebuild it.
+        _self = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("mlbCast.listen", _self);
+    }
+
+    /// <summary>The game as it stands. <paramref name="detailed"/> is whether the controlling page shows the animated field.</summary>
+    [JSInvokable]
+    public void OnState(string json, bool detailed)
+    {
+        var snapshot = GameSnapshots.FromJson(json);
+        if (snapshot is null) return;
+        try
+        {
+            _game = GameSnapshots.Restore(snapshot, id => _teams.FirstOrDefault(t => t.Id == id), id => Teams.FindStadium(id));
+            _detailed = detailed;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _game = null;
+            _message = ex.Message;
+        }
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnDetailedReady() => await JS.InvokeVoidAsync("mlbCast.animatorUp");
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("mlbCast.unlisten"); }
+        catch (JSDisconnectedException) { }
+        _self?.Dispose();
+    }
+}

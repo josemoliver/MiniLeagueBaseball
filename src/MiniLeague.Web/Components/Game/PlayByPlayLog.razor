@@ -1,0 +1,62 @@
+@* The list stays newest first; filters change only this view, never the game's recorded events. *@
+@if (Events.Count > 0)
+{
+    <div class="pbp-tools">
+        <label class="sr-only" for="pbp-search">Search plays</label>
+        <input id="pbp-search" type="search" placeholder="Find a play" @bind="_query" @bind:event="oninput" />
+        <label class="sr-only" for="pbp-inning-filter">Filter inning</label>
+        <select id="pbp-inning-filter" @bind="_inningFilter" aria-label="Filter inning">
+            <option value="all">All innings</option>
+            @foreach (int inning in Events.Select(e => e.Inning).Distinct().OrderByDescending(i => i))
+            {
+                <option value="@inning">Inning @inning</option>
+            }
+        </select>
+        <button type="button" class="pbp-latest" @onclick="ShowLatest" title="Show latest plays">Latest ↑</button>
+    </div>
+}
+
+@{
+    var shown = FilteredEvents;
+}
+<div class="pbp-log" @key="_listVersion" data-testid="play-log-list">
+    @foreach (var half in shown.GroupBy(e => (e.Inning, e.IsTop)))
+    {
+        <div class="pbp-half">@(half.Key.IsTop ? "Top" : "Bottom") @half.Key.Inning</div>
+        @foreach (var ev in half)
+        {
+            <div class="pbp-entry">
+                <span class="pbp-desc">@ev.Description</span>
+                <span class="pbp-score">@ev.VisitorScore–@ev.HomeScore</span>
+            </div>
+        }
+    }
+    @if (Events.Count == 0)
+    {
+        <div class="pbp-empty">No plays yet</div>
+    }
+    else if (shown.Count == 0)
+    {
+        <div class="pbp-empty">No plays match. Try another inning or search.</div>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<PlayEvent> Events { get; set; } = [];
+    private string _query = "";
+    private string _inningFilter = "all";
+    private int _listVersion;
+
+    private IReadOnlyList<PlayEvent> FilteredEvents => Events
+        .Where(e => (_inningFilter == "all" || e.Inning.ToString() == _inningFilter)
+            && (string.IsNullOrWhiteSpace(_query) || e.Description.Contains(_query, StringComparison.OrdinalIgnoreCase)))
+        .ToArray();
+
+    private void ShowLatest()
+    {
+        _query = "";
+        _inningFilter = "all";
+        // WHY: replacing the scroll container resets its scroll position without interrupting a reader as new plays arrive.
+        _listVersion++;
+    }
+}

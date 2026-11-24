@@ -1,0 +1,73 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test .NET projects
+        run: dotnet test MiniLeagueBaseball.slnx
+
+      - name: Test JavaScript
+        run: node --test tests/js/sound.test.js tests/js/pwa.test.js tests/js/animator.test.js tests/js/cast.test.js
+
+      - name: Publish
+        run: dotnet publish src/MiniLeague.Web -c Release -o publish
+
+      - uses: actions/configure-pages@v5
+
+      # The site lives at https://<owner>.github.io/<repo>/, so the app needs that path prefix.
+      - name: Set the project-site base path
+        run: |
+          BASE="/${GITHUB_REPOSITORY#*/}/"
+          W=publish/wwwroot
+          sed -i "s#<base href=\"/\" />#<base href=\"$BASE\" />#" "$W/index.html"
+          sed -i "s#\"start_url\": \"/\"#\"start_url\": \"$BASE\"#; s#\"scope\": \"/\"#\"scope\": \"$BASE\"#; s#\"url\": \"/#\"url\": \"$BASE#g" "$W/manifest.webmanifest"
+          sed -i "s#const base = '/';#const base = '$BASE';#" "$W/service-worker.js"
+          grep -q "<base href=\"$BASE\" />" "$W/index.html"
+          grep -q "const base = '$BASE';" "$W/service-worker.js"
+          # GitHub Pages (Jekyll) skips folders that start with an underscore, such as _framework.
+          touch "$W/.nojekyll"
+          # Unknown paths (for example /game on a refresh) fall back to the app.
+          cp "$W/index.html" "$W/404.html"
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: publish/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

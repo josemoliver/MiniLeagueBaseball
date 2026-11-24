@@ -1,0 +1,240 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@* Human manager decision panel. Shows the offensive and/or defensive choices a human
+   is responsible for this plate appearance (both, when two humans share the game). *@
+
+<MudStack Spacing="2" Class="decision-panel">
+    @if (ShowOffense)
+    {
+        <MudText Typo="Typo.subtitle2" Class="mud-text-secondary">OFFENSIVE STRATEGY</MudText>
+        <div class="decision-choice-group">
+            <span class="decision-group-label">BATTING APPROACH</span>
+            <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                            OverrideStyles="false" Class="flex-wrap">
+                @foreach (var s in BattingOptions)
+                {
+                    var strategy = s;
+                    <MudButton Color="@(SelectedOffense == strategy ? Color.Primary : Color.Default)"
+                               Variant="@(SelectedOffense == strategy ? Variant.Filled : Variant.Outlined)"
+                               OnClick="@(() => SelectedOffense = strategy)">
+                        @Shortcuts.Label(strategy)<span class="key-hint">@Shortcuts.KeyFor(strategy)</span>
+                    </MudButton>
+                }
+            </MudButtonGroup>
+        </div>
+        <div class="decision-choice-group">
+            <span class="decision-group-label">RUNNING &amp; SMALL BALL</span>
+            <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                            OverrideStyles="false" Class="flex-wrap">
+                @foreach (var s in RunningOptions)
+                {
+                    var strategy = s;
+                    <MudButton Color="@(SelectedOffense == strategy ? Color.Primary : Color.Default)"
+                               Variant="@(SelectedOffense == strategy ? Variant.Filled : Variant.Outlined)"
+                               Disabled="@(NeedsRunnerGoing(strategy) && !CanSteal)"
+                               OnClick="@(() => SelectedOffense = strategy)">
+                        @Shortcuts.Label(strategy)<span class="key-hint">@Shortcuts.KeyFor(strategy)</span>
+                    </MudButton>
+                }
+            </MudButtonGroup>
+            @if (!CanSteal)
+            {
+                <span class="decision-tip">Steal and Hit &amp; Run need a runner on first and an open second base.</span>
+            }
+        </div>
+    }
+
+    @if (ShowDefense)
+    {
+        <MudText Typo="Typo.subtitle2" Class="mud-text-secondary">DEFENSIVE STRATEGY</MudText>
+        <span class="decision-group-label">PITCH SELECTION</span>
+        <MudButtonGroup Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small"
+                        OverrideStyles="false" Class="flex-wrap">
+            @foreach (var p in PitchOptions)
+            {
+                var pitch = p;
+                <MudButton Color="@(SelectedPitch == pitch ? Color.Secondary : Color.Default)"
+                           Variant="@(SelectedPitch == pitch ? Variant.Filled : Variant.Outlined)"
+                           OnClick="@(() => SelectedPitch = pitch)">
+                    @pitch.ToString().ToUpperInvariant()<span class="key-hint">@DefenseHint(Shortcuts.KeyFor(pitch))</span>
+                </MudButton>
+            }
+        </MudButtonGroup>
+
+        <span class="decision-group-label">FIELD POSITION</span>
+        <MudButtonGroup Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
+                        OverrideStyles="false" Class="flex-wrap">
+            @foreach (var a in AlignmentOptions)
+            {
+                var align = a;
+                <MudButton Color="@(SelectedAlignment == align ? Color.Warning : Color.Default)"
+                           Variant="@(SelectedAlignment == align ? Variant.Filled : Variant.Outlined)"
+                           Disabled="@AlignmentMoving" OnClick="@(() => SelectAlignment(align))">
+                    @AlignmentLabel(align)<span class="key-hint">@DefenseHint(Shortcuts.KeyFor(align))</span>
+                </MudButton>
+            }
+        </MudButtonGroup>
+    }
+
+    <MudStack Row="true" Spacing="2" Class="decision-actions">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Medium" Class="decision-commit"
+                   OnClick="OnCommit" Disabled="@(_committing || AlignmentMoving)">
+            PITCH<span class="key-hint">Enter</span>
+        </MudButton>
+        @if (ShowDefense)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Medium"
+                       OnClick="OnIntentionalWalk" Disabled="@AlignmentMoving">
+                IBB<span class="key-hint">@DefenseHint(Shortcuts.IntentionalWalkKey.ToString())</span>
+            </MudButton>
+        }
+        <MudButton Variant="Variant.Outlined" Size="Size.Medium" OnClick="OnSubstitutions">
+            SUBS<span class="key-hint">S</span>
+        </MudButton>
+    </MudStack>
+</MudStack>
+
+@code {
+    /// <summary>A human chooses the batting side's strategy.</summary>
+    [Parameter] public bool ShowOffense { get; set; }
+    /// <summary>A human chooses the fielding side's pitch and alignment.</summary>
+    [Parameter] public bool ShowDefense { get; set; }
+    [Parameter] public bool CanSteal { get; set; }
+    [Parameter] public bool AlignmentMoving { get; set; }
+    [Parameter] public EventCallback<DefensiveAlignment> OnAlignmentChanged { get; set; }
+
+    /// <summary>Raised with the decision(s) for the side(s) shown; the other is null.</summary>
+    [Parameter] public EventCallback<(OffensiveDecision? Offense, DefensiveDecision? Defense)> OnDecision { get; set; }
+    [Parameter] public EventCallback OnSubstitutions { get; set; }
+    [Parameter] public EventCallback OnBoxScore { get; set; }
+
+    private DotNetObjectReference<DecisionPanel>? _self;
+
+    protected override void OnParametersSet()
+    {
+        if (!CanSteal && NeedsRunnerGoing(SelectedOffense))
+            SelectedOffense = OffensiveStrategy.SwingAway;
+    }
+
+    // ── Keyboard ─────────────────────────────────────────────────────────────
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _self = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("mlbKeys.register", _self); }
+        catch (JSException) { }
+    }
+
+    /// <summary>Called from the page's key listener with the browser's key code.</summary>
+    [JSInvokable]
+    public async Task OnKey(string code, bool shift)
+    {
+        if (AlignmentMoving) return;
+        var action = Shortcuts.Resolve(code, shift, ShowOffense, ShowDefense);
+        switch (action.Kind)
+        {
+            case ShortcutKind.Offense:
+                if (NeedsRunnerGoing(action.Strategy) && !CanSteal) return;
+                SelectedOffense = action.Strategy;
+                break;
+            case ShortcutKind.Pitch: SelectedPitch = action.Pitch; break;
+            case ShortcutKind.Alignment: await SelectAlignment(action.Alignment); return;
+            case ShortcutKind.IntentionalWalk: await OnIntentionalWalk(); return;
+            case ShortcutKind.Play: if (!_committing) await OnCommit(); return;
+            case ShortcutKind.Substitutions: await OnSubstitutions.InvokeAsync(); return;
+            case ShortcutKind.BoxScore: await OnBoxScore.InvokeAsync(); return;
+            default: return;
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // With two humans the defense keys need Shift; show that on the buttons.
+    private string DefenseHint(string key) => ShowOffense && ShowDefense ? $"⇧{key}" : key;
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("mlbKeys.unregister"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException) { }
+        _self?.Dispose();
+    }
+
+    private bool _committing;
+
+    private async Task SelectAlignment(DefensiveAlignment alignment)
+    {
+        if (AlignmentMoving || SelectedAlignment == alignment) return;
+        SelectedAlignment = alignment;
+        StateHasChanged();
+        await OnAlignmentChanged.InvokeAsync(alignment);
+    }
+
+    private OffensiveStrategy  SelectedOffense   { get; set; } = OffensiveStrategy.SwingAway;
+    private PitchType          SelectedPitch     { get; set; } = PitchType.Fastball;
+    private DefensiveAlignment SelectedAlignment { get; set; } = DefensiveAlignment.Standard;
+
+    private static readonly OffensiveStrategy[] BattingOptions =
+    [
+        OffensiveStrategy.SwingAway,
+        OffensiveStrategy.SwingAgressive,
+        OffensiveStrategy.SwingSafe,
+    ];
+
+    // WHY: a steal and a hit and run both send the runner on first with the pitch, so both need him there and second open.
+    private static bool NeedsRunnerGoing(OffensiveStrategy strategy) =>
+        strategy is OffensiveStrategy.Steal or OffensiveStrategy.HitAndRun;
+
+    private static readonly OffensiveStrategy[] RunningOptions =
+    [
+        OffensiveStrategy.Steal,
+        OffensiveStrategy.HitAndRun,
+        OffensiveStrategy.SacrificeBunt,
+    ];
+
+    private static readonly PitchType[] PitchOptions =
+        [PitchType.Fastball, PitchType.Curveball, PitchType.Slider, PitchType.Changeup];
+
+    private static readonly DefensiveAlignment[] AlignmentOptions =
+    [
+        DefensiveAlignment.Standard,
+        DefensiveAlignment.InfieldIn,
+        DefensiveAlignment.CornersIn,
+        DefensiveAlignment.GuardLines,
+        DefensiveAlignment.ShiftPull,
+        DefensiveAlignment.ShiftOpposite,
+    ];
+
+    private static string AlignmentLabel(DefensiveAlignment a) => a switch
+    {
+        DefensiveAlignment.Standard    => "Normal",
+        DefensiveAlignment.InfieldIn   => "In",
+        DefensiveAlignment.CornersIn   => "Corners",
+        DefensiveAlignment.GuardLines  => "Lines",
+        DefensiveAlignment.ShiftPull   => "Shift Pull",
+        DefensiveAlignment.ShiftOpposite => "Shift Oppo",
+        _ => a.ToString()
+    };
+
+    private OffensiveDecision? BuildOffense() =>
+        ShowOffense ? new OffensiveDecision { Strategy = SelectedOffense } : null;
+
+    private DefensiveDecision? BuildDefense(bool intentionalWalk = false) =>
+        ShowDefense
+            ? new DefensiveDecision
+              {
+                  PitchType = SelectedPitch,
+                  Alignment = SelectedAlignment,
+                  IntentionalWalk = intentionalWalk,
+              }
+            : null;
+
+    private async Task OnCommit()
+    {
+        _committing = true;
+        await OnDecision.InvokeAsync((BuildOffense(), BuildDefense()));
+        _committing = false;
+    }
+
+    private async Task OnIntentionalWalk() =>
+        await OnDecision.InvokeAsync((BuildOffense(), BuildDefense(intentionalWalk: true)));
+}

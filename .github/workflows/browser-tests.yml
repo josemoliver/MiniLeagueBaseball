@@ -1,0 +1,24 @@
+name: Browser tests
+
+# Runs the Playwright tests (tests/MiniLeague.Web.E2E) in the Chrome that is installed on the runner. It reports on
+# its own and does not hold up the Pages deployment.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  browser_tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Browser tests
+        run: dotnet test tests/MiniLeague.Web.E2E

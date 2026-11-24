@@ -1,0 +1,38 @@
+@* Visual baseball diamond showing base runners and out count *@
+
+<div class="diamond-container">
+    <div class="diamond">
+        @* Second base — top *@
+        <div class="base second @(RunnerOnSecond ? "occupied" : "")">
+            @if (RunnerOnSecond) { <span class="runner-dot"></span> }
+        </div>
+        @* Middle row: 3rd, pitcher mound, 1st *@
+        <div class="diamond-row middle">
+            <div class="base third @(RunnerOnThird ? "occupied" : "")">
+                @if (RunnerOnThird) { <span class="runner-dot"></span> }
+            </div>
+            <div class="mound"></div>
+            <div class="base first @(RunnerOnFirst ? "occupied" : "")">
+                @if (RunnerOnFirst) { <span class="runner-dot"></span> }
+            </div>
+        </div>
+        @* Home plate — bottom *@
+        <div class="base home"></div>
+    </div>
+
+    <div class="outs-row">
+        @for (int i = 0; i < 3; i++)
+        {
+            int idx = i;
+            <span class="out-dot @(idx < Outs ? "recorded" : "")"></span>
+        }
+        <span class="outs-label">OUT@(Outs == 1 ? "" : "S")</span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool RunnerOnFirst  { get; set; }
+    [Parameter] public bool RunnerOnSecond { get; set; }
+    [Parameter] public bool RunnerOnThird  { get; set; }
+    [Parameter] public int  Outs           { get; set; }
+}

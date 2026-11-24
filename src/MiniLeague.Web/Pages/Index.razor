@@ -1,0 +1,28 @@
+@page "/"
+@inject SoundService Sound
+
+<PageTitle>MiniLeague Baseball</PageTitle>
+
+<div class="start-page">
+    @* The artwork carries the title, so the heading is only for screen readers *@
+    <h1 class="visually-hidden">MiniLeague Baseball</h1>
+    <img class="start-art" src="images/minileague-baseball.webp" width="1224" height="1285"
+         alt="MiniLeague Baseball: a batter swings as the pitcher delivers, the catcher and umpire crouched behind him" />
+
+    <MudText Typo="Typo.subtitle1" Align="Align.Center" Class="mud-text-secondary">
+        Historical baseball simulation powered by public historical statistics.
+    </MudText>
+    @* data-no-theme: starting a game plays its own jingle, so the organ theme steps aside *@
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+               Href="game" StartIcon="@Icons.Material.Filled.SportsBaseball" data-no-theme="true">
+        PLAY BALL
+    </MudButton>
+</div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await Sound.PlayThemeAsync();
+    }
+}

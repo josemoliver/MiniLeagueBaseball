@@ -1,0 +1,164 @@
+@* The animated field: a canvas drawn by wwwroot/js/playAnimator.js. Between plays it shows the situation
+   (fielders in place, batter up, runners on); GameRoom hands it a script to play for each play. *@
+@using MiniLeague.Engine.Animation
+@using EngineModels = MiniLeague.Engine.Models
+@implements IAsyncDisposable
+@inject IJSRuntime Js
+
+<div class="detailed-field" data-testid="detailed-field">
+    <canvas @ref="_canvas" class="detailed-canvas" width="640" height="400"
+            role="img" aria-label="Baseball field. Click to skip the play being shown."></canvas>
+    @* The text is drawn on this second canvas, at the screen's real resolution, so it stays sharp. *@
+    <canvas @ref="_overlay" class="detailed-overlay" aria-hidden="true"></canvas>
+    @* While a play is shown its corner has Skip; when it is over, the same corner offers to show the last one again. *@
+    @if (_playing)
+    {
+        <button type="button" class="skip-play" data-testid="skip-play" @onclick="SkipAsync">Skip ▶▶</button>
+    }
+    else if (CanReplay)
+    {
+        <button type="button" class="skip-play" data-testid="replay" aria-label="Replay the last play"
+                @onclick="OnReplay">↺ Replay</button>
+    }
+    <div class="sr-only" aria-live="polite" data-testid="play-announcement">@_announcement</div>
+</div>
+
+@code {
+    [Parameter] public EngineModels.GameState? Game { get; set; }
+    [Parameter] public EngineModels.Stadium? Stadium { get; set; }
+
+    /// <summary>Raised once the canvas is ready to draw on.</summary>
+    [Parameter] public EventCallback OnReady { get; set; }
+
+    /// <summary>Whether there is a play to show again (the button is there only between plays).</summary>
+    [Parameter] public bool CanReplay { get; set; }
+
+    /// <summary>Raised when the visitor asks to see the last play again.</summary>
+    [Parameter] public EventCallback OnReplay { get; set; }
+
+    private ElementReference _canvas;
+    private ElementReference _overlay;
+    private bool _ready;
+    private bool _playing;
+    private string _announcement = "";
+    private (int Inning, bool IsTop, EngineModels.DefensiveAlignment Alignment)? _alignmentPreview;
+
+    /// <summary>True while a play is being shown.</summary>
+    public bool IsPlaying => _playing;
+
+    private object ParkData
+    {
+        get
+        {
+            var park = Stadium ?? EngineModels.Stadium.Generic;
+            return new
+            {
+                name = park.Name,
+                leftField = park.LeftField, leftCenter = park.LeftCenter, center = park.Center,
+                rightCenter = park.RightCenter, rightField = park.RightField,
+                leftWallHeight = park.LeftWallHeight, rightWallHeight = park.RightWallHeight,
+                isDome = park.IsDome,
+                wallColor = park.WallColor,   // null for most parks: the field keeps its default wall
+            };
+        }
+    }
+
+    // A screen reader hears who is up, as the picture shows, until the first play. After that the result of
+    // each play is announced instead (see PlayAsync). Set before the render so no second render is needed.
+    protected override void OnParametersSet()
+    {
+        if (_announcement.Length > 0 || Game is null) return;
+        try { _announcement = SetupMessage().Replace("\n", ". "); }
+        catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException) { }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Safe(() => Js.InvokeVoidAsync("mlbAnimator.init", _canvas, _overlay).AsTask());
+            _ready = true;
+            await OnReady.InvokeAsync();
+        }
+        // Whenever the page redraws between plays, show the field as it now stands.
+        if (_ready && !_playing) await ShowSetupAsync();
+    }
+
+    private async Task ShowSetupAsync()
+    {
+        if (Game is null) return;
+        string json;
+        try
+        {
+            var situation = EngineModels.PrePlaySnapshot.Capture(Game);
+            if (_alignmentPreview is { } preview)
+            {
+                if (preview.Inning == situation.Inning && preview.IsTop == situation.IsTop)
+                    situation = situation with { Alignment = preview.Alignment };
+                else
+                    _alignmentPreview = null;
+            }
+            // Once the game is over the field shows the final score card.
+            json = PlayScriptJson.Serialize(Game.Status == EngineModels.GameStatus.Final
+                ? SceneChoreographer.FinalScene(situation, Game)
+                : PlayChoreographer.BuildSetup(situation));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or ArgumentException)
+        {
+            return;   // nothing to show yet (for example a game with no lineup)
+        }
+        string message = SetupMessage();
+        await Safe(() => Js.InvokeVoidAsync("mlbAnimator.show", json, ParkData, message).AsTask());
+    }
+
+    private string SetupMessage()
+    {
+        var s = Game!;
+        if (s.Status == EngineModels.GameStatus.Final) return "FINAL";
+        // Who is up, with his average, and how many pitches the pitcher has thrown.
+        var batter = s.CurrentBatter;
+        string average = batter.Overall is { AtBats: > 0 } stats ? $" ({stats.BattingAverage.ToString("F3").TrimStart('0')})" : "";
+        var pitcher = s.CurrentPitcher;
+        string surname = pitcher.Player.Name.Trim().Split(' ').Last();
+        return $"{(s.IsTopOfInning ? "TOP" : "BOTTOM")} OF INNING {s.CurrentInning}\n{batter.Name} AT BAT{average}\n{surname}: {pitcher.PitchCount} PITCHES";
+    }
+
+    /// <summary>Plays a script and returns when it has finished (or been skipped).</summary>
+    public async Task RepositionAsync(EngineModels.PrePlaySnapshot before, EngineModels.DefensiveAlignment alignment, double speed)
+    {
+        _alignmentPreview = (before.Inning, before.IsTop, alignment);
+        await PlayAsync(SceneChoreographer.AlignmentChange(before, alignment), speed);
+    }
+
+    public async Task PlayAsync(PlayScript script, double speed)
+    {
+        _playing = true;
+        StateHasChanged();
+        try
+        {
+            await Js.InvokeVoidAsync("mlbAnimator.play", PlayScriptJson.Serialize(script), ParkData, speed);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException
+                                      or ObjectDisposedException or InvalidOperationException)
+        {
+            // Showing a play is best effort. If the browser cannot, the game carries on.
+        }
+        finally
+        {
+            _playing = false;
+        }
+        _announcement = script.Cues.LastOrDefault(c => c.Kind == CueKind.Banner)?.Value ?? "";
+        StateHasChanged();
+    }
+
+    private async Task SkipAsync() => await Safe(() => Js.InvokeVoidAsync("mlbAnimator.skip").AsTask());
+
+    private static async Task Safe(Func<Task> call)
+    {
+        try { await call(); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException
+                                      or ObjectDisposedException or InvalidOperationException) { }
+    }
+
+    public async ValueTask DisposeAsync() => await Safe(() => Js.InvokeVoidAsync("mlbAnimator.stop").AsTask());
+}

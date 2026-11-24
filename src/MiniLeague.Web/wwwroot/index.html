@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b4ea2" />
+    <meta name="description" content="Historical baseball simulation powered by public historical statistics." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MiniLeague" />
+    <!-- What a link to the game looks like when it is shared (WhatsApp, Facebook, X, Slack, iMessage...). These
+         programs read this page without running it, so the tags are here and their URLs are absolute. The image
+         is the one in wwwroot/images; keep it under 300 KB or WhatsApp will not show it. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MiniLeague Baseball" />
+    <meta property="og:title" content="MiniLeague Baseball" />
+    <meta property="og:description" content="Be the manager: call every pitch and strategy as classic teams from 1927 to 1982 play out on real statistics. Plays in your browser, installs like an app, works offline." />
+    <meta property="og:url" content="https://josemoliver.github.io/MiniLeagueBaseball/" />
+    <meta property="og:image" content="https://josemoliver.github.io/MiniLeagueBaseball/images/minileague-baseball.webp" />
+    <meta property="og:image:type" content="image/webp" />
+    <meta property="og:image:width" content="1224" />
+    <meta property="og:image:height" content="1285" />
+    <meta property="og:image:alt" content="MiniLeague Baseball: a batter swings as the pitcher delivers, the catcher crouched behind him" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="MiniLeague Baseball" />
+    <meta name="twitter:description" content="Be the manager: call every pitch and strategy as classic teams from 1927 to 1982 play out on real statistics." />
+    <meta name="twitter:image" content="https://josemoliver.github.io/MiniLeagueBaseball/images/minileague-baseball.webp" />
+    <meta name="twitter:image:alt" content="MiniLeague Baseball: a batter swings as the pitcher delivers, the catcher crouched behind him" />
+    <title>MiniLeague Baseball</title>
+    <base href="/" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="css/site.css" rel="stylesheet" />
+    <link href="MiniLeague.Web.styles.css" rel="stylesheet" />
+    <link rel="icon" href="favicon.ico" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+</head>
+<body>
+    <div id="app">Loading...</div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <div id="update-banner" hidden>
+        A new version of MiniLeague Baseball is ready.
+        <button type="button">Reload</button>
+    </div>
+
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="js/sound.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/playAnimator.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/keys.js"></script>
+    <script src="js/mobileScore.js"></script>
+    <script src="js/pwa.js"></script>
+    <script src="js/cast.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+</html>
