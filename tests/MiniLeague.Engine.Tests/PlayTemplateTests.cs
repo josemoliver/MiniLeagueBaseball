@@ -38,7 +38,7 @@ public class PlayTemplateTests
             int guard = 0;
             while (game.State!.Status == GameStatus.InProgress && guard++ < 2000)
             {
-                var result = game.ExecuteComputerTurn();
+                var result = PlayDriver.Next(game);
                 if (result is null) break;
                 plays.Add((result, game.LastPrePlay!));
             }

@@ -1,0 +1,57 @@
+.manager-chooser {
+    margin-top: 4px;
+}
+
+.manager-profile {
+    margin-top: 6px;
+    padding: 8px 12px 10px;
+    border-left: 3px solid var(--mud-palette-secondary);
+    border-radius: 4px;
+    background: rgba(11, 78, 162, 0.055);
+    font-size: 0.85rem;
+}
+
+.manager-style {
+    font-weight: 700;
+    color: var(--mud-palette-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+}
+
+.manager-tagline {
+    margin: 2px 0 6px;
+}
+
+.manager-traits {
+    list-style: none;
+    margin: 0 0 6px;
+    padding: 0;
+    display: grid;
+    gap: 2px 18px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.manager-traits li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.manager-pips {
+    color: var(--mud-palette-primary);
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.manager-bio summary {
+    cursor: pointer;
+    color: var(--mud-palette-primary);
+    font-weight: 600;
+}
+
+.manager-bio p {
+    margin: 4px 0 0;
+    color: var(--mud-palette-text-secondary);
+}

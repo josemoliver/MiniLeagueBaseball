@@ -149,6 +149,17 @@
                             </MudStack>
                         </div>
                     </details>
+                    @* The managers come after the game options so the options keep their place in the form. *@
+                    @if (_humanSide is not (HumanSide.Visitor or HumanSide.Both))
+                    {
+                        <ManagerChooser Label="Visitors' computer manager" TestId="visitor-manager"
+                                        Value="@_visitorManagerId" ValueChanged="@(id => _visitorManagerId = id)" />
+                    }
+                    @if (_humanSide is not (HumanSide.Home or HumanSide.Both))
+                    {
+                        <ManagerChooser Label="Home computer manager" TestId="home-manager"
+                                        Value="@_homeManagerId" ValueChanged="@(id => _homeManagerId = id)" />
+                    }
                 </MudStack>
             </MudCardContent>
             <MudCardActions>
@@ -368,7 +379,7 @@ else
                     <MudPaper Class="pa-4" Elevation="1">
                         <MudStack AlignItems="AlignItems.Center" Spacing="2">
                             <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
-                            <MudText Typo="Typo.body2" Class="mud-text-secondary">Computer deciding…</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">@DecidingText</MudText>
                         </MudStack>
                     </MudPaper>
                 }
@@ -470,6 +481,10 @@ else
     private const string HomePark = "home";
     private string _stadiumChoice = HomePark;
     private bool _randomEvents = true;
+
+    // Which computer manager runs each side when the computer manages it (ids from the manager catalog).
+    private string _visitorManagerId = ManagerCatalog.DefaultId;
+    private string _homeManagerId = ManagerCatalog.DefaultId;
     private bool _mobileLineupVisitor = true;
     private bool _mobilePitchingExpanded;
     private bool _scoreObserved;
@@ -526,7 +541,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         Cast.Changed += OnCastChanged;
-        _game = new GameService(Resolver, CpuManager, Dice);
+        _game = new GameService(Resolver, CpuManager, Dice, ManagerCatalog.Default);
         await ViewPrefs.InitAsync();
         try
         {
@@ -559,7 +574,9 @@ else
             homeLineupSlots: LineupFor(_teamOptions[_homeIdx]),
             options: _randomEvents ? GameOptions.Standard : GameOptions.None,
             visitorStarterId: StarterFor(_teamOptions[_visitorIdx], visitor: true),
-            homeStarterId: StarterFor(_teamOptions[_homeIdx], visitor: false));
+            homeStarterId: StarterFor(_teamOptions[_homeIdx], visitor: false),
+            visitorManagerId: _visitorManagerId,
+            homeManagerId: _homeManagerId);
         bool detailed = ViewPrefs.View == FieldViewMode.Detailed;
         if (detailed)
         {
@@ -673,11 +690,24 @@ else
         StateHasChanged();
     }
 
+    // Names the computer manager whose call is awaited, so the player knows who is making it.
+    private string DecidingText
+    {
+        get
+        {
+            if (_game.State is not { } s) return "Computer deciding…";
+            bool offenseIsComputer = (s.IsTopOfInning ? s.VisitorControl : s.HomeControl) == ManagerControl.Computer;
+            bool visitor = offenseIsComputer == s.IsTopOfInning;   // the batting side if it is the computer, else the fielding side
+            var persona = _game.PersonaFor(visitor);
+            return persona is null ? "Computer deciding…" : $"{persona.Name} is deciding…";
+        }
+    }
+
     private void ResetGame()
     {
         _previewAlignment = null;
         _cpuCts?.Cancel();
-        _game = new GameService(Resolver, CpuManager, Dice);
+        _game = new GameService(Resolver, CpuManager, Dice, ManagerCatalog.Default);
         _lastResult = null;
         _replay = null;
         _shown = null;
@@ -692,7 +722,10 @@ else
         if (_animating) return;   // a play is still being shown
         try
         {
-            var defense = decision.Defense ?? CpuManager.MakeDefensiveDecision(_game.State!);
+            // WHY: the computer defense answers the batter the human offense has announced, pinch hitter included.
+            var planned = decision.Offense?.PinchHitterPlayerId is int pinchId
+                ? _game.State!.OffenseTeam.Roster.FirstOrDefault(p => p.Id == pinchId) : null;
+            var defense = decision.Defense ?? _game.GetComputerDefense(planned);
             await PreviewAlignmentAsync(defense.Alignment);
             _lastResult = _game.ExecutePlay(decision.Offense, defense);
             _previewAlignment = null;
@@ -844,7 +877,7 @@ else
             await InvokeAsync(async () =>
             {
                 if (_game.State is not { Status: GameStatus.InProgress } state || _game.IsHumanTurn) return;
-                var defense = CpuManager.MakeDefensiveDecision(state);
+                var defense = _game.GetComputerDefense();
                 await PreviewAlignmentAsync(defense.Alignment);
                 if (token.IsCancellationRequested) return;
                 _lastResult = _game.ExecutePlay(null, defense);

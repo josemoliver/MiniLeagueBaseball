@@ -1,0 +1,48 @@
+@using MiniLeague.Engine.AI
+
+@* Picks the computer manager for one side, and shows who that is: style, profile and background. *@
+
+@{
+    var persona = Catalog.Get(Value);
+}
+
+<div class="manager-chooser" data-testid="@TestId">
+    <MudSelect T="string" Label="@Label" Value="@Value" ValueChanged="@ValueChanged" Dense="true">
+        @foreach (var p in Catalog.All)
+        {
+            <MudSelectItem Value="@p.Id">@p.DisplayName</MudSelectItem>
+        }
+    </MudSelect>
+
+    <div class="manager-profile" data-testid="@(TestId + "-profile")">
+        <div class="manager-style">@persona.Style</div>
+        <p class="manager-tagline">@persona.Tagline</p>
+        <ul class="manager-traits">
+            @foreach (var trait in persona.Traits)
+            {
+                <li>
+                    <span>@trait.Label</span>
+                    @* NOTE: the pips are decoration; the label carries the rating for a screen reader. *@
+                    <span class="manager-pips" role="img" aria-label="@trait.Rating out of 5">@Pips(trait.Rating)</span>
+                </li>
+            }
+        </ul>
+        <details class="manager-bio">
+            <summary>Background</summary>
+            <p>@persona.Biography</p>
+        </details>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Computer manager";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string TestId { get; set; } = "manager-chooser";
+
+    /// <summary>The managers on offer; the app's catalog unless a test supplies its own.</summary>
+    [Parameter] public ManagerCatalog Catalog { get; set; } = ManagerCatalog.Default;
+
+    private static string Pips(int rating) =>
+        new string('●', Math.Clamp(rating, 0, 5)) + new string('○', 5 - Math.Clamp(rating, 0, 5));
+}

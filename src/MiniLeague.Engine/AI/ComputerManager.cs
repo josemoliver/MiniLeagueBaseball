@@ -4,141 +4,204 @@ using MiniLeague.Engine.Simulation;
 namespace MiniLeague.Engine.AI;
 
 /// <summary>
-/// Rule-based computer manager. Makes situationally appropriate
-/// offensive and defensive decisions without lookahead.
+/// Compares legal calls using matchup-adjusted one-play values and protects limited bench and bullpen resources.
 /// </summary>
 public class ComputerManager
 {
-    private readonly Random _rng;
+    protected readonly Random Rng;
 
-    public ComputerManager(Random? rng = null) => _rng = rng ?? Random.Shared;
+    /// <summary>The dials this manager runs on; see <see cref="ManagerTuning"/>.</summary>
+    protected ManagerTuning Tuning { get; }
+
+    /// <param name="rng">Randomness for tie-breaks and mixed calls (seed it for repeatable games).</param>
+    /// <param name="tuning">How readily this manager makes each kind of call; the Analyst's dials when omitted.</param>
+    public ComputerManager(Random? rng = null, ManagerTuning? tuning = null)
+    {
+        Rng = rng ?? Random.Shared;
+        Tuning = tuning ?? ManagerTuning.Default;
+    }
 
     // ── Defensive decisions ─────────────────────────────────────────────────
 
-    public DefensiveDecision MakeDefensiveDecision(GameState state)
+    public virtual DefensiveDecision MakeDefensiveDecision(GameState state, Player? plannedBatter = null)
     {
-        var pitcher = state.CurrentPitcher;
-        var batter  = state.CurrentBatter;
-        bool closegame  = Math.Abs(state.VisitorTotalScore - state.HomeTotalScore) <= 2;
-        bool lateInning = state.CurrentInning >= 7;
-        bool runnersOn  = state.RunnerOnFirst is not null
-                       || state.RunnerOnSecond is not null
-                       || state.RunnerOnThird is not null;
-
-        // Intentional walk: avoid dangerous hitter with first base open and a weaker bat on deck
-        if (ShouldIntentionalWalk(state, batter))
+        var pitcher = state.CurrentPitcher.Player;
+        var batter = plannedBatter ?? state.CurrentBatter;
+        double fatigue = FatigueModel.GetModifier(state.CurrentPitcher);
+        if (ShouldIntentionalWalk(state, batter, pitcher, fatigue))
             return new DefensiveDecision { IntentionalWalk = true };
-
-        // Infield in: runner on third, less than 2 outs, close game
-        var alignment = DefensiveAlignment.Standard;
-        if (state.RunnerOnThird is not null && state.Outs < 2 && closegame)
-            alignment = DefensiveAlignment.InfieldIn;
-        else if (state.RunnerOnFirst is not null && state.Outs == 0 && IsBunter(batter))
-            alignment = DefensiveAlignment.CornersIn;
-
-        // Pitch selection: vary based on count situation
-        var pitch = SelectPitch(pitcher, batter, lateInning);
-
-        return new DefensiveDecision
+        var best = new DefensiveDecision();
+        double bestValue = double.PositiveInfinity;
+        foreach (var alignment in AvailableAlignments(state, batter))
+        foreach (var pitch in new[] { PitchType.Fastball, PitchType.Curveball, PitchType.Slider, PitchType.Changeup })
         {
-            PitchType = pitch,
-            Alignment = alignment
-        };
+            // WHY: The fielding manager minimizes the batting side's expected runs. Evaluating the same outcome
+            // table used by the resolver makes pitch and alignment depend on both players' statistics and the ballpark.
+            double value = ManagerDecisionModel.AtBat(state, batter, pitcher, fatigue, pitch, alignment);
+            if (value > bestValue - 0.004 && !(Math.Abs(value - bestValue) < 0.004 && Rng.NextDouble() < 0.2))
+                continue;
+            bestValue = value;
+            best.PitchType = pitch;
+            best.Alignment = alignment;
+        }
+
+        if (state.RunnerOnFirst is { } runner && state.RunnerOnSecond is null && state.Outs < 2
+            && Math.Abs(ScoreMargin(state)) <= 2)
+        {
+            // WHY: A pitchout is priced as a wasted ball, not through the pitch table. The table scales hits to
+            // 10% and doubles walks for it, which makes a pitchout look like the best pitch in the game against
+            // any batter; the manager then threw one constantly and every steal attempt ran into it. It is only
+            // worth a ball when the runner is likely to go, and even then it is mixed in so it is not predictable.
+            double go = ManagerDecisionModel.RunnerGoChance(state, runner.Player);
+            int bases = WinProbability.BaseState(state);
+            double success = ManagerDecisionModel.StealChance(state, runner.Player, pitchout: true);
+            double steals = success * ManagerDecisionModel.StateValue(state, (bases & ~1) | 2, state.Outs)
+                + (1 - success) *ManagerDecisionModel.StateValue(state, bases & ~1, state.Outs + 1);
+            double pitchout = go * steals + (1 - go) * (bestValue + ManagerDecisionModel.PitchoutBallCost);
+            if (pitchout < bestValue - 0.02 && Rng.NextDouble() < Tuning.PitchoutShare)
+                best.PitchType = PitchType.Pitchout;
+        }
+        return best;
     }
 
     // ── Offensive decisions ─────────────────────────────────────────────────
 
-    public OffensiveDecision MakeOffensiveDecision(GameState state)
+    public virtual OffensiveDecision MakeOffensiveDecision(GameState state)
     {
-        var decision = ChooseStrategy(state);
+        var decision = new OffensiveDecision();
         ChoosePinchRunner(state, decision);
+        decision.Strategy = ChooseStrategy(state, state.CurrentBatter, decision);
+        // WHY: A steal is resolved without a plate appearance. Do not spend a pinch hitter until the batter
+        // will actually swing or bunt; after a substitution, reconsider the strategy with the new batter.
+        if (decision.Strategy == OffensiveStrategy.Steal) return decision;
         ChoosePinchHitter(state, decision);
+        if (decision.PinchHitterPlayerId is int id)
+            decision.Strategy = ChooseStrategy(state, state.OffenseTeam.Roster.First(p => p.Id == id), decision);
         return decision;
     }
 
     // ── Substitutions ───────────────────────────────────────────────────────
 
-    // Pinch hit for a clearly weaker hitter in a late, close game when a bench bat is
-    // meaningfully better. A catcher is only replaced if the bench has another catcher.
-    private static void ChoosePinchHitter(GameState state, OffensiveDecision decision)
+    private void ChoosePinchHitter(GameState state, OffensiveDecision decision)
     {
-        if (state.CurrentInning < 7 || ScoreMargin(state) is > 1 or < -3) return;
+        if (state.CurrentInning < Tuning.PinchHitFromInning || ScoreMargin(state) is > 2 or < -4) return;
 
         bool visitor = state.IsTopOfInning;
         var batter = state.CurrentBatter;
+        var pitcher = state.CurrentPitcher.Player;
         var bench = state.Bench(visitor)
             .Where(p => (p.Overall?.AtBats ?? 0) >= 100 && p.Id != decision.PinchRunnerPlayerId)
             .ToList();
-        if (state.CurrentBatterPosition == Position.C && !bench.Any(p => p.PrimaryPosition == Position.C))
-            return;
+        if (bench.Count == 0) return;
 
-        var best = bench.OrderByDescending(Ops).FirstOrDefault();
-        if (best is not null && Ops(best) - Ops(batter) >= 0.080)
-            decision.PinchHitterPlayerId = best.Id;
+        double fatigue = FatigueModel.GetModifier(state.CurrentPitcher);
+        double current = ManagerDecisionModel.AtBat(state, batter, pitcher, fatigue,
+            PitchType.Fastball, DefensiveAlignment.Standard);
+        var position = state.CurrentBatterPosition;
+        double bestGain = 0;
+        foreach (var candidate in bench)
+        {
+            // WHY: The pinch hitter remains in the lineup. A better bat can cost more runs with the glove or
+            // consume the last viable catcher, so a raw OPS comparison is insufficient.
+            if (position == Position.C && !candidate.IsNaturalAt(Position.C)) continue;
+            double fieldCost = position is Position.DH or Position.P ? 0
+                : Math.Max(0, batter.FieldingAt(position).Value - candidate.FieldingAt(position).Value)
+                    * Math.Max(0, 9 - state.CurrentInning) * 0.006;
+            double reserveCost = (bench.Count <= 2 ? 0.045 : 0.015) * Tuning.BenchReserveScale;
+            double futureCost = (state.CurrentInning <= 7 ? 0.025 : 0) * Tuning.BenchReserveScale;
+            double gain = ManagerDecisionModel.AtBat(state, candidate, pitcher, fatigue,
+                PitchType.Fastball, DefensiveAlignment.Standard) - current
+                + 0.2 * (Ops(candidate) - Ops(batter))
+                - fieldCost - reserveCost - futureCost;
+            if (gain <= bestGain + Tuning.PinchHitGain) continue;
+            bestGain = gain;
+            decision.PinchHitterPlayerId = candidate.Id;
+        }
     }
 
-    // Replace a slow lead runner with the fastest bench player when one run matters.
-    private static void ChoosePinchRunner(GameState state, OffensiveDecision decision)
+    private void ChoosePinchRunner(GameState state, OffensiveDecision decision)
     {
-        if (state.CurrentInning < 8 || ScoreMargin(state) is > 0 or < -1 || state.Outs >= 2) return;
+        if (state.CurrentInning < 8 || ScoreMargin(state) is > 0 or < -2 || state.Outs >= 2) return;
 
         int baseIndex = state.RunnerOnSecond is not null ? 2 : state.RunnerOnFirst is not null ? 1 : 0;
         if (baseIndex == 0) return;
         var runner = (baseIndex == 2 ? state.RunnerOnSecond : state.RunnerOnFirst)!.Player;
-        if (runner.SpeedRating > 2) return;
-
-        var best = state.Bench(state.IsTopOfInning)
-            .Where(p => p.SpeedRating >= runner.SpeedRating + 2)
-            .OrderByDescending(p => p.SpeedRating)
-            .FirstOrDefault();
-        if (best is null) return;
-
-        decision.PinchRunnerPlayerId = best.Id;
-        decision.PinchRunnerBaseIndex = baseIndex;
+        var bench = state.Bench(state.IsTopOfInning).ToList();
+        var position = state.PositionsFor(state.IsTopOfInning)[runner.Id];
+        double bestGain = 0;
+        foreach (var candidate in bench.Where(p => p.SpeedRating > runner.SpeedRating))
+        {
+            // WHY: A fast runner helps most from second with one run needed. The replacement also occupies a
+            // lineup spot, so spending the last strong bench bat for a small speed gain is usually wasteful.
+            double gain = (candidate.SpeedRating - runner.SpeedRating) * (baseIndex == 2 ? 0.055 : 0.043);
+            double batCost = Math.Max(0, Ops(runner) - Ops(candidate)) * 0.12;
+            double fieldCost = position is Position.DH or Position.P ? 0
+                : Math.Max(0, runner.FieldingAt(position).Value - candidate.FieldingAt(position).Value)
+                    * Math.Max(0, 9 - state.CurrentInning) * 0.006;
+            double reserveCost = bench.Count <= 2 ? 0.045 : 0.01;
+            gain -= batCost + fieldCost + reserveCost;
+            if (gain <= bestGain + Tuning.PinchRunGain) continue;
+            bestGain = gain;
+            decision.PinchRunnerPlayerId = candidate.Id;
+            decision.PinchRunnerBaseIndex = baseIndex;
+        }
     }
 
     // How far the batting team leads (negative when trailing).
-    private static int ScoreMargin(GameState state) => state.IsTopOfInning
+    protected static int ScoreMargin(GameState state) => state.IsTopOfInning
         ? state.VisitorTotalScore - state.HomeTotalScore
         : state.HomeTotalScore - state.VisitorTotalScore;
 
-    private static double Ops(Player p) =>
+    protected static double Ops(Player p) =>
         (p.Overall?.OnBasePercentage ?? 0) + (p.Overall?.SluggingPct ?? 0);
 
-    private OffensiveDecision ChooseStrategy(GameState state)
+    private OffensiveStrategy ChooseStrategy(GameState state, Player batter, OffensiveDecision decision)
     {
-        var batter    = state.CurrentBatter;
-        bool closegame  = Math.Abs(state.VisitorTotalScore - state.HomeTotalScore) <= 1;
-        bool lateInning = state.CurrentInning >= 7;
-        bool runner1    = state.RunnerOnFirst is not null;
-        bool runner2    = state.RunnerOnSecond is not null;
-        bool runner3    = state.RunnerOnThird is not null;
+        var pitcher = state.CurrentPitcher.Player;
+        double fatigue = FatigueModel.GetModifier(state.CurrentPitcher);
+        var alignment = state.IsTopOfInning ? state.HomeAlignment : state.VisitorAlignment;
+        var pitch = new[] { PitchType.Fastball, PitchType.Curveball, PitchType.Slider, PitchType.Changeup }
+            .MinBy(p => ManagerDecisionModel.AtBat(state, batter, pitcher, fatigue, p, alignment));
+        double bestValue = ManagerDecisionModel.AtBat(state, batter, pitcher, fatigue,
+            pitch, alignment);
+        var best = OffensiveStrategy.SwingAway;
 
-        // Sacrifice bunt: pitcher batting, runner on first or second, 0 outs
-        if (!state.DHRule && batter.IsPitcher && (runner1 || runner2) && state.Outs == 0)
-            return new OffensiveDecision { Strategy = OffensiveStrategy.SacrificeBunt };
+        // WHY: In this resolver aggressive running can take an extra base but cannot be thrown out. It therefore
+        // wins only when a runner can actually benefit; keep the ordinary call when the projected values tie.
+        double aggressive = ManagerDecisionModel.AtBat(state, batter, pitcher, fatigue,
+            pitch, alignment, OffensiveStrategy.SwingAgressive);
+        if (aggressive > bestValue + Tuning.AggressiveRunMargin) { bestValue = aggressive; best = OffensiveStrategy.SwingAgressive; }
 
-        // Sacrifice bunt: weak hitter, runner on first or second, 0 outs, close late game
-        if (closegame && lateInning && state.Outs == 0 && (runner1 || runner2)
-                      && IsWeakHitter(batter) && !runner3)
-            return new OffensiveDecision { Strategy = OffensiveStrategy.SacrificeBunt };
+        bool firstOnly = state.RunnerOnFirst is not null && state.RunnerOnSecond is null;
+        // WHY: When already ahead late, an unnecessary caught stealing or line-drive double-off is more costly
+        // than the extra base; leave the runner in place and make the batter use his plate appearance.
+        if (firstOnly && state.Outs < 2 && !(state.CurrentInning >= 7 && ScoreMargin(state) > 0))
+        {
+            var runner = decision.PinchRunnerPlayerId is int runnerId && decision.PinchRunnerBaseIndex == 1
+                ? state.OffenseTeam.Roster.First(p => p.Id == runnerId) : state.RunnerOnFirst!.Player;
+            double steal = ManagerDecisionModel.Steal(state, runner);
+            double staying = ManagerDecisionModel.StateValue(state, WinProbability.BaseState(state), state.Outs);
+            // WHY: Stealing consumes a separate play, so compare its expected next situation to simply keeping
+            // the current runner. The catcher, pitcher's hold rating, and runner's own record set the success odds.
+            if (steal > staying + Tuning.StealMargin && (state.CurrentInning >= 6 || ScoreMargin(state) <= 0))
+                return OffensiveStrategy.Steal;
 
-        // Steal: fast runner on first, no runner on second, close game
-        if (runner1 && !runner2 && state.RunnerOnFirst!.Player.SpeedRating >= 4
-                    && closegame && state.Outs < 2 && _rng.NextDouble() < 0.40)
-            return new OffensiveDecision { Strategy = OffensiveStrategy.Steal };
+            double hitAndRun = ManagerDecisionModel.AtBat(state, batter, pitcher, fatigue,
+                pitch, alignment, OffensiveStrategy.HitAndRun);
+            if (hitAndRun > bestValue + Tuning.HitAndRunMargin && IsContactHitter(batter))
+            { bestValue = hitAndRun; best = OffensiveStrategy.HitAndRun; }
+        }
 
-        // Hit and run: runner on first, good contact hitter, < 2 outs
-        if (runner1 && !runner2 && state.Outs < 2 && IsContactHitter(batter)
-                    && lateInning && closegame && _rng.NextDouble() < 0.25)
-            return new OffensiveDecision { Strategy = OffensiveStrategy.HitAndRun };
-
-        // Default: aggressive running in close game, safe otherwise
-        var strategy = closegame && lateInning
-            ? OffensiveStrategy.SwingAgressive
-            : OffensiveStrategy.SwingAway;
-
-        return new OffensiveDecision { Strategy = strategy };
+        if (state.Outs == 0 && !(state.CurrentInning >= 7 && ScoreMargin(state) <= -2)
+            && (state.RunnerOnFirst is not null || state.RunnerOnSecond is not null)
+            && state.RunnerOnThird is null)
+        {
+            // WHY: Giving away an out is worthwhile only when the bunt's hit, error, and advancement chances
+            // beat swinging in this base/out/score situation. Pitchers are evaluated by the same rule.
+            double bunt = ManagerDecisionModel.Bunt(state, batter, alignment);
+            if (bunt > bestValue + Tuning.BuntMargin) best = OffensiveStrategy.SacrificeBunt;
+        }
+        return best;
     }
 
     // ── Bullpen management ──────────────────────────────────────────────────
@@ -151,63 +214,100 @@ public class ComputerManager
     /// Fatigue drives it (warm up once the starter is past his first threshold, change when he
     /// is really tiring), and a closer is held for a save situation in the 9th.
     /// </summary>
-    public PitchingMove DecidePitching(GameState state, bool visitor)
+    public virtual PitchingMove DecidePitching(GameState state, bool visitor)
     {
         var pitcher = state.PitcherFor(visitor);
         var pen = state.BullpenFor(visitor);
         if (pen.Count == 0) return new PitchingMove();
 
-        FatigueModel.GetModifier(pitcher);  // refresh pitcher.Condition
+        double currentFatigue = FatigueModel.GetModifier(pitcher);
         int lead = visitor
             ? state.VisitorTotalScore - state.HomeTotalScore
             : state.HomeTotalScore - state.VisitorTotalScore;
         bool saveSpot = state.CurrentInning >= 9 && lead is >= 1 and <= 3;
         bool saveSoon = state.CurrentInning >= 8 && lead is >= 1 and <= 3;
-        bool pitcherIsCloser = pitcher.Player.Role == PitcherRole.Closer;
-
         var closer = pen.FirstOrDefault(w => w.Player.Role == PitcherRole.Closer);
         var ready = pen.Where(w => w.IsWarm).ToList();
-
-        // Hand the lead to the closer.
-        if (saveSpot && !pitcherIsCloser && closer is not null && closer.IsWarm)
-            return new PitchingMove(ChangeToId: closer.Player.Id);
-
-        // Fatigue: change once he is tiring (a settled reliever is left alone a little longer).
         bool settled = pitcher.BattersFaced - pitcher.SettleFrom >= FatigueModel.SettleInBatters;
-        bool pastHisBest = pitcher.Condition >= PitcherCondition.Tiring && settled;
         bool spent = pitcher.Condition >= PitcherCondition.Tired && settled;
-
-        // Getting shelled: a starter is hooked after five runs, a reliever after three.
         bool starter = pitcher.Player.Role == PitcherRole.Starter;
-        bool shelled = pitcher.BattersFaced >= 3 && pitcher.RunsAllowed >= (starter ? 5 : 3);
-        pastHisBest |= shelled;
-        spent |= shelled;
-        if (pastHisBest || spent)
+        double runsPerBatter = pitcher.RunsAllowed / (double)Math.Max(1, pitcher.BattersFaced);
+        bool shelled = pitcher.BattersFaced >= 5 && pitcher.RunsAllowed >= (starter ? 5 : 3)
+            && runsPerBatter >= 0.18;
+        double currentValue = PitchingValue(state, pitcher.Player, currentFatigue);
+
+        // WHY: A warm arm with a better ERA can still be wrong for the next three hitters. Compare each arm against
+        // those hitters, with fatigue, while charging the closer for using him before a save and cold arms for poor entry.
+        // NOTE: the team data has no left/right splits and the engine applies no platoon effect, so today this
+        // comparison sees only each pitcher's overall season line; a platoon effect would make it a true matchup.
+        var next = BestReliever(state, ready, saveSpot);
+        bool closerReady = saveSpot && closer is { IsWarm: true }
+            && pitcher.Player.Role != PitcherRole.Closer;
+        double edge = next is null ? 0 : currentValue - RelieverValue(state, next, saveSpot);
+        double threshold = state.CurrentInning >= 7 && Math.Abs(lead) <= 2 ? Tuning.ReliefEdgeClose : Tuning.ReliefEdgeOther;
+        if (next is not null && (closerReady && next == closer || spent || shelled
+            || settled && pitcher.Condition >= PitcherCondition.Tiring && edge > -0.08
+            || settled && (pitcher.Condition >= PitcherCondition.Ok || pitcher.PitchCount >= Tuning.QuickHookPitchCount)
+                && edge > threshold))
+            return new PitchingMove(ChangeToId: next.Player.Id);
+
+        if ((spent || shelled) && next is null)
         {
-            var next = PickReliever(ready, saveSpot, closer);
-            if (next is null && spent)  // nobody ready, but he cannot go on: take the best arm available
-                next = PickReliever(pen, saveSpot, closer);
-            if (next is not null)
-                return new PitchingMove(ChangeToId: next.Player.Id);
+            // WHY: A spent pitcher sometimes cannot wait four more batters; the warm-up penalty is still used
+            // when choosing which available arm suffers least from entering cold.
+            var emergency = BestReliever(state, pen, saveSpot);
+            if (emergency is not null) return new PitchingMove(ChangeToId: emergency.Player.Id);
         }
 
-        // Get somebody loose before he is needed.
-        bool anyWarming = pen.Any(w => w.IsWarming);
+        // WHY: An overwarmed arm no longer occupies the useful warm-up window. If another reliever is resting,
+        // start him rather than treating the stale arm as permanent bullpen coverage.
+        bool anyWarming = pen.Any(w => w.IsWarming && !w.IsOverwarmed);
         if (!anyWarming)
         {
-            if (saveSoon && !pitcherIsCloser && closer is not null)
+            if (saveSoon && pitcher.Player.Role != PitcherRole.Closer && closer is { IsWarming: false })
                 return new PitchingMove(StartWarmingId: closer.Player.Id);
-            if (pitcher.Condition >= PitcherCondition.Ok && settled)
+            if (settled && (pitcher.Condition >= PitcherCondition.Ok || shelled ||
+                state.CurrentInning >= Tuning.WarmUpFromInning && Math.Abs(lead) <= 2
+                && pitcher.PitchCount >= Tuning.WarmUpPitchCount))
             {
-                var next = PickReliever(pen, saveSpot, closer);
-                if (next is not null) return new PitchingMove(StartWarmingId: next.Player.Id);
+                var warm = BestReliever(state, pen.Where(w => !w.IsWarming), saveSoon);
+                if (warm is not null) return new PitchingMove(StartWarmingId: warm.Player.Id);
             }
         }
         return new PitchingMove();
     }
 
+    private static WarmingPitcher? BestReliever(GameState state, IEnumerable<WarmingPitcher> options, bool saveSpot) =>
+        options.OrderBy(w => RelieverValue(state, w, saveSpot)).FirstOrDefault();
+
+    private static double RelieverValue(GameState state, WarmingPitcher w, bool saveSpot)
+    {
+        double value = PitchingValue(state, w.Player, FatigueModel.GetWarmupModifier(w));
+        // WHY: A closer's save role matters, but it does not erase a large matchup mismatch. Outside a save,
+        // preserving him has a real opportunity value, unless he is the last arm available.
+        if (w.Player.Role == PitcherRole.Closer) value += saveSpot ? -0.08 : 0.20;
+        return value;
+    }
+
+    private static double PitchingValue(GameState state, Player pitcher, double fatigue)
+    {
+        var lineup = state.LineupFor(state.IsTopOfInning);
+        var team = state.OffenseTeam;
+        if (lineup.Count == 0) return 0;
+        double total = 0;
+        for (int n = 0; n < Math.Min(3, lineup.Count); n++)
+        {
+            var batter = team.Roster.First(p => p.Id == lineup[(state.CurrentBatterIndex + n) % lineup.Count]);
+            // WHY: The pitcher will normally face a pocket of hitters, not just the man at the plate. Let him
+            // use his best modeled pitch against each, then average the expected scoring against that pocket.
+            total += new[] { PitchType.Fastball, PitchType.Curveball, PitchType.Slider, PitchType.Changeup }
+                .Min(p => ManagerDecisionModel.AtBat(state, batter, pitcher, fatigue, p, DefensiveAlignment.Standard));
+        }
+        return total / Math.Min(3, lineup.Count);
+    }
+
     // Best available arm: the closer only in a save spot (or when he is all that is left).
-    private static WarmingPitcher? PickReliever(
+    protected static WarmingPitcher? PickReliever(
         IEnumerable<WarmingPitcher> options, bool saveSpot, WarmingPitcher? closer)
     {
         var list = options.ToList();
@@ -283,30 +383,47 @@ public class ComputerManager
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
-    private bool ShouldIntentionalWalk(GameState state, Player batter)
+    private static IEnumerable<DefensiveAlignment> AvailableAlignments(GameState state, Player batter)
     {
-        if (state.RunnerOnFirst is not null) return false; // base occupied
-        if (state.Outs == 2) return false;                 // no upside with 2 outs
-
-        // Only walk a power/dangerous hitter
-        int hr = batter.Overall?.HomeRuns ?? 0;
-        return hr >= 25 && _rng.NextDouble() < 0.5;
+        yield return DefensiveAlignment.Standard;
+        // WHY: The infield comes in only with a possible runner to cut down at the plate. The corners come in
+        // only when a bunt can matter. Otherwise those alignments would exploit a probability modifier for free.
+        if (state.RunnerOnThird is not null && state.Outs < 2)
+            yield return DefensiveAlignment.InfieldIn;
+        if (state.Outs < 2 && (state.RunnerOnFirst is not null || state.RunnerOnSecond is not null)
+            && IsBunter(batter))
+            yield return DefensiveAlignment.CornersIn;
+        if (state.CurrentInning >= 7 && Math.Abs(ScoreMargin(state)) <= 2)
+            yield return DefensiveAlignment.GuardLines;
+        // NOTE: The data does not have spray charts; power and batting side are only rough shift clues, so
+        // ordinary positioning stays available and wins ties.
+        if (batter.PowerRating >= 3) yield return DefensiveAlignment.ShiftPull;
+        if (batter.PowerRating <= 2) yield return DefensiveAlignment.ShiftOpposite;
     }
 
-    private PitchType SelectPitch(ActivePitcher pitcher, Player batter, bool lateInning)
+    private bool ShouldIntentionalWalk(GameState state, Player batter, Player pitcher, double fatigue)
     {
-        // Weight toward pitcher's best pitch; vary to avoid predictability
-        var options = new[] { PitchType.Fastball, PitchType.Fastball, PitchType.Curveball,
-                              PitchType.Slider, PitchType.Changeup };
-        return options[_rng.Next(options.Length)];
+        if (state.RunnerOnFirst is not null || state.Outs >= 2 ||
+            state.RunnerOnSecond is null && state.RunnerOnThird is null ||
+            state.CurrentInning < 7 || Math.Abs(ScoreMargin(state)) > 2) return false;
+        var lineup = state.LineupFor(state.IsTopOfInning);
+        if (lineup.Count < 2) return false;
+        var next = state.OffenseTeam.Roster.First(p => p.Id == lineup[(state.CurrentBatterIndex + 1) % lineup.Count]);
+        double gap = Ops(batter) - Ops(next);
+        if (gap < 0.15 || Ops(batter) < 0.8) return false;
+
+        // WHY: An intentional walk buys the next hitter at the cost of a base runner. Price the forced runner
+        // state first, then credit only a bounded part of the on-deck matchup; a star alone is never enough.
+        double walk = ManagerDecisionModel.WalkValue(state, WinProbability.BaseState(state), state.Outs)
+            - Math.Clamp(gap * 0.7, 0, 0.35);
+        double face = new[] { PitchType.Fastball, PitchType.Curveball, PitchType.Slider, PitchType.Changeup }
+            .Min(p => ManagerDecisionModel.AtBat(state, batter, pitcher, fatigue, p, DefensiveAlignment.Standard));
+        return walk + Tuning.IntentionalWalkMargin < face;
     }
 
-    private static bool IsBunter(Player p) =>
+    protected static bool IsBunter(Player p) =>
         p.BuntingAbility >= 4 || p.SacrificeAbility >= 4;
 
-    private static bool IsWeakHitter(Player p) =>
-        (p.Overall?.HomeRuns ?? 0) < 8 && (p.Overall?.BattingAverage ?? 0) < 0.240;
-
-    private static bool IsContactHitter(Player p) =>
+    protected static bool IsContactHitter(Player p) =>
         (p.Overall?.BattingAverage ?? 0) >= 0.270 && (p.Overall?.Strikeouts ?? 99) < 80;
 }

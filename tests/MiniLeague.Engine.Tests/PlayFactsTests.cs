@@ -31,7 +31,7 @@ public class PlayFactsTests
             int guard = 0;
             while (game.State!.Status == GameStatus.InProgress && guard++ < 2000)
             {
-                var result = game.ExecuteComputerTurn();
+                var result = PlayDriver.Next(game);
                 if (result is null) break;
                 yield return (result, game.LastPrePlay!);
             }

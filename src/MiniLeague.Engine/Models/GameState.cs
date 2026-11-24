@@ -73,6 +73,13 @@ public class GameState
     public ManagerControl VisitorControl { get; set; }
     public ManagerControl HomeControl { get; set; }
 
+    /// <summary>
+    /// Which computer manager (a <c>ManagerPersona</c> id) runs each side while it is computer-controlled.
+    /// Null means the default manager; it is saved with the game so a resumed game keeps the same personalities.
+    /// </summary>
+    public string? VisitorManagerId { get; set; }
+    public string? HomeManagerId { get; set; }
+
     // Score
     // One entry per inning; grows past nine in extra innings.
     public List<int> VisitorScoreByInning { get; set; } = new(new int[9]);

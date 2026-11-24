@@ -249,4 +249,18 @@ public class AtBatResolverTests
         Assert.Equal(1.0, freshMod);
         Assert.True(tiredMod < freshMod, $"Expected tired mod {tiredMod} < fresh {freshMod}");
     }
+
+    [Fact]
+    public void ADegradedPitcherAllowsMoreHitsThanTheSameFreshPitcher()
+    {
+        var batter = new BatterStats { AtBats = 400, Hits = 120, Doubles = 25, HomeRuns = 20,
+            Walks = 35, Strikeouts = 70 };
+        var pitcher = new PitcherStats { ERA = 4, InningsPitched = 180, WalksAllowed = 60,
+            Strikeouts = 150, GroundBallRate = 0.45 };
+        OutcomeWeights Weights(double effectiveness) => ProbabilityTable.Build(batter, pitcher,
+            Stadium.Generic, BatHand.Right, PitchType.Fastball, DefensiveAlignment.Standard, effectiveness);
+        double Hits(OutcomeWeights w) => w.Single + w.Double + w.Triple + w.HomeRun;
+
+        Assert.True(Hits(Weights(0.7)) > Hits(Weights(1.0)));
+    }
 }

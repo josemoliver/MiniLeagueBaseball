@@ -35,7 +35,11 @@ public static class ProbabilityTable
         // --- Pitcher modifier: scale batter rates by pitcher quality ---
         // Reference ERA ≈ 4.00. Good pitcher (ERA=2) → hitMod=0.5 (fewer hits).
         // Bad pitcher (ERA=6) → hitMod=1.5 (more hits). Clamped to avoid extremes.
-        double hitMod  = Math.Clamp(pitcher.ERA / 4.00, 0.40, 2.0) * pitcherFatigueMod;
+        // WHY: FatigueModel returns effectiveness below 1 for a tired, cold, or overwarmed pitcher. Dividing
+        // the hit rate by that effectiveness makes those conditions allow more hits; multiplying would make a
+        // worn-out pitcher harder to hit and reward the manager for never using the bullpen.
+        double hitMod  = Math.Clamp(pitcher.ERA / 4.00, 0.40, 2.0)
+            / Math.Clamp(pitcherFatigueMod, 0.5, 1.0);
 
         // BB/9 reference ≈ 3.0. Good control (BB=1) → bbMod low. Wild (BB=5) → higher.
         double bbMod   = Math.Clamp(pitcher.WalksPerNine / 3.0, 0.4, 2.5);

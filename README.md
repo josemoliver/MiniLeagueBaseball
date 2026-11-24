@@ -39,7 +39,7 @@ It runs **entirely in the browser** (Blazor WebAssembly), so it needs no server,
 - Pitchers tire by pitch count and their own durability, and a computer manager pulls them.
 - Fielding matters: range, error rates and arm strength per position. Errors happen at each season's real rate, and a bench bat playing shortstop is a liability.
 - Optional random events: injuries that force a replacement, rain delays that can end a game, and manager ejections that hand your team to the computer.
-- A computer manager that pinch hits, pinch runs, warms up and changes pitchers, and tidies its defense after substitutions.
+- Five computer managers to choose from, each a fictional person with a style and a profile: a numbers-driven analyst, an old-school "book" manager, a small-ball tactician, a let-them-swing slugger and a matchup-obsessed tinkerer. Pick one for each side the computer manages. They pinch hit, pinch run, warm up and change pitchers, and tidy the defense after substitutions.
 
 **Watching the game**
 - Two ways to see each play. **Detailed** (the default) is a view from behind home plate in the spirit of the 1984 original: little players run to the ball, throw, slide, tag and steal, the ball casts a shadow on the field, the outfield plays deeper for a power hitter, and a message box announces each play. Each ballpark is drawn to its real fence distances, which are painted on the wall (curving with it), with foul poles, bullpens and the infield's base paths and bases. The game opens with the lineups and "Play ball!", teams run on and off between innings, relievers and pinch hitters walk out, home runs are met at the plate, a walk-off is mobbed, and a score card closes the game. **Classic** is the overhead view with the ball's path and the runners moving.
@@ -162,7 +162,7 @@ Then open <http://localhost:5248>. On Windows, `./build.ps1 -Action Run 5001` do
 
 Each plate appearance is a weighted roll over the possible outcomes. The batter's per-appearance rates are scaled by the pitcher's quality (his ERA, walks and strikeouts, reduced by fatigue), then adjusted for the ballpark, the pitch chosen, the defensive alignment and the fielders' range. A ball hit to a fielder for an out can become an error at that season's real rate, and the runners then advance according to speed, outfield arms and the manager's strategy.
 
-The computer manager is rule based. It decides situationally: bunt, steal, pinch hit, warm up a reliever, bring in the closer for a save, or pull a starter who is tiring or getting shelled.
+The computer managers decide situationally: bunt, steal, hit and run, pinch hit, pinch run, walk a batter, warm up a reliever, bring in the closer for a save, or pull a starter who is tiring or getting shelled. Four of them price each call in expected runs, using the same outcome table that resolves the play, and differ only in how much better than the ordinary call a move must look before they make it (the `ManagerTuning` dials). The fifth, Gus "Ironhide" Halloran, is the original rule-based manager: fixed rules, no lookahead.
 
 ## Project layout
 
@@ -183,6 +183,10 @@ tools/
   sound-preview.html     Open in a browser to hear every sound and organ tune
 docs/                    The original planning document, the Animated Plays specification, and screenshots
 ```
+
+## Adding a computer manager
+
+The managers on the setup screen come from `ManagerCatalog` (`src/MiniLeague.Engine/AI/ManagerCatalog.cs`). To add one, add a `ManagerPersona` to the `BuiltIn` list: an id (it is saved with the game, so never change it once released), a fictional name and nickname, a style, a tagline, a short biography, a few 1 to 5 trait ratings for the profile, and a `Create` function. For a new temperament, build a `ComputerManager` with your own `ManagerTuning` (every dial is a margin in expected runs, and a lower number means the manager acts more readily). For different logic, subclass `ComputerManager` and override `MakeOffensiveDecision`, `MakeDefensiveDecision` or `DecidePitching`, as `OldSchoolManager` does. The setup screen lists whatever the catalog holds, so nothing else needs to change.
 
 ## Adding teams and ballparks
 

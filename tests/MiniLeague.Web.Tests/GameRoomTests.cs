@@ -920,4 +920,67 @@ public class GameRoomTests : BunitContext, IAsyncLifetime
         Assert.Matches(@"--mud-palette-primary:rgba?\(11,78,162", css);     // the blue
         Assert.Matches(@"--mud-palette-secondary:rgba?\(200,50,58", css);   // the red
     }
+
+    // ── Choosing the computer manager ────────────────────────────────────────
+
+    // Opens one of the computer-manager selects on the setup card and picks a persona by name.
+    private void ChooseComputerManager(IRenderedComponent<GameRoom> room, string testId, string name)
+    {
+        room.Find($"[data-testid={testId}] .mud-input-control").MouseDown();
+        _popovers.WaitForState(() => _popovers.FindAll(".mud-list-item").Count > 0);
+        _popovers.FindAll(".mud-list-item").First(i => i.TextContent.Contains(name)).Click();
+    }
+
+    [Fact]
+    public void TheSetupScreenOffersAComputerManagerOnlyForASideTheComputerManages()
+    {
+        RenderProviders();
+        var room = OpenGameRoom();
+
+        // The default is the visitors managed by the player, so only the home side is the computer's.
+        Assert.Empty(room.FindAll("[data-testid=visitor-manager]"));
+        Assert.Single(room.FindAll("[data-testid=home-manager]"));
+
+        ChooseManager(room, "Neither");
+        Assert.Single(room.FindAll("[data-testid=visitor-manager]"));
+        Assert.Single(room.FindAll("[data-testid=home-manager]"));
+
+        ChooseManager(room, "Both teams");
+        Assert.Empty(room.FindAll("[data-testid=visitor-manager]"));
+        Assert.Empty(room.FindAll("[data-testid=home-manager]"));
+    }
+
+    [Fact]
+    public void EachManagerShowsItsStyleProfileAndBackground()
+    {
+        RenderProviders();
+        var room = OpenGameRoom();
+        var profile = room.Find("[data-testid=home-manager-profile]");
+
+        var analyst = ManagerCatalog.Default.Get(ManagerCatalog.DefaultId);
+        Assert.Contains(analyst.Style, profile.TextContent);
+        Assert.Contains(analyst.Tagline, profile.TextContent);
+        foreach (var trait in analyst.Traits) Assert.Contains(trait.Label, profile.TextContent);
+        Assert.Contains(analyst.Biography, profile.TextContent);
+
+        ChooseComputerManager(room, "home-manager", "Rosa Delgado");
+
+        var smallBall = ManagerCatalog.Default.Get("smallball");
+        profile = room.Find("[data-testid=home-manager-profile]");
+        Assert.Contains(smallBall.Tagline, profile.TextContent);
+        Assert.DoesNotContain(analyst.Tagline, profile.TextContent);
+    }
+
+    [Fact]
+    public void TheChosenComputerManagerRunsTheGame_AndIsSavedWithIt()
+    {
+        RenderProviders();
+        var room = OpenGameRoom();
+        ChooseComputerManager(room, "home-manager", "Duke Pruitt");
+
+        Click(room, "PLAY BALL");
+
+        Assert.Equal("slugger", _store.Snapshot!.HomeManagerId);
+        Assert.Equal(ManagerCatalog.DefaultId, _store.Snapshot.VisitorManagerId);
+    }
 }

@@ -25,6 +25,8 @@ public class GameSnapshot
     public GameOptions Options { get; set; } = GameOptions.None;
     public ManagerControl VisitorControl { get; set; }
     public ManagerControl HomeControl { get; set; }
+    public string? VisitorManagerId { get; set; }   // null in games saved before there was a choice of manager
+    public string? HomeManagerId { get; set; }
     public GameStatus Status { get; set; }
 
     public List<int> VisitorScoreByInning { get; set; } = [];
@@ -113,6 +115,8 @@ public static class GameSnapshots
             Options = s.Options,
             VisitorControl = s.VisitorControl,
             HomeControl = s.HomeControl,
+            VisitorManagerId = s.VisitorManagerId,
+            HomeManagerId = s.HomeManagerId,
             Status = s.Status,
             VisitorScoreByInning = [.. s.VisitorScoreByInning],
             HomeScoreByInning = [.. s.HomeScoreByInning],
@@ -210,6 +214,8 @@ public static class GameSnapshots
             Options = snap.Options,
             VisitorControl = snap.VisitorControl,
             HomeControl = snap.HomeControl,
+            VisitorManagerId = snap.VisitorManagerId,
+            HomeManagerId = snap.HomeManagerId,
             Status = snap.Status,
             VisitorScoreByInning = [.. snap.VisitorScoreByInning],
             HomeScoreByInning = [.. snap.HomeScoreByInning],

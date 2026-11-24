@@ -198,6 +198,24 @@ public class GameFlowTests
     }
 
     [Fact]
+    public void ComputerDefenseSeesTheAnnouncedPinchHitter()
+    {
+        var game = NewGame(visitor: ManagerControl.Human);
+        var state = game.State!;
+        var incoming = state.Bench(true).First();
+        incoming.VsLeft = null;
+        incoming.VsRight = null;
+        incoming.Overall = new BatterStats { AtBats = 400, Hits = 160, HomeRuns = 80,
+            Walks = 25, Strikeouts = 15 };
+        var expected = new ComputerManager(new Random(1)).MakeDefensiveDecision(state, incoming);
+
+        var play = game.ExecutePlay(new OffensiveDecision { PinchHitterPlayerId = incoming.Id });
+
+        Assert.Equal(expected.PitchType, play.Pitch);
+        Assert.Equal(incoming.Id, game.LastPrePlay!.Batter.Id);
+    }
+
+    [Fact]
     public void HumanDefense_IsAskedWhileTheComputerBats()
     {
         var game = NewGame(home: ManagerControl.Human);  // computer visitors bat first

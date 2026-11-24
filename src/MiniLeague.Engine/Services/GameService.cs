@@ -12,6 +12,10 @@ public class GameService
 {
     private readonly AtBatResolver _resolver;
     private readonly ComputerManager _cpu;
+    private readonly ManagerCatalog? _catalog;
+    // One manager per side, built on first use from the ids in the game state (see ManagerFor).
+    private ComputerManager? _visitorCpu, _homeCpu;
+    private string? _visitorCpuId, _homeCpuId;
     private readonly Random _events;
     private readonly List<GameMoment> _moments = [];
     private readonly List<GameEvent> _happenings = [];
@@ -51,12 +55,34 @@ public class GameService
         return taken;
     }
 
+    /// <param name="cpu">The computer manager for any side that has not been given a persona of its own.</param>
     /// <param name="eventRng">Randomness for injuries, weather and ejections (seed it for repeatable games).</param>
-    public GameService(AtBatResolver resolver, ComputerManager cpu, Random? eventRng = null)
+    /// <param name="catalog">Where to find the persona a side was given; without one every side uses <paramref name="cpu"/>.</param>
+    public GameService(AtBatResolver resolver, ComputerManager cpu, Random? eventRng = null, ManagerCatalog? catalog = null)
     {
         _resolver = resolver;
         _cpu = cpu;
         _events = eventRng ?? Random.Shared;
+        _catalog = catalog;
+    }
+
+    /// <summary>
+    /// The computer manager for one side. WHY: each side can have its own persona, so no decision may go through a
+    /// single shared manager. The manager is rebuilt if the side's id changes (a new or resumed game).
+    /// </summary>
+    private ComputerManager ManagerFor(bool visitor)
+    {
+        string? id = visitor ? State!.VisitorManagerId : State!.HomeManagerId;
+        if (id is null || _catalog is null) return _cpu;
+
+        ref var cached = ref (visitor ? ref _visitorCpu : ref _homeCpu);
+        ref var cachedId = ref (visitor ? ref _visitorCpuId : ref _homeCpuId);
+        if (cached is null || cachedId != id)
+        {
+            cached = _catalog.Create(id);
+            cachedId = id;
+        }
+        return cached;
     }
 
     public void StartGame(Team visitor, Team home,
@@ -67,7 +93,9 @@ public class GameService
         IReadOnlyList<LineupSlot>? homeLineupSlots = null,
         GameOptions? options = null,
         int? visitorStarterId = null,
-        int? homeStarterId = null)
+        int? homeStarterId = null,
+        string? visitorManagerId = null,
+        string? homeManagerId = null)
     {
         // Each game works on its own copy so substitutions never alter the team.
         var visitorSlots = ResolveLineup(visitor, visitorLineupSlots);
@@ -84,6 +112,8 @@ public class GameService
             Options = options ?? GameOptions.None,
             VisitorControl = visitorControl,
             HomeControl = homeControl,
+            VisitorManagerId = visitorManagerId,
+            HomeManagerId = homeManagerId,
             VisitorLineup = visitorSlots.Select(x => x.PlayerId).ToList(),
             HomeLineup = homeSlots.Select(x => x.PlayerId).ToList(),
             VisitorPositions = visitorSlots.ToDictionary(x => x.PlayerId, x => x.Position),
@@ -182,8 +212,12 @@ public class GameService
         if (humanDefense is null && DefenseIsHuman)
             throw new InvalidOperationException("The fielding manager must make a decision.");
 
-        var offense = humanOffense ?? _cpu.MakeOffensiveDecision(s);
-        var defense = humanDefense ?? _cpu.MakeDefensiveDecision(s);
+        var offense = humanOffense ?? ManagerFor(s.IsTopOfInning).MakeOffensiveDecision(s);
+        // WHY: the batting manager declares a pinch hitter before the pitch. The computer defense must select
+        // its pitch, alignment, and intentional-walk response for that incoming batter, not the outgoing one.
+        var plannedBatter = offense.PinchHitterPlayerId is int pinchId
+            ? s.OffenseTeam.Roster.FirstOrDefault(p => p.Id == pinchId) : null;
+        var defense = humanDefense ?? ManagerFor(!s.IsTopOfInning).MakeDefensiveDecision(s, plannedBatter);
         return ExecuteAtBat(offense, defense);
     }
 
@@ -240,13 +274,19 @@ public class GameService
         bool visitor = !s.IsTopOfInning;  // the side that fields next
         if (ControlOf(s, visitor) != ManagerControl.Computer) return;
 
-        var move = _cpu.DecidePitching(s, visitor);
+        var move = ManagerFor(visitor).DecidePitching(s, visitor);
         if (move.StartWarmingId is int warm) StartWarming(visitor, warm);
         if (move.ChangeToId is int relief) ChangePitcher(visitor, relief);
     }
 
     /// <summary>The computer's fielding decision for the next at-bat (when a human bats).</summary>
-    public DefensiveDecision GetComputerDefense() => _cpu.MakeDefensiveDecision(State!);
+    /// <param name="plannedBatter">The pinch hitter the human batting manager has announced, if any.</param>
+    public DefensiveDecision GetComputerDefense(Player? plannedBatter = null) =>
+        ManagerFor(!State!.IsTopOfInning).MakeDefensiveDecision(State!, plannedBatter);
+
+    /// <summary>The persona running a side, for showing the player who is making the computer's calls.</summary>
+    public ManagerPersona? PersonaFor(bool visitor) =>
+        _catalog?.Get(visitor ? State!.VisitorManagerId : State!.HomeManagerId);
 
     // ── Substitutions ────────────────────────────────────────────────────────
     // A player who leaves the game cannot return. A replacement takes the batting
@@ -396,7 +436,7 @@ public class GameService
     {
         var s = State!;
         if (ControlOf(s, visitor) != ManagerControl.Computer) return;
-        foreach (var (a, b) in _cpu.BestPositionSwaps(s, visitor))
+        foreach (var (a, b) in ManagerFor(visitor).BestPositionSwaps(s, visitor))
             SwapPositions(visitor, a, b);
     }
 
@@ -528,7 +568,7 @@ public class GameService
         BoxScoreRecorder.Note(s, $"{s.TeamFor(hurt.Visitor).Abbreviation}: {text}");
 
         if (ControlOf(s, hurt.Visitor) == ManagerControl.Computer)
-            ResolveInjury(_cpu.ChooseInjuryReplacement(s, s.PendingInjury));
+            ResolveInjury(ManagerFor(hurt.Visitor).ChooseInjuryReplacement(s, s.PendingInjury));
     }
 
     internal void MaybeEjectManager(PlayResult result, bool wasTop)
