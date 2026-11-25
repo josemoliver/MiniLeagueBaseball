@@ -40,7 +40,7 @@ It runs **entirely in the browser** (Blazor WebAssembly), so it needs no server,
 - Fielding matters: range, error rates and arm strength per position. Errors happen at each season's real rate, and a bench bat playing shortstop is a liability.
 - Optional random events: injuries that force a replacement, rain delays that can end a game, and manager ejections that hand your team to the computer.
 - An optional designated hitter rule: a designated hitter for both teams (the default), the home team's league and year, or pitchers bat, with pinch hitters for the pitcher, pitcher bunts and the double switch.
-- Five computer managers to choose from, each a fictional person with a style and a profile: a numbers-driven analyst, an old-school "book" manager, a small-ball tactician, a let-them-swing slugger and a matchup-obsessed tinkerer. Pick one for each side the computer manages. They pinch hit, pinch run, warm up and change pitchers, and tidy the defense after substitutions.
+- Pick a [computer manager persona](#computer-managers-and-personas) for either side the computer controls. Each has a distinct approach to strategy, the bench and the bullpen.
 
 **Watching the game**
 - Two ways to see each play. **Detailed** (the default) is a view from behind home plate in the spirit of the 1984 original: little players run to the ball, throw, slide, tag and steal, the ball casts a shadow on the field, the outfield plays deeper for a power hitter, and a message box announces each play. Each ballpark is drawn to its real fence distances, which are painted on the wall (curving with it), with foul poles, bullpens and the infield's base paths and bases. The game opens with the lineups and "Play ball!", teams run on and off between innings, relievers and pinch hitters walk out, home runs are met at the plate, a walk-off is mobbed, and a score card closes the game. **Classic** is the overhead view with the ball's path and the runners moving.
@@ -161,9 +161,23 @@ Then open <http://localhost:5248>. On Windows, `./build.ps1 -Action Run 5001` do
 
 ## How it works
 
-Each plate appearance is a weighted roll over the possible outcomes. The batter's per-appearance rates are scaled by the pitcher's quality (his ERA, walks and strikeouts, reduced by fatigue), then adjusted for the ballpark, the pitch chosen, the defensive alignment and the fielders' range. A ball hit to a fielder for an out can become an error at that season's real rate, and the runners then advance according to speed, outfield arms and the manager's strategy.
+Each plate appearance is a weighted roll over the possible outcomes. The batter's season rates are adjusted by how often the pitcher allowed hits, home runs and walks or recorded strikeouts **relative to his own league and year**. Handedness, fatigue, the ballpark, the pitch chosen, the defensive alignment and the fielders' range also change the odds. A ball hit to a fielder for an out can become an error at that season's real rate, and the runners then advance according to speed, outfield arms and the manager's strategy.
 
-The computer managers decide situationally: bunt, steal, hit and run, pinch hit, pinch run, walk a batter, warm up a reliever, bring in the closer for a save, or pull a starter who is tiring or getting shelled. Four of them price each call in expected runs, using the same outcome table that resolves the play, and differ only in how much better than the ordinary call a move must look before they make it (the `ManagerTuning` dials). The fifth, Gus "Ironhide" Halloran, is the original rule-based manager: fixed rules, no lookahead.
+## Computer managers and personas
+
+Choose a manager for each computer-controlled side on the setup screen; two computer teams can use different personas. Their profiles show a style, background and 1-to-5 ratings for habits such as base running, bench use and bullpen timing. The choice is saved with the game.
+
+| Manager | Approach |
+|---|---|
+| **Ellie Whitcombe, “The Actuary”** | The default analyst: makes a move when the numbers give it a clear edge. |
+| **Gus Halloran, “Ironhide”** | Follows traditional, fixed rules rather than calculating every option. |
+| **Rosa Delgado, “Spark”** | Pushes for one run with steals, bunts, hit and runs and fast pinch runners. |
+| **Duke Pruitt, “Big Sky”** | Lets hitters swing, saves the bench and gives starters a longer leash. |
+| **Marcus Delacroix, “The Tinkerer”** | Pursues matchups, using the bench and bullpen early and often. |
+
+The four numbers-driven managers use the same probability table that resolves each play to compare calls: a swing, steal, bunt or hit and run on offense; a pitch, alignment or intentional walk on defense. They also weigh pinch hitters, pinch runners, reliever warm-ups, pitching changes and late defensive replacements. Their shared decision model considers the score, inning, outs, runners, batter and pitcher, fatigue and ballpark. In close late innings it values the chance of **winning**, so a single run can matter more than a bigger inning. Persona-specific tuning changes how much of an advantage each manager needs before acting. Gus uses a separate rule-based approach.
+
+The managers are checked in seeded computer-versus-computer games, including a 6,000-game benchmark that measures whether their on-field choices match their profiles. The simulation is also compared with the clubs' real-season totals; those checks have driven changes to pitcher scaling, stamina and running rules. See [Computer managers](docs/ComputerManagers.md) for the decision model, profiles and benchmark results, and [Modeling, statistics and probability](docs/ModelingStatisticsProbability.md) for calibration methods and current limits.
 
 ## Project layout
 
@@ -181,8 +195,9 @@ tests/
   js/                        Node tests for the sound code, the offline service worker, the Detailed view's player and casting to a TV
 tools/
   generate_teams.py      Builds the team, ballpark and fielding JSON from the Lahman database
+  MiniLeague.ManagerBench/  Seeded manager matchups and historical calibration
   sound-preview.html     Open in a browser to hear every sound and organ tune
-docs/                    The original planning document, the Animated Plays specification, and screenshots
+docs/                    Simulation and computer-manager guides, the Animated Plays specification, and screenshots
 ```
 
 ## Adding a computer manager
@@ -221,6 +236,7 @@ python tools/generate_teams.py <folder with the Lahman CSV files>
 dotnet test MiniLeagueBaseball.slnx                              # engine and UI tests
 node --test tests/js/sound.test.js tests/js/pwa.test.js tests/js/animator.test.js tests/js/cast.test.js   # sound, offline, animated-field and casting tests
 dotnet test tests/MiniLeague.Web.E2E                             # the whole app in a real browser (about 6 minutes)
+dotnet run -c Release --project tools/MiniLeague.ManagerBench -- --games 20 --check   # 6,000 seeded games between managers
 ```
 
 The browser tests start the app on a free port and drive the Chrome installed on your machine, so nothing needs downloading; set `E2E_BROWSER_CHANNEL` to use another browser (for example `msedge`). They stand in for a TV with a pretend Cast connection, so a real Chromecast still has to be tried by hand.
