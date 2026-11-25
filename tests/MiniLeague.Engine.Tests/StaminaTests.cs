@@ -51,7 +51,7 @@ public class StaminaTests
     public void StaminaIsKeptToAPlausibleRange()
     {
         Assert.InRange(FatigueModel.Stamina(Starter(6, 30, 0)), 70, 150);
-        Assert.Equal(150, FatigueModel.Stamina(Starter(40, 30, 30)));
+        Assert.Equal(140, FatigueModel.Stamina(Starter(40, 30, 30)));
     }
 
     [Fact]

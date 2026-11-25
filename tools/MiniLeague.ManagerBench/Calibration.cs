@@ -13,6 +13,7 @@ public sealed class TeamTally
     public int Games, RunsFor, RunsAgainst, AB, H, D2, D3, HR, BB, SO, HBP, SB, CS, SH, DoublePlays, Errors;
     public int CompleteGames, PitchersUsed, StarterOuts, StarterPitches, IntentionalWalks;
     public int PitcherPlateAppearances, PitcherSacrifices, DoublePlayChances, GroundDoublePlays;
+    public int Pitches, BattersFaced, Starts130, Starts150, MostPitches;
 }
 
 public sealed record CalibrationOptions(int GamesPerMatchup = 10, int Seed = 1, string Persona = "analyst",
@@ -37,6 +38,7 @@ public static class Calibration
         var tallies = ids.ToDictionary(id => id, _ => new TeamTally());
 
         int n = 0, chances = 0, doublePlays = 0, groundOuts = 0;
+        var starts = new Dictionary<string, Dictionary<int, int>>();   // team id -> pitcher id -> starts so far in this run
         for (int v = 0; v < files.Count; v++)
         for (int h = 0; h < files.Count; h++)
         {
@@ -46,8 +48,11 @@ public static class Calibration
                 int seed = options.Seed + n;
                 var game = new GameService(new AtBatResolver(new Random(seed)), new ComputerManager(new Random(seed)),
                     new Random(seed), ManagerCatalog.Default, managerSeed: seed);
-                game.StartGame(TeamLoader.Parse(json[files[v]]), TeamLoader.Parse(json[files[h]]), ManagerControl.Computer,
-                    ManagerControl.Computer, options: GameOptions.None with { DesignatedHitter = options.DesignatedHitter },
+                var visitor = TeamLoader.Parse(json[files[v]]);
+                var home = TeamLoader.Parse(json[files[h]]);
+                game.StartGame(visitor, home, ManagerControl.Computer, ManagerControl.Computer,
+                    options: GameOptions.None with { DesignatedHitter = options.DesignatedHitter },
+                    visitorStarterId: NextStarter(visitor, ids[v], starts), homeStarterId: NextStarter(home, ids[h], starts),
                     visitorManagerId: options.Persona, homeManagerId: options.Persona);
                 var s = game.State!;
                 int visitorWalks = 0, homeWalks = 0;
@@ -69,6 +74,35 @@ public static class Calibration
         }
         DoublePlayCounts = (chances, doublePlays, groundOuts);
         return tallies;
+    }
+
+    /// <summary>
+    /// Whose turn it is to start: the starter furthest behind his share of the team's real games started.
+    /// WHY: the game's default starter is the ace, and a real team's numbers came from its whole rotation. Starting the ace every
+    /// game made every opponent's pitching far better than it was (an ace walked 0.69 of his league's rate where the rotation
+    /// walked 0.80), which showed as too few walks and too many strikeouts.
+    /// </summary>
+    public static int NextStarter(Team team, string id, Dictionary<string, Dictionary<int, int>> starts)
+    {
+        var rotation = team.Pitchers.Where(p => p.Role == PitcherRole.Starter).ToList();
+        if (rotation.Count == 0) return team.DefaultStarter.Id;
+        if (!starts.TryGetValue(id, out var used)) starts[id] = used = [];
+        // A file with no games started shares the starts evenly.
+        double Share(Player p) => Math.Max(p.PitchingOverall?.GamesStarted ?? 0, 1);
+        double total = rotation.Sum(Share);
+        int played = used.Values.Sum() + 1;
+        var next = rotation.MaxBy(p => played * Share(p) / total - used.GetValueOrDefault(p.Id))!;
+        used[next.Id] = used.GetValueOrDefault(next.Id) + 1;
+        return next.Id;
+    }
+
+    /// <summary>How hard the pitchers were worked: pitches per batter faced, and how often a start ran long.</summary>
+    public static string Workload(Dictionary<string, TeamTally> tallies)
+    {
+        var all = tallies.Values;
+        double games = all.Sum(t => t.Games);
+        return $"workload: {(double)all.Sum(t => t.Pitches) / Math.Max(all.Sum(t => t.BattersFaced), 1):F2} pitches a batter faced; " +
+               $"starts of 130+ pitches {all.Sum(t => t.Starts130) / games:P1}, of 150+ {all.Sum(t => t.Starts150) / games:P1}, longest {all.Max(t => t.MostPitches)}";
     }
 
     /// <summary>Over the last run: chances (runner on first, fewer than two out), double plays on them, and ground outs on them.</summary>
@@ -99,6 +133,13 @@ public static class Calibration
         if (box.Pitchers.Count == 1) t.CompleteGames++;
         t.StarterOuts += box.Pitchers.Count > 0 ? box.Pitchers[0].Outs : 0;
         t.StarterPitches += box.Pitchers.Count > 0 ? box.Pitchers[0].Pitches : 0;
+        // WHY: a plausible rate of long outings is a check of its own: outs a start can be right while a few men throw 180.
+        t.Pitches += box.Pitchers.Sum(p => p.Pitches);
+        t.BattersFaced += box.Pitchers.Sum(p => p.BF);
+        int starter = box.Pitchers.Count > 0 ? box.Pitchers[0].Pitches : 0;
+        if (starter >= 130) t.Starts130++;
+        if (starter >= 150) t.Starts150++;
+        t.MostPitches = Math.Max(t.MostPitches, starter);
     }
 
     /// <summary>One measure: the real rate per game from the reference file and the simulated one.</summary>

@@ -5,14 +5,14 @@
     "buntRate": [0.03, 0.20],
     "hitAndRunRate": [0.2, 0.45],
     "aggressiveRate": [0.08, 0.25],
-    "pitchingChangesPerGame": [0.8, 1.5],
+    "pitchingChangesPerGame": [0.6, 1.5],
     "defensiveSubsPerGame": [0.0, 0.01]
   },
   "oldschool": {
     "winRate": [0.36, 0.46],
     "walkRate": [0.08, 0.16],
     "buntRate": [0.0, 0.03],
-    "pitchingChangesPerGame": [1.1, 1.6],
+    "pitchingChangesPerGame": [0.9, 1.6],
     "defensiveSubsPerGame": [0.08, 0.3]
   },
   "smallball": {
@@ -20,7 +20,7 @@
     "stealRate": [0.1, 0.24],
     "buntRate": [0.05, 0.30],
     "aggressiveRate": [0.28, 0.48],
-    "pitchingChangesPerGame": [0.8, 1.5],
+    "pitchingChangesPerGame": [0.6, 1.5],
     "defensiveSubsPerGame": [0.12, 0.4]
   },
   "slugger": {
@@ -29,8 +29,8 @@
     "buntRate": [0.0, 0.0],
     "hitAndRunRate": [0.0, 0.0],
     "aggressiveRate": [0.0, 0.14],
-    "completeGameRate": [0.10, 0.40],
-    "pitchingChangesPerGame": [0.7, 1.2],
+    "completeGameRate": [0.2, 0.55],
+    "pitchingChangesPerGame": [0.55, 1.2],
     "defensiveSubsPerGame": [0.0, 0.01]
   },
   "tinkerer": {

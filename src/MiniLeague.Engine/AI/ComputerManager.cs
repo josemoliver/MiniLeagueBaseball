@@ -151,7 +151,7 @@ public class ComputerManager
         {
             var arm = state.PitcherFor(visitor);
             bool wanted = ScoreMargin(state) <= 0 && state.CurrentInning >= 6
-                || arm.PitchCount >= 90 || arm.Condition >= PitcherCondition.Tiring;
+                || arm.PitchCount >= 79 || arm.Condition >= PitcherCondition.Tiring;
             if (!wanted || state.BullpenFor(visitor).Count == 0) return;
             pitcherCost = 0.03;
         }

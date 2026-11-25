@@ -176,10 +176,10 @@ public class GameFlowTests
         while (s.Status == GameStatus.InProgress && s.CurrentInning <= 3)
             game.ExecuteComputerTurn();
 
-        // Roughly 3.5–4.5 pitches per batter. Use the starter's own box-score line (he may have been relieved).
+        // About 3.5 pitches a batter, wider in a three-inning sample. Use the starter's own box-score line (he may have been relieved).
         var starter = s.Box.Home.Pitchers[0];
         Assert.True(starter.BF >= 9);
-        Assert.InRange((double)starter.Pitches / starter.BF, 3.0, 5.0);
+        Assert.InRange((double)starter.Pitches / starter.BF, 2.7, 4.4);
     }
 
     // ── Who decides ──────────────────────────────────────────────────────────
@@ -438,7 +438,9 @@ public class GameFlowTests
         // (the ace starts every game, so this is a floor, not a real-world average).
         // NOTE: lowered from 0.25 when aggressive sends could be thrown out and the infield in began holding the
         // runner on third: fewer runs score, so fewer starters are shelled and pulled.
-        Assert.InRange(pitchingChanges / (games * 2.0), 0.2, 3.0);
+        // NOTE: lowered from 0.2 when pitch counts came down to about 3.5 a batter and starters were given stamina from their
+        // real starts: the aces of 1927 to 1982 finished far more often than a modern starter.
+        Assert.InRange(pitchingChanges / (games * 2.0), 0.15, 3.0);
     }
 
     // ── Save and resume ──────────────────────────────────────────────────────

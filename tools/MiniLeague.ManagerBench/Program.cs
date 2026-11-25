@@ -49,6 +49,7 @@ if (args.Contains("--calibrate"))
     Console.WriteLine(MiniLeague.ManagerBench.Calibration.Report(rows, teamGames,
         (double)tallies.Values.Sum(t => t.StarterPitches) / teamGames, (double)tallies.Values.Sum(t => t.StarterOuts) / teamGames,
         tallies.Values.Sum(t => t.PitcherPlateAppearances), tallies.Values.Sum(t => t.PitcherSacrifices)));
+    Console.WriteLine(MiniLeague.ManagerBench.Calibration.Workload(tallies));
     var dp = MiniLeague.ManagerBench.Calibration.DoublePlayCounts;
     Console.WriteLine($"double plays: {dp.DoublePlays} in {dp.Chances} chances ({(double)dp.DoublePlays / Math.Max(dp.Chances, 1):P1}); ground outs on them {dp.GroundOuts}, so {(double)dp.DoublePlays / Math.Max(dp.GroundOuts + dp.DoublePlays, 1):P1} of ground balls turned two");
     // --raw METRIC also lists that measure's real and simulated per-game values, team by team.

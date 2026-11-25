@@ -2,9 +2,9 @@
 
 How the simulation is checked against real baseball, what was found, what works and what does not. Read this before
 changing the at-bat probability table, base running, fatigue, the era data, or anything the benchmarks measure; update it
-when you change them or learn something new (see [Keeping this document current](#14-keeping-this-document-current)).
+when you change them or learn something new (see [Keeping this document current](#17-keeping-this-document-current)).
 
-Last updated: 2026-11-25 (steals, pitch balance, double plays and sacrifices calibrated).
+Last updated: 2026-11-25 (observations on adding more teams and eras).
 
 ## Contents
 
@@ -16,12 +16,15 @@ Last updated: 2026-11-25 (steals, pitch balance, double plays and sacrifices cal
 6. [Finding 2: starters tired in the wrong way](#6-finding-2-starters-tired-in-the-wrong-way)
 7. [Finding 3: steals](#7-finding-3-steals)
 8. [Finding 4: the free pitch, the double play and the sacrifice](#8-finding-4-the-free-pitch-the-double-play-and-the-sacrifice)
-9. [Current state](#9-current-state)
-10. [What works, and what does not](#10-what-works-and-what-does-not)
-11. [The tests that guard this](#11-the-tests-that-guard-this)
-12. [Open problems, in order](#12-open-problems-in-order)
-13. [Pitfalls and gotchas](#13-pitfalls-and-gotchas)
-14. [Keeping this document current](#14-keeping-this-document-current)
+9. [Finding 5: the ace started every game](#9-finding-5-the-ace-started-every-game)
+10. [Finding 6: too many pitches](#10-finding-6-too-many-pitches)
+11. [Current state](#11-current-state)
+12. [What works, and what does not](#12-what-works-and-what-does-not)
+13. [The tests that guard this](#13-the-tests-that-guard-this)
+14. [Open problems, in order](#14-open-problems-in-order)
+15. [Adding more teams or other eras](#15-adding-more-teams-or-other-eras)
+16. [Pitfalls and gotchas](#16-pitfalls-and-gotchas)
+17. [Keeping this document current](#17-keeping-this-document-current)
 
 ## 1. Why this exists
 
@@ -50,12 +53,12 @@ Where the code is: `tools/MiniLeague.ManagerBench/Calibration.cs` (`Run`, `Compa
 
 Calibration defaults: 10 games per ordered pair of teams (15 × 14 × 10 = 2,100 games, about 280 per team and seat mix,
 under a minute), the analyst manager on both sides, the **Historical** designated-hitter rule (so each real league's rule
-applies), seed 1. Every random source is seeded, so equal options give equal numbers. `--raw "<measure>"` lists a measure's
+applies), **starters in rotation** (each in proportion to his real games started), seed 1. Every random source is seeded, so equal options give equal numbers. `--raw "<measure>"` lists a measure's
 real and simulated values team by team.
 
 > **Correction (2026-11-25).** Until finding 4, `--calibrate` said it used the Historical rule but silently used the
 > designated hitter in every game (it took the benchmark's default). So findings 1 to 3 were measured with no pitchers
-> batting; their conclusions hold, and the numbers in section 9 are re-measured with the rule actually applied. With
+> batting; their conclusions hold, and the numbers in section 11 are re-measured with the rule actually applied. With
 > pitchers batting the starters leave sooner (a pinch hitter for the pitcher ends his day), so the stamina offset was
 > re-tuned (section 6).
 
@@ -183,7 +186,7 @@ Reading them:
 | Walks | 0.84 | 0.84 |
 
 Scoring went from about 3.2 to about 4.2 runs per team per game. The benchmark ranges that moved with it were re-baselined
-(section 11).
+(section 13).
 
 ## 6. Finding 2: starters tired in the wrong way
 
@@ -201,11 +204,11 @@ After finding 1 the starters were pulled far too early (complete games 0.12 of r
 `FatigueModel.Stamina(PitcherStats)`, used when the starter's games started are known (the team files now carry `gs`):
 
 ```
-stamina = clamp( outsPerStart × 5.6 − 12 + 15 × completeGameRate , 70, 150 )   // pitches
+stamina = clamp( outsPerStart × 4.9 + 15 × completeGameRate , 70, 140 )   // pitches
 effectiveness: × 0.92 above stamina, × 0.80 above stamina + 20, × 0.65 above stamina + 35
 ```
 
-`5.6` is the engine's measured pitches per out (calibration prints it). Relievers, and files without `gs`, keep the tiring
+`4.9` is the engine's measured pitches per out (calibration prints it; finding 6). Relievers, and files without `gs`, keep the tiring
 factor. The managers pull by the pitcher's *condition*, so the same stamina gives each persona its own completion rate.
 
 ### What was tried
@@ -216,7 +219,8 @@ factor. The managers pull by the pitcher's *condition*, so the same stamina give
 | `outs × 5.6 + 15 × CG rate` (no offset) | 1.95 | 1.09 | 0.68 | starters go too far |
 | `outs × 5.6 − 18 + 15 × CG rate` (measured with a DH in every game) | 0.94 | 1.02 | 0.84 | chosen on wrong data |
 | `outs × 5.6 − 18 + 15 × CG rate`, Historical rule | 0.51 | 0.94 | 1.02 | pitchers batting end starts sooner |
-| `outs × 5.6 − 12 + 15 × CG rate`, Historical rule | **0.67** | **0.96** | **1.00** | kept |
+| `outs × 5.6 − 12 + 15 × CG rate`, Historical rule | 0.67 | 0.96 | 1.00 | chosen with aces starting (finding 5) |
+| `outs × 5.6 + 15 × CG rate`, Historical rule, **rotation** | **0.74** | **0.94** | **0.97** | kept |
 | `outs × 5.6 − 6 + 15 × CG rate`, Historical rule | 0.71 | 0.96 | 0.96 | fewer pitchers than real |
 
 Pitchers per game fell to 0.84 of real, because the starters last longer; a more detailed bullpen-use model would be the
@@ -341,12 +345,8 @@ engine walks 0.73 of the real rate.
 
 ### Walks (0.73)
 
-Not fixed. About 0.91 is expected; the rest is explained, not erroneous:
-* the team files carry only the top starters, the closer and a few relievers, and these have better control than the whole
-  staff (innings-weighted walk modifier 0.85, against 0.91 for the real staffs);
-* intentional walks are in the real totals (a few percent) and almost absent from the analyst's play.
-
-Left as is; a bullpen-wide walk model, or walks per batter faced of the whole staff, would close it.
+First explained here as the roster and missing intentional walks. **That explanation was wrong** (see finding 5): a batter's
+walk rate already includes his intentional walks, and the roster accounts for only part of the gap.
 
 ### Sacrifices (0.41 → 0.86)
 
@@ -360,37 +360,168 @@ Left as is; a bullpen-wide walk model, or walks per batter faced of the whole st
   (the 1927 Yankees 1.3 a game, 0.42 simulated). Small ball is nearer to real. Nothing in the engine is wrong here; an era-aware
   manager (open problem 1) is the fix.
 
-## 9. Current state
+## 9. Finding 5: the ace started every game
 
-Calibration (2026-11-25), analyst on both sides, **Historical designated-hitter rule**, 20 games per matchup (8,400 team-games),
-simulated ÷ real, median over the 15 teams:
+Walks stood at 0.73 of real with about 0.91 expected, and strikeouts at 1.08 to 1.10 with about 1.00 expected.
+
+### Splitting the gap (temporary experiments, reverted)
+
+| Neutralized | Runs | Walks | Strikeouts |
+|---|--:|--:|--:|
+| Nothing | 0.84 | 0.73 | 1.08 |
+| Pitcher walk modifier | 0.95 | **0.98** | 1.13 |
+| Pitch-type walk multipliers | 0.82 | 0.77 | 1.14 |
+
+* **The batters were not the cause:** the eight regulars' walk rate is 1.06 of their team's.
+* **Pitch choice was not the cause** (4 points).
+* **The pitcher modifier acted like 0.745** (0.73 ÷ 0.98), although the files' pitchers average 0.85 of their league's walk
+  rate. So the pitchers on the mound were not the average of the file.
+
+### Cause
+
+`--calibrate` never chose a starter, so every game used the default: **the ace**. A real season was pitched by a rotation.
+
+| Mean over the 15 teams, relative to the league | Ace | Rotation |
+|---|--:|--:|
+| Walks per nine | 0.69 | 0.80 |
+| Strikeouts per nine | 1.11 | 1.01 |
+| Non-home-run hits per nine | 0.92 | 0.95 |
+| Share of starts finished | 41% | 33% |
+
+### Fix (the tool, not the engine)
+
+`Calibration.NextStarter` gives each start to the starter furthest behind his share of the team's real games started.
+
+| Measure | Ace every game | Rotation |
+|---|--:|--:|
+| Runs | 0.84 | **0.90** |
+| Runs allowed | 1.03 | 1.13 |
+| Hits | 0.98 | 1.02 |
+| Walks | 0.73 | **0.83** |
+| Strikeouts | 1.10 | **1.04** |
+| Double plays | 0.85 | 0.89 |
+| Complete games | 0.67 | 0.46 |
+| Starter outs per start | 0.96 | 0.92 |
+| Sacrifices | 0.86 | 0.77 |
+| Steals | 1.18 | 1.26 |
+
+**Every earlier finding was measured with aces starting.** Their causes and fixes stand (each was shown by switching it off or
+checked without a manager), but their ratios are not comparable with section 11's.
+
+### What is left of the walk gap (0.83)
+
+The engine with no pitcher walk modifier walks 0.98, and the pitchers the files carry walk about 0.85 of their league's rate
+where the real staffs walked 0.91 (the files hold 83% of each staff's innings: the best of them). So about 0.89 is reachable
+with these rosters, and the rest is the missing tail of each staff. Adding more pitchers to the team files would be the fix;
+bending the modifier to compensate would not.
+
+### Tried and rejected: modifiers per batter faced
+
+The table is per plate appearance, while the pitcher modifiers compare rates per nine innings, and a good pitcher faces
+fewer batters per nine. Converting them (batters faced estimated as outs, hits and walks):
+
+| | Runs | Hits | Walks | Strikeouts |
+|---|--:|--:|--:|--:|
+| Per nine innings (kept) | 0.90 | 1.02 | 0.83 | 1.04 |
+| Walks and strikeouts per batter faced | 0.91 | 1.03 | 0.84 | 1.07 |
+| Walks, strikeouts and non-home-run hits per batter faced | 0.94 | 1.05 | 0.84 | 1.08 |
+
+One point of walks for worse hits and strikeouts: not adopted.
+
+### The stamina offset, re-tuned against a rotation
+
+The offset had been tuned while aces started every game. Re-measured with a rotation:
+
+| Stamina offset | Complete games | Outs per start | Pitchers a game |
+|---|--:|--:|--:|
+| −12 | 0.46 | 0.92 | 1.03 |
+| −6 | 0.62 | 0.93 | 1.00 |
+| **0 (adopted 2026-11-25)** | **0.74** | **0.94** | **0.97** |
+| +6 | 0.79 | 0.95 | 0.95 |
+
+In a game as played the default starter is still the ace, and an ace finishes more often than his rotation (41% against 33% of
+starts in the real data): the benchmark, which starts aces, now has the analyst's starter finishing 48% of games.
+
+## 10. Finding 6: too many pitches
+
+Browser games after the offset was set to 0 showed five of six starts going nine innings, and 2,000 headless games of the
+default matchup showed 22% of starts at 150 pitches or more (longest 186).
+
+### Causes
+
+* **The pitch estimate ran high:** 3.98 pitches a batter and 5.6 an out, about 150 for nine innings. Strikeouts drew 4 to 7,
+  walks 5 to 7, balls in play 1 to 6. The game of 1927 to 1982 is believed to have run near 3.6 (pitch counts were not
+  recorded and Lahman has none, so this figure is background knowledge, not data).
+* **Stamina could reach 150**, so a finisher did not begin to tire until then.
+
+### Fix
+
+* `AtBatResolver.EstimatePitches`: strikeout 3 to 7, walk 4 to 7, hit by pitch 1 to 5, in play 1 to 5: **3.48 a batter, 4.94
+  an out**. One draw per play, as before.
+* `FatigueModel.PitchesPerOut` 5.6 → 4.9 and the stamina cap 150 → 140 (offset stays 0).
+* The managers' pitch thresholds scaled by the same 0.875, so each acts at the same point of an outing: `WarmUpPitchCount`
+  65 → 57 (slugger 90 → 79, tinkerer 45 → 39), the tinkerer's `QuickHookPitchCount` 60 → 52 and `StarterPitchLimit`
+  100 → 88, and the warm-arm limit 90 → 79.
+* The slugger's `ShelledRuns` 6 → 7: he and the analyst had become indistinguishable in pitching changes, which his
+  profile (less quick with the bullpen) forbids.
+
+### Sweep (rotation, cap 140, 20 games per matchup)
+
+| Offset | Complete games | Outs per start | Pitchers a game | Starts of 130+ | Starts of 150+ |
+|---|--:|--:|--:|--:|--:|
+| −6 | 0.71 | 0.94 | 0.97 | 6.6% | 0.1% |
+| **0 (kept)** | **0.79** | **0.95** | **0.94** | **9.0%** | **0.4%** |
+| +6 | 0.84 | 0.96 | 0.92 | 11.7% | 0.7% |
+| +18 | 1.00 | 0.97 | 0.87 | 15.2% | 2.2% |
+
+Higher offsets reach real complete games only by working starters harder and using too few pitchers. The cap barely matters
+(130 and 140 give the same results). (After the threshold scaling the kept setting measures complete games 0.77.)
+
+### Result, and what is still long
+
+| 2,000 games, 1927 Yankees at 1955 Dodgers, analyst | Before | After |
+|---|--:|--:|
+| Yankees starter, 150+ pitches | 22.9% | 4.8% |
+| Dodgers starter, 150+ pitches | 22.1% | 1.3% |
+| Longest start | 186 | 167 |
+
+This matchup is the extreme: both aces finished most of their real starts. Still, 24% of its starts reach 130 pitches. A
+hard pitch limit for the managers would be the next lever if that is too many.
+
+`--calibrate` now prints a `workload:` line (pitches a batter, share of starts of 130+ and 150+, the longest) so this is
+visible without a browser.
+
+## 11. Current state
+
+Calibration (2026-11-25), analyst on both sides, Historical designated-hitter rule, **starters in rotation**, 20 games per
+matchup (8,400 team-games), simulated ÷ real, median over the 15 teams:
 
 | Measure | Ratio | Judgment |
 |---|--:|---|
-| Runs | 0.84 | good (0.90 is perfect here) |
-| Runs allowed | 1.03 | good |
-| At-bats | 1.02 | good |
-| Hits | 0.98 | good |
-| Doubles | 1.00 | good |
-| Triples | 0.93 | fine (small counts) |
-| Home runs | 1.02 | good |
-| Strikeouts | 1.10 | a little high (1.00 expected) |
-| Walks | 0.73 | low (0.91 expected; see section 8) |
-| Errors | 0.95 | good |
-| Starter outs per start | 0.96 | good |
-| Complete games | 0.67 | low, uneven by team (the analyst pulls early) |
-| Pitchers used per game | 1.00 | good |
-| Steals | 1.18 | a little high (0.84 to 5.57 by team) |
-| Steal attempts | 1.02 | right in total, **wrong by team** (0.54 to 4.90) |
-| Steal success | 1.06 | a little high |
-| Caught stealing | 0.86 | noisy |
-| Double plays | 0.85 | a little low |
-| Sacrifices | 0.86 | a little low (persona-driven) |
+| Runs | 0.91 | on target (0.90 is perfect here) |
+| Runs allowed | 1.13 | high: the opposing lineups are all strong |
+| At-bats | 1.03 | good |
+| Hits, doubles, home runs | 1.02, 1.02, 1.05 | good |
+| Triples | 0.95 | fine (small counts) |
+| Strikeouts | 1.05 | good |
+| Walks | 0.83 | a little low (about 0.89 reachable with these rosters) |
+| Errors | 0.96 | good |
+| Double plays | 0.89 | a little low |
+| Pitchers used per game | 0.96 | good |
+| Starter outs per start | 0.94 | good |
+| Complete games | 0.77 | a little low (manager behavior) |
+| Steals, caught stealing | 1.25, 0.97 | a little high; noisy |
+| Steal attempts | 1.13 | **wrong by team** (0.58 to 5.11) |
+| Steal success | 1.05 | good |
+| Sacrifices | 0.73 | low (manager behavior) |
+| Pitches a batter faced | 3.48 | about 3.6 believed real (not in Lahman) |
+| Starts of 150+ pitches | 0.6% or less | plausible |
 
-Benchmark (designated hitter, 6,000 games, `--check` passes): about 4.4 runs a team a game; see
-[ComputerManagers.md](ComputerManagers.md) section 9 for the persona table.
+Benchmark (designated hitter, default starters, 6,000 games, `--check` passes): about 4.4 runs a team a game; see
+[ComputerManagers.md](ComputerManagers.md) section 9. It still starts each team's ace, which is fine for comparing managers
+with each other.
 
-## 10. What works, and what does not
+## 12. What works, and what does not
 
 ### Works
 
@@ -419,6 +550,11 @@ Benchmark (designated hitter, 6,000 games, `--check` passes): about 4.4 runs a t
 * **A fixed league steal rate (67%) and a double-counted speed rating**: they put every poor-stealing team's success 4 to 15
   points above its real rate.
 * **Judging steals by the count alone**: it hides whether the attempts or the success is wrong, and they have different causes.
+* **A calibration that starts the ace every game.** It made every opponent far better than the real one and sent us looking
+  for an engine defect (walks). Check *who played* before blaming a rule.
+* **Judging pitcher use by outs and complete games alone:** both looked right while one start in five ran past 150 pitches.
+  Check the pitch counts too.
+* **Per-batter-faced pitcher modifiers**: one point of walks, worse hits and strikeouts (finding 5).
 * **Fixed scaling constants** (ERA ÷ 4.00, K/9 ÷ 7.0, BB/9 ÷ 3.0). They ignore the era and double-count the league.
 * **ERA relative to the league** as the hit scale (0.66 runs): ERA is a much stronger lever than hits.
 * **Unshrunk home-run rates:** one pitcher's season HR rate is too noisy (home runs 1.07, with extremes of 0.80 to 1.19).
@@ -432,7 +568,7 @@ Benchmark (designated hitter, 6,000 games, `--check` passes): about 4.4 runs a t
 * **Small samples for rare events.** Steals by team (1.0 to 5.07), complete games and sacrifices swing too much at 10 games
   per matchup.
 
-## 11. The tests that guard this
+## 13. The tests that guard this
 
 | Test | File | What it guards |
 |---|---|---|
@@ -448,6 +584,8 @@ Benchmark (designated hitter, 6,000 games, `--check` passes): about 4.4 runs a t
 | steal of third, double steal, squeezes, double-play odds, `StealOfSecond` filter | `BuntAndHitAndRunTests.cs`, `PlayTemplateTests.cs`, `ManagerModelTests.cs` | the running plays; `TheRunningRulesAreTheOnesTheEngineRolls` checks `RunningRules` is shared |
 | `ARunnerWithNoRecordSucceedsAtHisLeaguesRate`, `ALongRecordOutweighsTheLeaguesRate`, `AShortRecordMovesTowardTheLeagueRateMoreThanALongOne`, `EveryShippedTeamCarriesItsLeaguesStealRate...`, `ATeamFileWithoutALeagueStealRate_UsesTheDefault`, `WeightedByAttempts_TheModelReproducesEachRealTeamsSuccessRate` | `StealCalibrationTests.cs` | steal success follows the record and the league, and matches the real teams (mean error under 4 points; reads `lahman-reference.json`) |
 | `AgainstAnOrdinaryHitter_NoOrdinaryPitchBeatsAnother`, `ThePitchesStillDiffer_ByWhatTheyTradeAgainstTheHitter`, `TheDoublePlayChanceIsTheOneTheCalibrationSet`, `EveryShippedTeamCarriesItsSacrificeHits_ItsPitchersBattingLines_AndItsHabits` | `PitchBalanceTests.cs` | pitches are balanced (under 0.0035 runs per plate appearance apart) and still differ by batter; the 0.52 double-play chance; the data has `sh`, pitcher batting lines and `tendencies` |
+| `StartersTakeTurnsInProportionToTheGamesTheyReallyStarted`, `ATeamFileWithoutGamesStarted_SharesTheStartsEvenly` | `CalibrationRotationTests.cs` | calibration pitches a real rotation, not the ace |
+| `APlateAppearanceTakesAboutThreeAndAHalfPitches_WithStrikeoutsAndWalksLonger`, `TheStaminaFormulaUsesTheEnginesOwnPitchesPerOut` | `PitchEstimateTests.cs` | the pitch estimate stays plausible, and the stamina formula uses the measured pitches per out |
 | `NoFreeOptionTests` | engine tests | no alignment beats Normal for free |
 | `ManagerBenchmarkTests` | engine tests | the benchmark tool itself (seeding, counts, ranges check) in a few seconds |
 | Benchmark `--check` | `expected-ranges.json`, CI `manager-benchmark.yml` (non-blocking) | persona behavior stays inside ranges |
@@ -468,20 +606,26 @@ meant to move it; record why here.
 | smallball `buntRate` | 0.12 to 0.30 | 0.05 to 0.30 | same |
 | slugger `aggressiveRate` | 0 to 0.08 | 0 to 0.14 | more baserunners |
 | slugger `completeGameRate` | 0.14 to 0.26 | 0.10 to 0.40 | per-starter stamina; real teams averaged about 0.28 |
-| analyst and one other persona `pitchingChangesPerGame` | 0.9 to 1.5 | 0.8 to 1.5 | stamina offset −12 keeps starters in a little longer (the analyst makes 0.89) |
+| analyst and one other persona `pitchingChangesPerGame` (superseded below) | 0.9 to 1.5 | 0.8 to 1.5 | stamina offset −12 keeps starters in a little longer (the analyst makes 0.89) |
+| analyst and smallball `pitchingChangesPerGame` | 0.8 to 1.5 | 0.6 to 1.5 | stamina offset 0: starters last longer |
+| oldschool `pitchingChangesPerGame` | 1.1 to 1.6 | 0.9 to 1.6 | same |
+| slugger `pitchingChangesPerGame` | 0.7 to 1.2 | 0.55 to 1.2 | same |
+| slugger `completeGameRate` | 0.10 to 0.40 | 0.20 to 0.55 | same, and the benchmark starts aces |
 
-## 12. Open problems, in order
+The pitch-estimate change (finding 6) re-baselined no range; it changed the slugger's `ShelledRuns` instead, and lowered a
+floor in `ManyComputerGames_AlwaysEndLegallyWithRealisticBullpenUse` from 0.2 to 0.15 pitching changes.
+
+## 14. Open problems, in order
 
 1. **Steal attempts follow runner quality, not the club.** The success formula is calibrated (section 7); the managers still
    send good stealers about twice as often and poor ones half as often as the real clubs did. Needs managers that follow their
    club's real tendencies (`Team.Tendencies.StealAttemptsPerGame` is in the files, unused): an era-aware or "historical"
    persona, a design decision (review item 11).
-2. **Sacrifices (0.86) and complete games (0.67) are manager behavior.** The data is in place (section 8); the analyst bunts and
-   leaves starters in less than real clubs did. Same remedy as 1.
-3. **Walks 0.73.** Mostly the roster the files carry (section 8); a whole-staff walk rate would close it.
-4. **Double plays 0.85, strikeouts 1.10.** Fewer chances (walks) and a strikeout modifier slightly high; revisit after the walk
-   rate.
-5. **Calibration as pass/fail** with the tolerances in section 11.
+2. **Sacrifices (0.73) and complete games (0.77) are partly manager behavior.** The data is in place (section 8); the analyst
+   bunts and leaves starters in less than real clubs did. Same remedy as 1.
+3. **Walks 0.83.** The team files hold only the best 83% of each staff's innings; more pitchers per team would close most of it.
+4. **Runs allowed 1.13.** Expected in part (every opponent is strong); a league-average opponent (item 6) would show how much.
+5. **Calibration as pass/fail** with the tolerances in section 13.
 6. **A league-average opponent** instead of the other 14 strong teams, so the 0.90 adjustment is not needed.
 7. **Era-aware managers** (a "Historical" persona), so complete games and bullpen use can be compared with the era.
 8. **Park factors** (`BPF`, `PPF` are in the data) and their effect on calibrated runs.
@@ -497,7 +641,89 @@ wait for the text "A modern recreation of the 1984", which the committed About p
 `SetupKeepsOptionalChoicesCollapsedUntilRequested` (the mobile setup layout) and
 `StoppingTheCastInTheMiddleOfAPlayLeavesTheGamePlayable` (waiting on the PITCH button).
 
-## 13. Pitfalls and gotchas
+## 15. Adding more teams or other eras
+
+Observations from reading the code (2026-11-25). **None of this has been tested with new teams**: treat each risk as a
+prediction to check, not a finding. Everything in this document was calibrated or checked against 15 great teams of 1927 to
+1982 only.
+
+### Adjusts by itself
+
+These come from each team's own data, so an average or poor team from the same decades should mostly just work:
+
+* pitcher quality against his own league (hits, home runs, walks, strikeouts: `leaguePitching`);
+* steal success (`leagueStealRate`) and error rates (`eraErrorsPerGame`, `eraStrikeoutsPerGame`);
+* starter stamina from real starts (`gs`, innings, complete games);
+* fielding ratings, which are relative to the league at each position;
+* the Historical designated-hitter rule (season and league).
+
+### Era-dependent constants to re-check
+
+The modern figures below are background knowledge, not measured from Lahman.
+
+| Number | Set now | Why a new era strains it |
+|---|---|---|
+| Pitches a batter (`EstimatePitches`) and `PitchesPerOut` | about 3.5 and 4.9 | modern games run near 3.9 pitches a batter |
+| Stamina cap and complete-game bonus; the managers' pitch thresholds | tuned to men who finished games | modern starters rarely finish and are pulled near 100 pitches |
+| `RunningRules.DoublePlayChance` | 0.52 | one value for every era |
+| `WinProbability` run expectancy and scoring chance | one scoring level | changes what managers think a bunt or a steal is worth |
+| Pitch-type balance (`ApplyPitchType`) | balanced for a .290 hitter | strikeout-heavy eras change the trade |
+| Extra-base base chances, platoon modifiers | fixed | not checked against any era |
+
+### Ratings with absolute cutoffs
+
+Likely the most quietly wrong, because nothing fails when they are:
+
+* **Speed** (`generate_teams.py`, `speed_rating`): steals and triples per 600 at-bats against fixed cutoffs. Teams from
+  low-steal decades would all rate slow, and high-steal ones fast.
+* **Power** (`TeamLoader`): raw home run totals (30, 15, 5), so strike-shortened seasons and dead-ball teams are distorted.
+  It decides which shifts a computer manager considers.
+* **Bunting** (`TeamLoader.BuntRating`): raw sacrifice hits per plate appearance, so modern teams would nearly all rate as
+  poor bunters.
+
+Making these relative to the team's league and season should come before adding other eras.
+
+### Weak teams
+
+Nothing has been calibrated against a bad club. Pitchers far from average could reach the clamps on the modifiers (section 5).
+The team files carry only the best pitchers of each staff (finding 5), which may flatter a weak staff more than a great one.
+
+### Calibration and the benchmark
+
+* **The 0.90 runs target** (section 4) exists only because every opponent is strong. With average teams added it moves toward
+  1.00 and must be recomputed from the staffs' rates against their leagues. This is an improvement: the comparison gets fairer.
+* **`expected-ranges.json`** needs re-baselining, because the benchmark plays every team file.
+* **Calibration run time** grows with the square of the number of teams: lower `--games` per matchup.
+* **The team list is hard-coded** in `export_lahman_reference.py` and in the generator; `lahman-reference.json` must be
+  regenerated for new teams, or calibration leaves them out.
+* **A median over mixed eras can hide opposite errors:** report calibration by decade.
+
+### Tests that assume today's teams
+
+| Test | Assumption that would break |
+|---|---|
+| `EveryShippedTeamCarriesItsLeaguesPitching...` | league ERA 2.5 to 4.5, strikeouts 2 to 7 and walks 2 to 4.5 per nine |
+| `EveryShippedTeamCarriesItsLeaguesStealRate...` | steal success 50% to 75%, and never exactly the 0.67 default |
+| `EveryShippedStarterCarriesHisGamesStarted...` | a starter's outs per start between 12 and 28 |
+| `ManagerBenchmarkTests` | 15 teams (30 games for one pairing, both seats) |
+| `FieldingAndParkTests` | league errors per team game 0.4 to 2.5 |
+
+### Rules and data gaps
+
+* Modern rules are not modeled: the extra-inning runner, the three-batter minimum, the pitch clock.
+* Older seasons have missing statistics (1927 already does: section 3). Without caught-stealing figures a team falls back to the
+  default steal rate.
+
+### Suggested order
+
+1. Add a few **average and poor teams from 1927 to 1982**, run `--calibrate`, and see whether any measure moves with team
+   quality.
+2. Make the speed, power and bunting ratings **relative to the league**.
+3. Add one team each from the 1990s and the 2010s as probes; expect to make the pitch estimate, stamina and the managers'
+   pitch thresholds depend on the season.
+4. Report calibration **by decade**.
+
+## 16. Pitfalls and gotchas
 
 * **Calibrate with one manager on both sides, and say which.** Different personas change running, bunting, pitching
   changes and complete games; the engine's batting line is much less affected.
@@ -516,16 +742,17 @@ wait for the text "A modern recreation of the 1984", which the committed About p
 * **Keep the temporary experiment out of the commit:** the environment-variable overrides used to isolate a cause belong
   to the experiment, not the game.
 
-## 14. Keeping this document current
+## 17. Keeping this document current
 
 Update this document in the same change when you:
 
 * alter `ProbabilityTable`, `FatigueModel`, `RunningRules`, base running, the double-play odds, or the era data
   (`leaguePitching`, `eraErrorsPerGame`, `eraStrikeoutsPerGame`, `gs`);
-* re-run calibration after such a change (record the date, the options and the new ratios in section 9);
-* re-baseline `expected-ranges.json` (add a row to the table in section 11, with the reason);
-* learn that something does not work (add it to section 10, with the evidence);
-* add or change a test that guards modeling behavior (section 11);
-* regenerate `lahman-reference.json` (note a change of source or schema in section 3).
+* re-run calibration after such a change (record the date, the options and the new ratios in section 11);
+* re-baseline `expected-ranges.json` (add a row to the table in section 13, with the reason);
+* learn that something does not work (add it to section 12, with the evidence);
+* add or change a test that guards modeling behavior (section 13);
+* regenerate `lahman-reference.json` (note a change of source or schema in section 3);
+* add teams or eras (replace the predictions in section 15 with what was measured).
 
 Keep the numbers dated, and say which options produced them (games per matchup, persona, designated-hitter rule, seed).

@@ -117,7 +117,7 @@ leaves a good starter in, and would rather lose swinging than win bunting.
 **In play.** Steals, hit and runs and bunts are switched off (`ManagerTuning.Never`, a margin no call can reach). He
 pinch hits only from the seventh inning and only for a large gain, charges a high price for spending a bench player
 (1.6 times the normal cost), and walks a batter only on a large edge (0.10). He keeps a starter longer than anyone:
-bullpen margins of 0.07 and 0.14, warm-up not before the eighth inning or 90 pitches, a tiring starter stays unless
+bullpen margins of 0.07 and 0.14, warm-up not before the eighth inning or 79 pitches, a tiring starter stays unless
 the reliever is clearly better (+0.06), and a starter is not "shelled" until he has allowed 6 runs. His starters
 finish about 20% of games, against about 1% for the Tinkerer's. **Philosophy:** he is stubborn, not changing his plan
 for the moment (`LeverageSensitivity` -0.3) and trusting his hitters over the platoon book (`PlatoonWeight` 0.3).
@@ -131,13 +131,13 @@ swinging, his bench plays every night, and he will walk a star to face a lesser 
 
 **In play.** Pinch hitting from the fifth inning for a small gain (0.012) with a half-price bench. Considers an
 intentional walk from the sixth inning, for a smaller gap between the batter and the next hitter (0.08 of OPS), and
-makes it on any edge. Starts a reliever warming from the fourth inning at 45 pitches, and from 60 pitches will swap a
+makes it on any edge. Starts a reliever warming from the fourth inning at 39 pitches, and from 52 pitches will swap a
 still-fresh starter for a warm reliever who looks at least as good (a margin of -0.02 in a close late game, 0.0
 otherwise). A tiring pitcher goes even for a somewhat worse arm (-0.20), and a starter is "shelled" after 4 runs. The
 platoon effect (section 4.1) gives his matchup changes something real to work on: he uses the most pitchers and pinch
 hitters of the five, and his starters finish the fewest games. **Philosophy:** the platoon book matters twice as much to
 him as it really does (`PlatoonWeight` 2.0), the big moments matter most (`LeverageSensitivity` 0.6), a starter is done at
-100 pitches (`StarterPitchLimit`), the closer comes in from the eighth (`CloserFromInning` 8), a glove goes in for a lead
+88 pitches (`StarterPitchLimit`), the closer comes in from the eighth (`CloserFromInning` 8), a glove goes in for a lead
 from the seventh, and he varies his calls a little (`PitchMix` 0.015).
 
 ## 3. Architecture
@@ -329,7 +329,7 @@ comes from the team file (`bat`, which the generator writes from the Lahman batt
 * **Pinch hitting for the pitcher** takes him out of the game: the pinch hitter holds the pitcher's spot and position, and
   when the side next takes the field a reliever is brought in by the manager who made the move (a human's by the default
   manager, who prefers a reliever who is already warm). It is refused when the bullpen is empty.
-  A computer manager does it only when it is behind or tied from the sixth inning, or the pitcher has thrown 90 pitches
+  A computer manager does it only when it is behind or tied from the sixth inning, or the pitcher has thrown 79 pitches
   or is tiring, and only with a reliever to bring in; the pitcher's poor bat would otherwise make it worth doing every
   time. Gus Halloran does it only from the seventh, behind or tied.
 * **The double switch** (`GameService.DoubleSwitch`, offered in the Substitutions dialog's Pitching tab): the new pitcher
@@ -368,7 +368,7 @@ no call can clear the bar.
 | `ShelledRuns` | 5 | Runs a starter may allow before he is pulled as shelled |
 | `ReliefEdgeClose` | 0.035 | Edge a reliever needs over a tiring pitcher in a close late game |
 | `ReliefEdgeOther` | 0.085 | The same bar earlier, or when the game is not close |
-| `WarmUpPitchCount` | 65 | Pitches after which a reliever is warmed early in a close game |
+| `WarmUpPitchCount` | 57 | Pitches after which a reliever is warmed early in a close game |
 | `WarmUpFromInning` | 7 | First inning that early warm-up applies |
 | `QuickHookPitchCount` | `int.MaxValue` | Pitches after which a still-fresh pitcher may be swapped for a warm reliever |
 | `PitchoutShare` | 0.30 | Share of the time a favorable pitchout is actually called |
@@ -407,20 +407,20 @@ Blank means the default. `OldSchoolManager` has no dials; see [section 6](#6-the
 | `IntentionalWalkFromInning` | 7 | 7 | 7 | **6** |
 | `IntentionalWalkOpsGap` | 0.15 | 0.15 | 0.15 | **0.08** |
 | `TiringSwapMargin` | -0.08 | -0.08 | **0.06** | **-0.20** |
-| `ShelledRuns` | 5 | 5 | **6** | **4** |
+| `ShelledRuns` | 5 | 5 | **7** | **4** |
 | `SituationalRisk` | 0 | **0.5** | 0 | 0 |
 | `LeverageSensitivity` | 0 | **0.3** | **-0.3** | **0.6** |
 | `PitchMix` | 0 | **0.02** | 0 | **0.015** |
-| `StarterPitchLimit` | off | off | off | **100** |
+| `StarterPitchLimit` | off | off | off | **88** |
 | `CloserFromInning` | 9 | 9 | 9 | **8** |
 | `PlatoonWeight` | 1.0 | 1.0 | **0.3** | **2.0** |
 | `DefensiveReplaceFromInning` | off | **8** | off | **7** |
 | `DoubleSwitchGain` | 0.02 | 0.02 | **Never** | **0.0** |
 | `ReliefEdgeClose` | 0.035 | 0.035 | **0.07** | **-0.02** |
 | `ReliefEdgeOther` | 0.085 | 0.085 | **0.14** | **0.0** |
-| `WarmUpPitchCount` | 65 | 65 | **90** | **45** |
+| `WarmUpPitchCount` | 57 | 57 | **79** | **39** |
 | `WarmUpFromInning` | 7 | 7 | **8** | **4** |
-| `QuickHookPitchCount` | off | off | off | **60** |
+| `QuickHookPitchCount` | off | off | off | **52** |
 | `PitchoutShare` | 0.30 | **0.45** | **0.15** | 0.30 |
 
 ## 6. The old-school manager
@@ -580,20 +580,21 @@ starters were given a stamina from their real starts (the calibration below). Sc
 
 | Manager | Win rate (95% CI) | Runs | Allowed | Steal % | Bunt % | H&R % | Aggressive % | IBB % | PH a game | Pitching changes | Complete games | Defensive subs a game |
 |---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| Ellie Whitcombe (analyst) | 54.2% (52.3-56.2) | 4.52 | 4.02 | 6.8 | 5.6 | 31.1 | 19.8 | 0.2 | 0.52 | 0.89 | 34.2% | 0.00 |
-| Marcus Delacroix (tinkerer) | 53.3% (51.3-55.3) | 4.57 | 4.35 | 7.3 | 5.5 | 29.0 | 17.7 | 1.3 | 0.77 | 1.75 | 0.2% | 0.21 |
-| Rosa Delgado (small ball) | 52.3% (50.3-54.3) | 4.43 | 4.28 | 14.9 | 9.9 | 29.4 | 34.3 | 0.3 | 0.53 | 0.95 | 31.8% | 0.23 |
-| Duke Pruitt (slugger) | 49.5% (47.5-51.5) | 4.34 | 4.15 | 0.0 | 0.0 | 0.0 | 10.5 | 0.2 | 0.28 | 0.80 | 34.5% | 0.00 |
-| Gus Halloran (old school) | 40.6% (38.6-42.6) | 4.07 | 5.11 | 4.9 | 0.4 | 1.4 | 10.3 | 11.2 | 0.54 | 1.21 | 15.8% | 0.15 |
+| Ellie Whitcombe (analyst) | 55.5% (53.5-57.4) | 4.50 | 4.00 | 6.6 | 5.8 | 31.1 | 20.0 | 0.1 | 0.53 | 0.64 | 52.2% | 0.00 |
+| Marcus Delacroix (tinkerer) | 52.3% (50.3-54.3) | 4.50 | 4.35 | 7.5 | 5.5 | 29.4 | 17.7 | 1.3 | 0.78 | 1.73 | 0.2% | 0.21 |
+| Rosa Delgado (small ball) | 53.6% (51.6-55.6) | 4.41 | 4.19 | 15.1 | 9.8 | 29.4 | 34.4 | 0.3 | 0.53 | 0.70 | 49.5% | 0.24 |
+| Duke Pruitt (slugger) | 48.2% (46.2-50.2) | 4.30 | 4.14 | 0.0 | 0.0 | 0.0 | 10.5 | 0.2 | 0.28 | 0.60 | 49.3% | 0.00 |
+| Gus Halloran (old school) | 40.4% (38.5-42.4) | 4.02 | 5.04 | 4.9 | 0.4 | 1.5 | 10.4 | 11.2 | 0.54 | 1.05 | 25.8% | 0.15 |
 
 Steal and hit-and-run percentages are of chances (a runner on first, second open, fewer than two out); bunt, of
 runner on first or second, third open, nobody out; aggressive, of plate appearances with a runner on; IBB, of first base
 open with a runner in scoring position and fewer than two out.
 
-The four expected-run personas are within about three points of each other and each is clearly itself: Spark runs and
-bunts the most, Duke never does and lets his starters finish, Marcus uses the most bench players and pitchers (and his
-starters almost never finish). Spark, Marcus and Gus are the ones who make defensive replacements, Gus only in the ninth.
-Gus is the easy opponent.
+The four expected-run personas are within about seven points of each other (48.2% to 55.5%), and the analyst now sits just
+outside five points of even. Spark runs and bunts the most, Duke never does, and Marcus uses the most bench players and
+pitchers (his starters almost never finish). Complete games do not set Duke apart: he, the analyst and Spark all finish 49%
+to 52% of the games their aces start. Spark, Marcus and Gus are the ones who make defensive replacements, Gus only in the
+ninth. Gus is the easy opponent.
 
 ### Calibration against the real seasons
 
@@ -626,12 +627,13 @@ fewer runs than its league. Still open: steals are about 1.5 times the real rate
 The tiring factor, whole innings per start taken from 10, gave nearly every starter a 2, 3 or 4: Cuellar of the 1970
 Orioles, who finished more than half his starts, and Nolan of the 1975 Reds, who finished five of 32, differed by one step
 (15 pitches on the threshold). A starter's stamina is now worked out from his real starts (`FatigueModel.Stamina`): his
-outs per start (the team files carry games started, `gs`) times the engine's 5.6 pitches an out, less 18, plus 15 for
-the share of his starts he finished. His effectiveness drops 8% at that pitch count, 20% twenty pitches later and 35%
-fifteen after that. Relievers and files without `gs` keep the tiring factor. With one manager on both sides the starter's
-outs a start are now 1.02 of real and complete games 0.94 of real, per team within about 0.8 to 1.2 of real outs a start
-(the 1979 Pirates and 1967 Cardinals, whose staffs are hit hard by the strong opposition, run shortest). Managers pull
-starters by their condition, so the same stamina gives each persona its own completion rate (section 9, above).
+outs per start (the team files carry games started, `gs`) times the engine's 4.9 pitches an out, plus 15 for the share of
+his starts he finished. His effectiveness drops 8% at that pitch count, 20% twenty pitches later and 35% fifteen after
+that. Relievers and files without `gs` keep the tiring factor. With a rotation and one manager on both sides, starter outs
+are 0.94 of real and complete games 0.77. The pitch estimate was lowered at the same time to about 3.5 a plate appearance (it was about 4.0, and a start could run past 180 pitches), and the managers' pitch thresholds were scaled to match. Managers pull starters by their condition, so the same stamina gives each persona
+its own completion rate (section 9, above); the benchmark starts each team's ace, so its rates run higher than a season's.
+The ratios in the table above predate the later calibration work; the current ones are in
+[ModelingStatisticsProbability.md](ModelingStatisticsProbability.md).
 
 ### Before: expected-run manager against the old rules
 

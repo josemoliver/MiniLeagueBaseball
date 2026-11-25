@@ -43,8 +43,8 @@ public static class FatigueModel
         return mod;
     }
 
-    /// <summary>The engine's pitches for each out a pitcher records, measured over simulated games (calibration shows ~5.6).</summary>
-    public const double PitchesPerOut = 5.6;
+    /// <summary>The engine's pitches for each out a pitcher records, measured over simulated games (calibration shows ~4.9).</summary>
+    public const double PitchesPerOut = 4.9;
 
     /// <summary>
     /// The pitch count at which a starter begins to tire, from how long his real starts were, or 0 when that is unknown.
@@ -56,8 +56,8 @@ public static class FatigueModel
     public static double Stamina(PitcherStats? stats)
     {
         if (stats is null || stats.GamesStarted <= 0) return 0;
-        double typical = stats.OutsPerStart * PitchesPerOut - 12 + 15 * stats.CompleteGameRate;
-        return Math.Clamp(typical, 70, 150);
+        double typical = stats.OutsPerStart * PitchesPerOut + 15 * stats.CompleteGameRate;
+        return Math.Clamp(typical, 70, 140);
     }
 
     /// <summary>

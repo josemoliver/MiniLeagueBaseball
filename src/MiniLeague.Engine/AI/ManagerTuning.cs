@@ -73,7 +73,7 @@ public sealed record ManagerTuning
     /// Pitches thrown after which, in a close game from <see cref="WarmUpFromInning"/> on, a reliever is told to warm
     /// up even though the pitcher is still effective. Lower means the bullpen is busier.
     /// </summary>
-    public int WarmUpPitchCount { get; init; } = 65;
+    public int WarmUpPitchCount { get; init; } = 57;
 
     /// <summary>The first inning in which a close game makes this manager start a reliever warming early.</summary>
     public int WarmUpFromInning { get; init; } = 7;

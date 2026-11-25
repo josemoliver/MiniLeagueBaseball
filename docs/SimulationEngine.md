@@ -227,8 +227,9 @@ needed and no injury is waiting to be replaced. A pending injury (section 12) bl
    afterwards, so the log, the box score and the out count agree.
 10. The **description**, **runner moves** (`RunnerMoveBuilder`, display only) and a **pitch estimate** are added to the result.
 
-**Pitch counts are an estimate, not a model.** A strikeout takes 4 to 7 pitches, a walk 5 to 7, an intentional walk 4, a hit by
-pitch 2 to 5, a steal 1, and anything else 1 to 6 (about 3.9 on average). They drive fatigue and nothing else.
+**Pitch counts are an estimate, not a model.** A strikeout takes 3 to 7 pitches, a walk 4 to 7, an intentional walk 4, a hit by
+pitch 1 to 5, a steal 1, and anything else 1 to 5: about 3.5 a plate appearance and 4.9 an out. They drive fatigue and the
+managers' pitch counts, nothing else.
 
 **Strategies the resolver treats specially:** `SwingAgressive` (the runners are sent hard on hits, section 7), `Steal`,
 `HitAndRun`, `SacrificeBunt`, `Squeeze`, `SafetySqueeze`. `SwingAway` and `SwingSafe` are the same plain swing (`SwingSafe` has
@@ -479,10 +480,10 @@ With a runner on first, second open and no intentional walk, the runner breaks w
 For a starter whose games started are known:
 
 ```
-stamina = clamp( outs per start × 5.6 − 12 + 15 × (share of his starts he finished), 70, 150 )   pitches
+stamina = clamp( outs per start × 4.9 + 15 × (share of his starts he finished), 70, 140 )   pitches
 ```
 
-where outs per start is three times his innings per start and 5.6 is the engine's pitches per out. Anyone else uses the tiring
+where outs per start is three times his innings per start and 4.9 is the engine's pitches per out. Anyone else uses the tiring
 factor (1 durable to 9 fragile; relievers 5): thresholds `80, 100, 115` shifted by `5 × (5 − factor)`. See
 [ModelingStatisticsProbability.md](ModelingStatisticsProbability.md) section 6 for why the tiring factor alone could not tell
 starters apart.
@@ -571,8 +572,10 @@ for browser storage, with a description for the resume prompt. Teams and ballpar
 `Restore` rebuilds the state and throws `InvalidOperationException` if a snapshot no longer fits the rosters. The snapshot holds
 the score by inning, inning, outs, runners (with their batting slot and the pitcher charged), lineups and positions, batter
 indices, both pitchers (pitch count, batters faced, settle point, runs, entry modifier, condition), bullpens (warming and batters
-warmed), used players, alignments, the play-by-play, the box score, the recap, the options, the manager ids, and the flags
-(ejections, rain, pending injury).
+warmed), used players, alignments, the newest 200 play-by-play entries, the box score, the recap, the options, the manager ids, and
+the flags (an error in the inning, ejections, rain, pending injury). The designated hitter rule is not stored: it is worked out
+again from the options and the home team. The box score in a captured snapshot is shared with the live game, so a snapshot is
+serialized (`ToJson`) as soon as it is taken.
 
 * The format has a **version** (`GameSnapshot.CurrentVersion`, now 2). A snapshot of another version is rejected (read as no save),
   not migrated.
@@ -635,23 +638,23 @@ These are deliberate gaps, not bugs. Where one affects a calibration result it i
 The engine has been checked against each team's real season (runs, hits, home runs, walks, strikeouts, steals, double plays,
 sacrifices, complete games, starter length), by playing every team against every other and comparing per game. The method, the
 findings and what works are in [ModelingStatisticsProbability.md](ModelingStatisticsProbability.md); the current picture
-(2026-11-25, analyst manager, Historical designated-hitter rule):
+(2026-11-25, analyst manager, Historical designated-hitter rule, starters in rotation):
 
 | Measure (simulated ÷ real) | Ratio |
 |---|--:|
-| Runs | 0.84 (a perfect model scores about 0.90: every opponent is a pennant winner) |
-| Hits, doubles, home runs | 0.98, 1.00, 1.02 |
-| Strikeouts, walks | 1.10, 0.73 |
-| Errors | 0.95 |
-| Starter outs per start, pitchers used a game | 0.96, 1.00 |
-| Double plays | 0.85 |
-| Steals, caught stealing | 1.18, 0.86 |
-| Sacrifices, complete games | 0.86, 0.67 |
+| Runs | 0.91 (about what a perfect model scores here: every opponent is a pennant winner) |
+| Hits, doubles, home runs | 1.02, 1.02, 1.05 |
+| Strikeouts, walks | 1.05, 0.83 |
+| Errors | 0.96 |
+| Starter outs per start, pitchers used a game | 0.94, 0.96 |
+| Double plays | 0.89 |
+| Steals, caught stealing | 1.25, 0.97 |
+| Sacrifices, complete games | 0.73, 0.77 |
 
 The corrections that made this possible, in the engine: pitchers scaled against their own league; hits and home runs by their own
 rates; each pitch balanced by run value; the double-play base 0.45 → 0.52; the steal success steadied toward the league's rate
 with a lighter record weight; stamina from a starter's real starts. What is left is mostly **manager behavior** (steal attempts,
-sacrifices, complete games follow the managers' habits, not the engine's) and the roster the team files carry (walks).
+sacrifices, complete games follow the managers' habits, not the engine's) and the roster the team files carry (walks; the files hold only each staff's best arms).
 
 ## 20. Tests
 
@@ -664,7 +667,7 @@ that matter for the rules above:
 | One play: outcomes, base running, tag-ups, errors | `AtBatResolverTests`, `FieldingAndParkTests`, `OutfieldDepthTests` |
 | Bunts, squeezes, hit and run, steals of third, double steals | `BuntAndHitAndRunTests`, `PlayFactsTests` |
 | No free option: alignments, pitchout, pitches | `NoFreeOptionTests`, `PitchBalanceTests` |
-| Pitcher scaling, stamina, steal calibration | `LeaguePitchingTests`, `StaminaTests`, `StealCalibrationTests` |
+| Pitcher scaling, pitch estimate, stamina, steal calibration | `LeaguePitchingTests`, `PitchEstimateTests`, `StaminaTests`, `StealCalibrationTests`, `CalibrationRotationTests` |
 | Lineups, substitutions, the designated hitter, a pitcher batting | `LineupAndSubstitutionTests`, `PitchersBatTests` |
 | Random events | `RandomEventTests` |
 | The box score and decisions | `BoxScoreTests` |

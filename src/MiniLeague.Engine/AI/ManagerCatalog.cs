@@ -113,8 +113,8 @@ public sealed class ManagerCatalog
                 SqueezeMargin = ManagerTuning.Never,
                 AggressiveRunMargin = 0.012, PinchHitFromInning = 7, PinchHitGain = 0.05, BenchReserveScale = 1.6,
                 PinchRunGain = 0.10, IntentionalWalkMargin = 0.10, ReliefEdgeClose = 0.07, ReliefEdgeOther = 0.14,
-                WarmUpPitchCount = 90, WarmUpFromInning = 8, PitchoutShare = 0.15,
-                TiringSwapMargin = 0.06, ShelledRuns = 6, DoubleSwitchGain = ManagerTuning.Never,
+                WarmUpPitchCount = 79, WarmUpFromInning = 8, PitchoutShare = 0.15,
+                TiringSwapMargin = 0.06, ShelledRuns = 7, DoubleSwitchGain = ManagerTuning.Never,
                 // Stubborn: the moment does not change his plan, and he trusts his hitters over the platoon book.
                 LeverageSensitivity = -0.3, PlatoonWeight = 0.3,
             })),
@@ -136,11 +136,11 @@ public sealed class ManagerCatalog
             {
                 PinchHitFromInning = 5, PinchHitGain = 0.012, BenchReserveScale = 0.5,
                 IntentionalWalkMargin = 0.0, IntentionalWalkFromInning = 6, IntentionalWalkOpsGap = 0.08,
-                ReliefEdgeClose = -0.02, ReliefEdgeOther = 0.0, WarmUpPitchCount = 45, WarmUpFromInning = 4,
-                QuickHookPitchCount = 60, TiringSwapMargin = -0.20, ShelledRuns = 4,
+                ReliefEdgeClose = -0.02, ReliefEdgeOther = 0.0, WarmUpPitchCount = 39, WarmUpFromInning = 4,
+                QuickHookPitchCount = 52, TiringSwapMargin = -0.20, ShelledRuns = 4,
                 // The platoon book matters most to him, and the tight spots matter most: a pitch limit, the closer from the
                 // eighth, a glove for a lead from the seventh, and some variety in what he calls.
-                PlatoonWeight = 2.0, LeverageSensitivity = 0.6, CloserFromInning = 8, StarterPitchLimit = 100,
+                PlatoonWeight = 2.0, LeverageSensitivity = 0.6, CloserFromInning = 8, StarterPitchLimit = 88,
                 DoubleSwitchGain = 0.0,
                 DefensiveReplaceFromInning = 7, PitchMix = 0.015,
             })),

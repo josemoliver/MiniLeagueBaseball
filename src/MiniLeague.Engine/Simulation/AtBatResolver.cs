@@ -40,15 +40,18 @@ public class AtBatResolver
         && state.RunnerOnFirst is not null && state.RunnerOnSecond is null
         && !defense.IntentionalWalk;
 
-    // Average ≈ 3.9 pitches per plate appearance, with strikeouts and walks running long.
+    // WHY: about 3.5 pitches a plate appearance, with strikeouts (5 on average) and walks (5.5) running long and a ball put in
+    // play taking 3. The 1927 to 1982 game is believed to have run near 3.6 (pitch counts were not recorded then, and Lahman has
+    // none, so this is an estimate). It was about 4.0, which made nine innings some 150 pitches and let a durable starter
+    // throw 180. Each outcome draws once, as before, so a seeded game rolls in the same order.
     private int EstimatePitches(OutcomeType outcome) => outcome switch
     {
-        OutcomeType.Strikeout => _rng.Next(4, 8),
-        OutcomeType.Walk => _rng.Next(5, 8),
+        OutcomeType.Strikeout => _rng.Next(3, 8),
+        OutcomeType.Walk => _rng.Next(4, 8),
         OutcomeType.IntentionalWalk => 4,
-        OutcomeType.HitByPitch => _rng.Next(2, 6),
+        OutcomeType.HitByPitch => _rng.Next(1, 6),
         OutcomeType.StolenBase or OutcomeType.CaughtStealing => 1,
-        _ => _rng.Next(1, 7),
+        _ => _rng.Next(1, 6),
     };
 
     private PlayResult ResolveCore(
