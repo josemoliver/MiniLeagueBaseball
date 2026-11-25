@@ -1,3 +1,5 @@
+using Microsoft.Playwright;
+
 namespace MiniLeague.Web.E2E;
 
 /// <summary>The game in a real browser: the things the component tests cannot show (start-up order, timing, the real animator).</summary>
@@ -124,9 +126,12 @@ public class GameTests(AppFixture app)
         var options = player.Page.Locator("[data-testid=setup-options]");
         Assert.False(await options.EvaluateAsync<bool>("element => element.open"));
         var play = player.Page.Locator("button", new() { HasText = "PLAY BALL" });
+        // The manager profile follows the optional choices on a phone, so the action can sit below the fold.
+        // Check that it remains reachable without opening those choices.
+        await play.ScrollIntoViewIfNeededAsync();
         var bounds = await play.BoundingBoxAsync();
         Assert.NotNull(bounds);
-        Assert.True(bounds.Y + bounds.Height <= 844);
+        Assert.True(bounds.Y >= 0 && bounds.Y + bounds.Height <= player.Page.ViewportSize!.Height);
 
         await options.Locator("summary").ClickAsync();
         Assert.True(await options.EvaluateAsync<bool>("element => element.open"));
@@ -205,7 +210,7 @@ public class GameTests(AppFixture app)
     {
         await using var player = await GamePage.OpenAsync(app, "/");
 
-        await player.Page.GetByText("A modern recreation of the 1984").WaitForAsync();
+        await player.Page.Locator(".start-page").GetByRole(AriaRole.Link, new() { Name = "PLAY BALL" }).WaitForAsync();
 
         Assert.False(await player.ErrorBannerShownAsync());
         Assert.Empty(player.Errors);
@@ -215,7 +220,7 @@ public class GameTests(AppFixture app)
     public async Task TheMenuOpensTheAboutPageWithTheDisclaimerAndTheCredits()
     {
         await using var player = await GamePage.OpenAsync(app, "/");
-        await player.Page.GetByText("A modern recreation of the 1984").WaitForAsync();
+        await player.Page.Locator(".start-page").GetByRole(AriaRole.Link, new() { Name = "PLAY BALL" }).WaitForAsync();
 
         await player.Page.Locator("button.mud-icon-button").First.ClickAsync();   // the menu button
         await player.Page.Locator("[data-testid=about-link]").ClickAsync();

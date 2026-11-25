@@ -52,7 +52,7 @@ public class CastEdgeCaseTests(AppFixture app)
         await player.WaitUntilIdleAsync();
         await player.StartCastingAsync();
 
-        await player.Page.Locator("button", new() { HasText = "PITCH" }).ClickAsync();   // the play starts...
+        await player.Page.Locator(".decision-panel button", new() { HasText = "PITCH" }).ClickAsync();   // the play starts...
         await player.StopCastingAsync();                                                  // ...and the TV goes away
 
         Assert.True(await GamePage.UntilAsync(async () =>
