@@ -35,8 +35,12 @@ public static class TeamLoader
     private static Team ToTeam(TeamData d)
     {
         var roster = new List<Player>();
-        roster.AddRange(d.Batters.Select(ToBatter));
-        roster.AddRange(d.Pitchers.Select(ToPitcher));
+        double leagueStealRate = d.LeagueStealRate ?? Simulation.RunningRules.DefaultLeagueStealRate;
+        roster.AddRange(d.Batters.Select(b => ToBatter(b, leagueStealRate)));
+        var league = d.LeaguePitching is { } lp
+            ? new LeaguePitching(lp.Era, lp.NonHomeRunHitsPerNine, lp.HomeRunsPerNine, lp.StrikeoutsPerNine, lp.WalksPerNine)
+            : LeaguePitching.Default;
+        roster.AddRange(d.Pitchers.Select(p => ToPitcher(p, league)));
 
         return new Team
         {
@@ -45,13 +49,18 @@ public static class TeamLoader
             StadiumId = d.Stadium ?? "generic",
             EraErrorsPerGame = d.EraErrorsPerGame ?? 0.8,
             EraStrikeoutsPerGame = d.EraStrikeoutsPerGame ?? 4.0,
+            LeaguePitching = league,
+            LeagueStealRate = leagueStealRate,
+            Tendencies = d.Tendencies is { } t
+                ? new TeamTendencies(t.StealAttemptsPerGame, t.SacrificesPerGame, t.CompleteGameRate, t.SavesPerGame)
+                : null,
             IsHistorical = true,
             Roster = roster,
             DefaultLineup = roster.Where(p => !p.IsPitcher).Take(LineupSize).Select(p => p.Id).ToList(),
         };
     }
 
-    private static Player ToBatter(BatterData b)
+    private static Player ToBatter(BatterData b, double leagueStealRate)
     {
         var stats = new BatterStats
         {
@@ -64,7 +73,12 @@ public static class TeamLoader
             Id = b.Id, Name = b.Name, BatHand = b.Bats, ThrowHand = b.Throws,
             PrimaryPosition = ParsePosition(b.Pos),
             SpeedRating = b.Speed,
+            LeagueStealRate = leagueStealRate,
             PowerRating = b.Hr >= 30 ? 4 : b.Hr >= 15 ? 3 : b.Hr >= 5 ? 2 : 1,
+            // WHY: a player's sacrifice hits are the record of how well and how often he bunted. Without them (team
+            // files generated before "sh" was added) he keeps the average rating of 3.
+            BuntingAbility = b.Sh is int sh ? BuntRating(sh, b.Ab + b.Bb + b.Hbp + sh) : 3,
+            SacrificeAbility = b.Sh is int sh2 ? BuntRating(sh2, b.Ab + b.Bb + b.Hbp + sh2) : 3,
             FieldingRating = 2,
             Fielding = ParseFielding(b),
             HasFieldingData = b.Field is not null,
@@ -72,7 +86,7 @@ public static class TeamLoader
         };
     }
 
-    private static Player ToPitcher(PitcherData p)
+    private static Player ToPitcher(PitcherData p, LeaguePitching league)
     {
         var stats = new PitcherStats
         {
@@ -80,13 +94,50 @@ public static class TeamLoader
             WalksAllowed = p.Bb, Strikeouts = p.So,
             Wins = p.Wins, Losses = p.Losses, Saves = p.Saves,
             CompleteGames = p.Cg, HomeRunsAllowed = p.Hr,
-            GroundBallRate = p.GbRate, TiringFactor = p.TiringFactor,
+            GroundBallRate = p.GbRate, TiringFactor = p.TiringFactor, GamesStarted = p.Gs ?? 0,
+            HoldRunners = p.HoldRunners ?? 3,
+            League = league,
         };
+        // WHY: with no designated hitter a pitcher has to bat. A file written by the generator carries his own batting
+        // line; a hand-written one gets an ordinary pitcher's: about .150, little power, and he can bunt.
+        var bat = p.Bat ?? DefaultPitcherBatting;
+        var batting = new BatterStats
+        {
+            AtBats = bat.Ab, Hits = bat.H, Doubles = bat.D2, Triples = bat.D3, HomeRuns = bat.Hr,
+            Walks = bat.Bb, Strikeouts = bat.So, HitByPitch = bat.Hbp,
+        };
+        int plateAppearances = bat.Ab + bat.Bb + bat.Hbp + (bat.Sh ?? 0);
+        int bunting = Math.Max(4, bat.Sh is int sh ? BuntRating(sh, plateAppearances) : 4);
         return new Player
         {
-            Id = p.Id, Name = p.Name, ThrowHand = p.Throws,
+            Id = p.Id, Name = p.Name, ThrowHand = p.Throws, BatHand = p.Bats ?? BatHand.Right,
             PrimaryPosition = Position.P, Role = p.Role,
             PitchingOverall = stats, PitchingVsLeft = stats, PitchingVsRight = stats,
+            Overall = batting, VsLeft = batting, VsRight = batting,
+            SpeedRating = 2, PowerRating = 1, BuntingAbility = bunting, SacrificeAbility = bunting,
+        };
+    }
+
+    /// <summary>An ordinary pitcher at the plate, for a team file that has no batting line for him.</summary>
+    private static readonly PitcherBattingData DefaultPitcherBatting = new()
+    { Ab = 150, H = 22, D2 = 3, D3 = 0, Hr = 1, Bb = 10, So = 55, Hbp = 1 };
+
+    /// <summary>
+    /// A 1–6 bunting rating from sacrifice hits per plate appearance. About 1% is an ordinary hitter who bunts now and
+    /// then (3); 3% or more is a specialist (6); none at all in a full season is a hitter who never did (1).
+    /// </summary>
+    public static int BuntRating(int sacrifices, int plateAppearances)
+    {
+        if (plateAppearances < 50) return 3;   // too few to say
+        double rate = (double)sacrifices / plateAppearances;
+        return rate switch
+        {
+            >= 0.030 => 6,
+            >= 0.020 => 5,
+            >= 0.012 => 4,
+            >= 0.006 => 3,
+            >= 0.002 => 2,
+            _ => 1,
         };
     }
 
@@ -126,8 +177,28 @@ public static class TeamLoader
         public string? Stadium { get; set; }
         public double? EraErrorsPerGame { get; set; }
         public double? EraStrikeoutsPerGame { get; set; }
+        public LeaguePitchingData? LeaguePitching { get; set; }
+        public double? LeagueStealRate { get; set; }   // the league's steal success that season; the generator writes it
         public List<BatterData> Batters { get; set; } = [];
         public List<PitcherData> Pitchers { get; set; } = [];
+        public TendenciesData? Tendencies { get; set; }
+    }
+
+    private sealed class LeaguePitchingData
+    {
+        public double Era { get; set; }
+        public double NonHomeRunHitsPerNine { get; set; }
+        public double HomeRunsPerNine { get; set; }
+        public double StrikeoutsPerNine { get; set; }
+        public double WalksPerNine { get; set; }
+    }
+
+    private sealed class TendenciesData
+    {
+        public double StealAttemptsPerGame { get; set; }
+        public double SacrificesPerGame { get; set; }
+        public double CompleteGameRate { get; set; }
+        public double SavesPerGame { get; set; }
     }
 
     private sealed class BatterData
@@ -149,7 +220,21 @@ public static class TeamLoader
         public int Cs { get; set; }
         public int Hbp { get; set; }
         public int Speed { get; set; } = 3;
+        public int? Sh { get; set; }   // sacrifice hits; absent in files generated before it was added
         public Dictionary<string, int[]>? Field { get; set; }
+    }
+
+    private sealed class PitcherBattingData
+    {
+        public int Ab { get; set; }
+        public int H { get; set; }
+        public int D2 { get; set; }
+        public int D3 { get; set; }
+        public int Hr { get; set; }
+        public int Bb { get; set; }
+        public int So { get; set; }
+        public int Hbp { get; set; }
+        public int? Sh { get; set; }
     }
 
     private sealed class PitcherData
@@ -163,7 +248,11 @@ public static class TeamLoader
         public int Bb { get; set; }
         public int So { get; set; }
         public double GbRate { get; set; } = 0.45;
+        public int? HoldRunners { get; set; }   // 1–5; no source in the Lahman data, so only hand-entered files have it
+        public BatHand? Bats { get; set; }
+        public PitcherBattingData? Bat { get; set; }   // his batting line; the generator writes it
         public int TiringFactor { get; set; } = 5;
+        public int? Gs { get; set; }   // games started; the generator writes it, and a hand-written file may leave it out
         public PitcherRole Role { get; set; } = PitcherRole.Starter;
         public int Wins { get; set; } = 15;
         public int Losses { get; set; } = 8;

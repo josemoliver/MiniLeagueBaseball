@@ -58,8 +58,14 @@ public class GameService
     /// <param name="cpu">The computer manager for any side that has not been given a persona of its own.</param>
     /// <param name="eventRng">Randomness for injuries, weather and ejections (seed it for repeatable games).</param>
     /// <param name="catalog">Where to find the persona a side was given; without one every side uses <paramref name="cpu"/>.</param>
-    public GameService(AtBatResolver resolver, ComputerManager cpu, Random? eventRng = null, ManagerCatalog? catalog = null)
+    /// <param name="managerSeed">
+    /// Seeds the randomness of each side's persona manager, so a computer-versus-computer game can be replayed exactly.
+    /// Without it they use shared randomness, as a real game should.
+    /// </param>
+    public GameService(AtBatResolver resolver, ComputerManager cpu, Random? eventRng = null, ManagerCatalog? catalog = null,
+        int? managerSeed = null)
     {
+        _managerSeed = managerSeed;
         _resolver = resolver;
         _cpu = cpu;
         _events = eventRng ?? Random.Shared;
@@ -70,6 +76,8 @@ public class GameService
     /// The computer manager for one side. WHY: each side can have its own persona, so no decision may go through a
     /// single shared manager. The manager is rebuilt if the side's id changes (a new or resumed game).
     /// </summary>
+    private readonly int? _managerSeed;
+
     private ComputerManager ManagerFor(bool visitor)
     {
         string? id = visitor ? State!.VisitorManagerId : State!.HomeManagerId;
@@ -79,7 +87,8 @@ public class GameService
         ref var cachedId = ref (visitor ? ref _visitorCpuId : ref _homeCpuId);
         if (cached is null || cachedId != id)
         {
-            cached = _catalog.Create(id);
+            // WHY: each side gets its own stream (seed, seed + 1), so a visitor's tie-break never shifts the home side's.
+            cached = _catalog.Create(id, _managerSeed is int seed ? new Random(seed + (visitor ? 0 : 1)) : null);
             cachedId = id;
         }
         return cached;
@@ -97,19 +106,24 @@ public class GameService
         string? visitorManagerId = null,
         string? homeManagerId = null)
     {
-        // Each game works on its own copy so substitutions never alter the team.
-        var visitorSlots = ResolveLineup(visitor, visitorLineupSlots);
-        var homeSlots = ResolveLineup(home, homeLineupSlots);
-
+        var gameOptions = options ?? GameOptions.None;
+        // WHY: both teams play by one rule, the home team's (see DesignatedHitterRules). Without a designated hitter the
+        // starting pitcher is in the batting order, so the starters are chosen before the lineups.
+        bool designatedHitter = DesignatedHitterRules.Applies(gameOptions.DesignatedHitter, home);
         var visitorStarter = ResolveStarter(visitor, visitorStarterId);
         var homeStarter = ResolveStarter(home, homeStarterId);
+
+        // Each game works on its own copy so substitutions never alter the team.
+        var visitorSlots = ResolveLineup(visitor, visitorLineupSlots, designatedHitter, visitorStarter);
+        var homeSlots = ResolveLineup(home, homeLineupSlots, designatedHitter, homeStarter);
 
         State = new GameState
         {
             VisitorTeam = visitor,
             HomeTeam = home,
             Stadium = stadium ?? Stadium.Generic,
-            Options = options ?? GameOptions.None,
+            Options = gameOptions,
+            DHRule = designatedHitter,
             VisitorControl = visitorControl,
             HomeControl = homeControl,
             VisitorManagerId = visitorManagerId,
@@ -173,6 +187,7 @@ public class GameService
         bool top = s.IsTopOfInning;
         var batter = s.CurrentBatter;
         LastPrePlay = PrePlaySnapshot.Capture(s);
+        int inningBefore = s.CurrentInning;
         var result = _resolver.Resolve(s, offense, defense);
         result.Pitch = defense.PitchType;
         ApplyPlay(result);
@@ -181,6 +196,12 @@ public class GameService
         {
             MaybeEjectManager(result, top);
             MaybeInjurePlayer(result, top, batter);
+            // A defensive replacement is made as a side takes the field, so only when the half-inning has just changed.
+            if (s.CurrentInning != inningBefore || s.IsTopOfInning != top)
+            {
+                EnforcePitcherAfterPinchHit();
+                ManageComputerDefense();
+            }
             ManageComputerPitching();
         }
         return result;
@@ -212,14 +233,27 @@ public class GameService
         if (humanDefense is null && DefenseIsHuman)
             throw new InvalidOperationException("The fielding manager must make a decision.");
 
-        var offense = humanOffense ?? ManagerFor(s.IsTopOfInning).MakeOffensiveDecision(s);
-        // WHY: the batting manager declares a pinch hitter before the pitch. The computer defense must select
-        // its pitch, alignment, and intentional-walk response for that incoming batter, not the outgoing one.
-        var plannedBatter = offense.PinchHitterPlayerId is int pinchId
-            ? s.OffenseTeam.Roster.FirstOrDefault(p => p.Id == pinchId) : null;
-        var defense = humanDefense ?? ManagerFor(!s.IsTopOfInning).MakeDefensiveDecision(s, plannedBatter);
+        OffensiveDecision offense;
+        DefensiveDecision defense;
+        // WHY: both managers value the same situation (the same batter, pitcher and bases), so what one works out the other
+        // can reuse. The scope ends before the play is resolved: from then on the situation is different.
+        using (ManagerDecisionModel.Decision(s))
+        {
+            offense = humanOffense ?? ManagerFor(s.IsTopOfInning).MakeOffensiveDecision(s);
+            // WHY: the batting manager declares a pinch hitter before the pitch. The computer defense must select
+            // its pitch, alignment, and intentional-walk response for that incoming batter, not the outgoing one.
+            var plannedBatter = offense.PinchHitterPlayerId is int pinchId
+                ? s.OffenseTeam.Roster.FirstOrDefault(p => p.Id == pinchId) : null;
+            defense = humanDefense ?? ManagerFor(!s.IsTopOfInning).MakeDefensiveDecision(s, plannedBatter);
+        }
+        LastOffense = offense;
+        LastDefense = defense;
         return ExecuteAtBat(offense, defense);
     }
+
+    /// <summary>The calls behind the most recent play (human or computer), for explaining or measuring them.</summary>
+    public OffensiveDecision? LastOffense { get; private set; }
+    public DefensiveDecision? LastDefense { get; private set; }
 
     /// <summary>Play the next plate appearance if no human decision is needed.</summary>
     public PlayResult? ExecuteComputerTurn() =>
@@ -239,7 +273,10 @@ public class GameService
     }
 
     /// <summary>Bring in a reliever. The pitcher he replaces is out of the game.</summary>
-    public void ChangePitcher(bool visitor, int relieverId)
+    public void ChangePitcher(bool visitor, int relieverId) => BringInReliever(visitor, relieverId, putInLineup: true);
+
+    // putInLineup: false only for a double switch, which places the new pitcher in the order itself.
+    private void BringInReliever(bool visitor, int relieverId, bool putInLineup)
     {
         var s = InProgress();
         var pen = s.BullpenFor(visitor);
@@ -259,9 +296,116 @@ public class GameService
         if (visitor) s.VisitorPitcher = entering; else s.HomePitcher = entering;
 
         BoxScoreRecorder.EntryLead(s, visitor, BoxScoreRecorder.Pitcher(s, visitor, incoming.Player, 0));
+        if (putInLineup && !s.DHRule) PutPitcherInLineup(s, visitor, incoming.Player);
         _moments.Add(GameMoment.PitchingChange);
         LogSubstitution(s, visitor,
             $"{incoming.Player.Name} relieves {outgoing.Player.Name} ({incoming.Status.ToLowerInvariant()}).");
+    }
+
+    // WHY: without a designated hitter the pitcher is in the batting order, so the new pitcher takes the old one's spot and
+    // position. The spot's holder is found by position, not by name, because a pinch hitter may already have taken it
+    // (the pitcher is then out of the game and this change is the one that follows). A runner who is the pitcher is
+    // replaced on the base too.
+    private static void PutPitcherInLineup(GameState s, bool visitor, Player incoming)
+    {
+        var lineup = s.LineupFor(visitor);
+        var positions = s.PositionsFor(visitor);
+        int slot = lineup.FindIndex(id => positions[id] == Position.P);
+        if (slot < 0) return;
+
+        var holder = s.TeamFor(visitor).Roster.First(p => p.Id == lineup[slot]);
+        foreach (int b in new[] { 1, 2, 3 })
+        {
+            var runner = b switch { 1 => s.RunnerOnFirst, 2 => s.RunnerOnSecond, _ => s.RunnerOnThird };
+            if (runner?.Player.Id == holder.Id)
+                PutRunner(s, b, new BaseRunner
+                {
+                    Player = incoming, BattingSlot = runner.BattingSlot,
+                    ResponsiblePitcherId = runner.ResponsiblePitcherId,
+                });
+        }
+        Swap(s, visitor, slot, holder, incoming, "");
+    }
+
+    /// <summary>
+    /// A double switch: the new pitcher bats in the spot of a fielder who leaves, and a bench player takes that fielder's
+    /// position and bats in the pitcher's old spot. The pitcher's spot comes up sooner than the fielder's, so the bench
+    /// bat gets the plate appearances and the pitcher is hidden at the bottom of the order. Only without a designated hitter.
+    /// </summary>
+    public void DoubleSwitch(bool visitor, int relieverId, int lineupPlayerId, int benchPlayerId)
+    {
+        var s = InProgress();
+        if (s.DHRule)
+            throw new InvalidOperationException("There is no double switch with a designated hitter.");
+        var lineup = s.LineupFor(visitor);
+        var positions = s.PositionsFor(visitor);
+        if (!lineup.Contains(lineupPlayerId))
+            throw new InvalidOperationException("That player is not in the lineup.");
+        if (positions[lineupPlayerId] == Position.P)
+            throw new InvalidOperationException("Choose a fielder to switch, not the pitcher.");
+        int pitcherSlot = lineup.FindIndex(id => positions[id] == Position.P);
+        if (pitcherSlot < 0)
+            throw new InvalidOperationException("The pitcher is not in the batting order.");
+        if (IsBusyOffensively(s, visitor, lineupPlayerId) || IsBusyOffensively(s, visitor, lineup[pitcherSlot]))
+            throw new InvalidOperationException("The batter or a runner cannot be switched now.");
+
+        var roster = s.TeamFor(visitor).Roster;
+        var holder = roster.First(p => p.Id == lineup[pitcherSlot]);
+        var leaving = roster.First(p => p.Id == lineupPlayerId);
+        var bench = TakeBenchPlayer(s, visitor, benchPlayerId);
+        int fielderSlot = lineup.IndexOf(lineupPlayerId);
+        var fieldingPosition = positions[lineupPlayerId];
+
+        BringInReliever(visitor, relieverId, putInLineup: false);
+        var reliever = s.PitcherFor(visitor).Player;
+
+        positions.Remove(holder.Id);
+        positions.Remove(leaving.Id);
+        positions[bench.Id] = fieldingPosition;
+        positions[reliever.Id] = Position.P;
+        lineup[pitcherSlot] = bench.Id;
+        lineup[fielderSlot] = reliever.Id;
+        s.UsedFor(visitor).Add(holder.Id);
+        s.UsedFor(visitor).Add(leaving.Id);
+        BoxScoreRecorder.Substituted(s, visitor, bench, "");
+        BoxScoreRecorder.Substituted(s, visitor, reliever, "");
+
+        LogSubstitution(s, visitor,
+            $"Double switch: {reliever.Name} bats {Ordinal(fielderSlot + 1)}; {bench.Name} replaces {leaving.Name} at " +
+            $"{LineupRules.Label(fieldingPosition)}, batting {Ordinal(pitcherSlot + 1)}.");
+    }
+
+    private static string Ordinal(int n) => n switch { 1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{n}th" };
+
+    // WHY: a pinch hitter who batted for the pitcher took his spot (and position P), so the pitcher is out of the game and a
+    // reliever has to take over when the side takes the field. The manager who made the move gets to choose, as he does for a
+    // computer side; a human's is chosen by the default manager, who prefers a reliever who is already warm.
+    private void EnforcePitcherAfterPinchHit()
+    {
+        var s = State!;
+        if (s.DHRule || s.Status != GameStatus.InProgress) return;
+        bool visitor = !s.IsTopOfInning;  // the side that fields in this half-inning
+        var lineup = s.LineupFor(visitor);
+        var positions = s.PositionsFor(visitor);
+        int slot = lineup.FindIndex(id => positions[id] == Position.P);
+        if (slot < 0 || lineup[slot] == s.PitcherFor(visitor).Player.Id) return;   // the pitcher is still the one in the order
+
+        var manager = ControlOf(s, visitor) == ManagerControl.Computer ? ManagerFor(visitor) : _cpu;
+        if (manager.ChooseForcedReliever(s, visitor) is not int relieverId) return;
+        ChangePitcher(visitor, relieverId);
+    }
+
+    // As a computer-managed side takes the field, it may swap a weak glove for a better one to protect a lead.
+    private void ManageComputerDefense()
+    {
+        var s = State!;
+        if (s.Status != GameStatus.InProgress || s.PendingInjury is not null) return;
+
+        bool visitor = !s.IsTopOfInning;  // the side that fields in this half-inning
+        if (ControlOf(s, visitor) != ManagerControl.Computer) return;
+
+        if (ManagerFor(visitor).ChooseDefensiveReplacement(s, visitor) is { } move)
+            Replace(visitor, move.OutPlayerId, move.InPlayerId);
     }
 
     // After each play, a computer-managed fielding side may start warming up or change pitchers
@@ -274,9 +418,17 @@ public class GameService
         bool visitor = !s.IsTopOfInning;  // the side that fields next
         if (ControlOf(s, visitor) != ManagerControl.Computer) return;
 
-        var move = ManagerFor(visitor).DecidePitching(s, visitor);
+        var manager = ManagerFor(visitor);
+        var move = manager.DecidePitching(s, visitor);
         if (move.StartWarmingId is int warm) StartWarming(visitor, warm);
-        if (move.ChangeToId is int relief) ChangePitcher(visitor, relief);
+        if (move.ChangeToId is int relief)
+        {
+            // With the pitcher in the batting order a change is a chance for a double switch.
+            if (!s.DHRule && manager.ChooseDoubleSwitch(s, visitor, relief) is { } ds)
+                DoubleSwitch(visitor, relief, ds.LineupPlayerId, ds.BenchPlayerId);
+            else
+                ChangePitcher(visitor, relief);
+        }
     }
 
     /// <summary>The computer's fielding decision for the next at-bat (when a human bats).</summary>
@@ -302,9 +454,16 @@ public class GameService
         var outgoing = s.CurrentBatter;
         var incoming = TakeBenchPlayer(s, visitor, benchPlayerId);
 
+        // A pinch hitter for the pitcher takes his spot, so the pitcher leaves the game and a reliever must replace him.
+        bool forPitcher = !s.DHRule && s.PositionsFor(visitor)[outgoing.Id] == Position.P;
+        if (forPitcher && s.BullpenFor(visitor).Count == 0)
+            throw new InvalidOperationException("There is nobody left in the bullpen to take over, so the pitcher has to bat.");
+
         int slot = s.BatterIndexFor(visitor) % s.LineupFor(visitor).Count;
         Swap(s, visitor, slot, outgoing, incoming, "PH");
-        LogSubstitution(s, visitor, $"Pinch hitter {incoming.Name} for {outgoing.Name}.");
+        LogSubstitution(s, visitor, forPitcher
+            ? $"Pinch hitter {incoming.Name} for the pitcher, {outgoing.Name}. A reliever will take the mound."
+            : $"Pinch hitter {incoming.Name} for {outgoing.Name}.");
         TidyDefense(visitor);
     }
 
@@ -345,6 +504,8 @@ public class GameService
         var s = InProgress();
         if (!s.LineupFor(visitor).Contains(lineupPlayerId))
             throw new InvalidOperationException("That player is not in the lineup.");
+        if (s.PositionsFor(visitor)[lineupPlayerId] == Position.P)
+            throw new InvalidOperationException("Use a pitching change (or a double switch) to replace the pitcher.");
         if (IsBusyOffensively(s, visitor, lineupPlayerId))
             throw new InvalidOperationException(
                 "Use pinch hit or pinch run to replace the batter or a runner on base.");
@@ -361,6 +522,8 @@ public class GameService
             throw new InvalidOperationException("Choose two different players from the lineup.");
 
         var positions = s.PositionsFor(visitor);
+        if (positions[playerIdA] == Position.P || positions[playerIdB] == Position.P)
+            throw new InvalidOperationException("The pitcher cannot change positions; use a pitching change.");
         (positions[playerIdA], positions[playerIdB]) = (positions[playerIdB], positions[playerIdA]);
 
         var roster = s.TeamFor(visitor).Roster;
@@ -461,11 +624,12 @@ public class GameService
             ?? throw new ArgumentException($"Player {chosenId} is not a pitcher on {team.DisplayName}.");
     }
 
-    private static List<LineupSlot> ResolveLineup(Team team, IReadOnlyList<LineupSlot>? custom)
+    private static List<LineupSlot> ResolveLineup(Team team, IReadOnlyList<LineupSlot>? custom,
+        bool designatedHitter, Player starter)
     {
-        if (custom is null) return LineupRules.Default(team);
+        if (custom is null) return LineupRules.Default(team, designatedHitter, starter);
 
-        var errors = LineupRules.Validate(team, custom);
+        var errors = LineupRules.Validate(team, custom, designatedHitter, starter.Id);
         if (errors.Count > 0)
             throw new ArgumentException($"Invalid {team.DisplayName} lineup: {string.Join(" ", errors)}");
         return [.. custom];
@@ -539,6 +703,8 @@ public class GameService
         void Add(bool visitor, Player p, bool isPitcher, double weight)
         {
             if (pool.Any(x => x.Player.Id == p.Id)) return;
+            // A pitcher who is batting or running is replaced by a reliever, not a bench player.
+            isPitcher |= p.IsPitcher;
             bool canReplace = isPitcher ? s.BullpenFor(visitor).Count > 0 : s.Bench(visitor).Any();
             if (canReplace) pool.Add((visitor, p, isPitcher, weight));
         }
@@ -549,7 +715,7 @@ public class GameService
 
         var pitcher = s.PitcherFor(!wasTop);
         Add(!wasTop, pitcher.Player, true, 1.0 + pitcher.PitchCount / 60.0);
-        foreach (var (p, pos) in s.LineupPlayers(!wasTop).Where(x => x.Position != Position.DH))
+        foreach (var (p, pos) in s.LineupPlayers(!wasTop).Where(x => x.Position is not (Position.DH or Position.P)))
             Add(!wasTop, p, false, 0.35);
 
         if (pool.Count == 0) return;

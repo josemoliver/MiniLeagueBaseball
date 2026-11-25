@@ -73,8 +73,15 @@ internal sealed partial class Staging
     public PlayScript Build()
     {
         SetCast();
-        // A hit and run: the runner is off with the pitch, before anything else in the play happens.
+        // A hit and run: the runner is off with the pitch, before anything else in the play happens. So is the runner on third on a
+        // suicide squeeze; on a safety squeeze he takes his lead and waits to see the bunt.
         if (_result.HitAndRun) RunnerBreaks();
+        else if (_result.Squeeze == SqueezeKind.Suicide) RunnerBreaks(3);
+        else if (_result.Squeeze == SqueezeKind.Safety)
+        {
+            TakeLeads();
+            _s.Cue(Release, CueKind.Banner, "SAFETY SQUEEZE");
+        }
         switch (_result.Outcome)
         {
             case OutcomeType.Strikeout: Strikeout(); break;

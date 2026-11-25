@@ -30,6 +30,7 @@ public static class PlayerLabels
     public static string Fielding(Player p, Position pos)
     {
         if (pos == Position.DH) return "designated hitter";
+        if (pos == Position.P) return p.IsPitcher ? "pitcher" : "⚠ not a pitcher";
         var f = p.FieldingAt(pos);
         string ratings = $"range {f.Range} · glove {f.ErrorRating} · arm {f.Arm}";
         return p.IsNaturalAt(pos) ? ratings : $"⚠ out of position — {ratings}";

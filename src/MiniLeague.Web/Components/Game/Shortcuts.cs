@@ -29,6 +29,8 @@ public static class Shortcuts
         (4, OffensiveStrategy.Steal),
         (5, OffensiveStrategy.HitAndRun),
         (6, OffensiveStrategy.SacrificeBunt),
+        (7, OffensiveStrategy.Squeeze),
+        (8, OffensiveStrategy.SafetySqueeze),
     ];
 
     public static readonly (int Key, PitchType Pitch)[] PitchKeys =
@@ -60,6 +62,8 @@ public static class Shortcuts
         OffensiveStrategy.Steal          => "Steal",
         OffensiveStrategy.HitAndRun      => "Hit & Run",
         OffensiveStrategy.SacrificeBunt  => "Sacrifice",
+        OffensiveStrategy.Squeeze        => "Squeeze",
+        OffensiveStrategy.SafetySqueeze  => "Safe squeeze",
         _ => s.ToString()
     };
 

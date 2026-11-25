@@ -93,8 +93,19 @@ public static class BoxScoreRecorder
             pitcherLine.BF++;
             CreditBatter(batterLine, pitcherLine, r);
         }
+        else if (r.RunnerMoves.Count > 0)
+        {
+            // Each runner who went: a stolen base if he got there, caught stealing if he was thrown out (on a double steal
+            // one can be each).
+            foreach (var move in r.RunnerMoves.Where(m => m.FromBase > 0 && (m.IsOut || m.ToBase > m.FromBase)))
+            {
+                var runnerLine = Batter(s, offenseVisitor, move.Player);
+                if (move.IsOut) runnerLine.CS++; else runnerLine.SB++;
+            }
+        }
         else if (s.RunnerOnFirst is { } runner)
         {
+            // A play built by hand with no runner moves: the runner on first is the one who went.
             var runnerLine = Batter(s, offenseVisitor, runner.Player);
             if (r.Outcome == OutcomeType.StolenBase) runnerLine.SB++; else runnerLine.CS++;
         }

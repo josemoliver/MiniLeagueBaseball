@@ -67,6 +67,16 @@ public class AtBatResolver
         if (offense.Strategy == OffensiveStrategy.SacrificeBunt)
             return ResolveBunt(state, defense, batter, pitcher);
 
+        // A squeeze is a bunt with the runner on third coming home. Called with no runner on third or with two out it is
+        // only a bunt: there is nobody to squeeze in.
+        if (offense.Strategy is OffensiveStrategy.Squeeze or OffensiveStrategy.SafetySqueeze)
+        {
+            var kind = state.RunnerOnThird is not null && state.Outs < 2
+                ? (offense.Strategy == OffensiveStrategy.Squeeze ? SqueezeKind.Suicide : SqueezeKind.Safety)
+                : SqueezeKind.None;
+            return ResolveBunt(state, defense, batter, pitcher, kind);
+        }
+
         bool hitAndRun = IsHitAndRun(state, offense, defense);
         var pitcherStats = pitcher.GetPitchingStats(batter.BatHand);
         var batterStats  = batter.GetBattingStats(pitcher.ThrowHand);
@@ -77,7 +87,7 @@ public class AtBatResolver
         var batsFrom = batter.BatsAgainst(pitcher.ThrowHand);
 
         var fielders = DefenseModel.RatingsFor(state);
-        int armPenalty = (int)Math.Round((fielders.OutfieldArm - 3) * 6);
+        int armPenalty = RunningRules.ArmPenalty(fielders.OutfieldArm);
 
         // Build probability table
         var weights = ProbabilityTable.Build(
@@ -88,10 +98,11 @@ public class AtBatResolver
             defense.PitchType,
             defense.Alignment,
             fatigueMod,
-            fielders);
+            fielders,
+            pitcher.ThrowHand);
 
         // Stolen base attempt pre-empts the at-bat
-        if (offense.Strategy == OffensiveStrategy.Steal && state.RunnerOnFirst is not null)
+        if (offense.Strategy == OffensiveStrategy.Steal && RunningRules.StealPlanFor(state) != StealPlan.None)
         {
             return ResolveStolenBase(state, defense, pitcher, pitcherStats);
         }
@@ -105,7 +116,7 @@ public class AtBatResolver
 
             // The batter's job is to put the ball in play, so he fights off strikes, and with the second baseman
             // covering the bag a grounder has a better chance of finding the hole.
-            weights = weights with { Strikeout = weights.Strikeout * 0.75, Single = weights.Single * 1.08 };
+            weights = RunningRules.ApplyHitAndRun(weights);
         }
 
         // Roll the outcome
@@ -132,12 +143,12 @@ public class AtBatResolver
 
         // WHY: a hit and run turns some fly balls into line drives, which is what catches a runner who has already gone.
         // It is decided after the error check so that a booted ball stays a booted ball.
-        if (hitAndRun && outcome == OutcomeType.FlyOut && _rng.NextDouble() < 0.35)
+        if (hitAndRun && outcome == OutcomeType.FlyOut && _rng.NextDouble() < RunningRules.HitAndRunLineOutShare)
             outcome = OutcomeType.LineOut;
 
         // Resolve base running
-        var (newFirst, newSecond, newThird, runs, outs) = ResolveBaseRunning(
-            outcome, state, batter, offense.Strategy, armPenalty, hitAndRun, pitcherStats);
+        var (newFirst, newSecond, newThird, runs, outs, thrownOut) = ResolveBaseRunning(
+            outcome, state, batter, offense.Strategy, armPenalty, hitAndRun, pitcherStats, fielderAt);
         // WHY: a double play is not rolled. It is a ground out that BaseRunningEngine.GroundOut turned into two outs, and
         // is relabelled only now so the description, the box score and OutsFor all see DoublePlay.
         if (outcome == OutcomeType.GroundOut && outs == 2)
@@ -155,6 +166,8 @@ public class AtBatResolver
             else if (outcome == OutcomeType.LineOut && outs == 2)
                 desc = $"{batter.Name} lines out and {goer.Player.Name} is doubled off first.";
         }
+        if (thrownOut is { } sent)
+            desc += $" {sent.Runner.Player.Name} is thrown out {(sent.AtBase == 4 ? "at the plate" : "at third")}.";
 
         return new PlayResult
         {
@@ -165,8 +178,11 @@ public class AtBatResolver
             NewSecond    = newSecond,
             NewThird     = newThird,
             // WHY: Max, because a hit and run can add an out the outcome alone does not carry (a strikeout that is
-            // also a runner caught stealing). For every other outcome `outs` is 0 or the same count OutsFor gives.
+            // also a runner caught stealing), and so can a hit on which a runner sent hard is thrown out (one out on a
+            // single or double). For every other outcome `outs` is 0 or the same count OutsFor gives.
             OutsRecorded = Math.Max(OutsFor(outcome), outs),
+            ThrownOutFrom = thrownOut?.FromBase,
+            ThrownOutAt  = thrownOut?.AtBase,
             ErrorBy      = errorBy,
             ErrorPosition = errorAt,
             Fielder      = fielderAt,
@@ -180,16 +196,22 @@ public class AtBatResolver
     /// over (a sacrifice); otherwise he is bunting for a hit. Either way the ball is popped up, booted, beaten out,
     /// turned into a fielder's choice, or the batter is thrown out (a sacrifice when it moved somebody).
     /// </summary>
-    private PlayResult ResolveBunt(GameState state, DefensiveDecision defense, Player batter, Player pitcher)
+    private PlayResult ResolveBunt(GameState state, DefensiveDecision defense, Player batter, Player pitcher,
+        SqueezeKind squeeze = SqueezeKind.None)
     {
         var first = state.RunnerOnFirst;
         var second = state.RunnerOnSecond;
         var third = state.RunnerOnThird;
         bool sacrifice = BuntModel.IsSacrifice(state);
+        bool suicide = squeeze == SqueezeKind.Suicide;
 
-        int? targetFrom = sacrifice ? BuntModel.FieldersChoiceFrom(first is not null, second is not null, third is not null) : null;
+        // A squeeze has its own target: the runner on third, out at the plate, on a suicide squeeze (below).
+        int? targetFrom = sacrifice && squeeze == SqueezeKind.None
+            ? BuntModel.FieldersChoiceFrom(first is not null, second is not null, third is not null) : null;
         var target = targetFrom == 2 ? second : targetFrom == 1 ? first : null;
-        var odds = BuntModel.Odds(batter, defense.Alignment, sacrifice, target?.Player);
+        var odds = squeeze == SqueezeKind.None
+            ? BuntModel.Odds(batter, defense.Alignment, sacrifice, target?.Player)
+            : BuntModel.SqueezeOdds(batter, defense.Alignment, squeeze, third!.Player);
 
         // Who the ball goes to, and whether he boots it.
         var spot = BuntModel.PickFielder(_rng, p => p == Position.P || state.DefenderAt(p) is not null);
@@ -203,12 +225,14 @@ public class AtBatResolver
         // A run scores on a bunt only when the inning is not over on it; a sacrifice never makes the third out, and a
         // thrown-out bunt with two out has nobody scoring.
         PlayResult Result(OutcomeType outcome, string description, BaseRunner? f, BaseRunner? s, BaseRunner? t, int runs, int outs,
-                          Player? errorBy = null, Position? errorAt = null) => new()
+                          Player? errorBy = null, Position? errorAt = null, int? thrownOutFrom = null, int? thrownOutAt = null) => new()
         {
             Outcome = outcome, Description = description, RunsScored = runs, OutsRecorded = outs,
             NewFirst = f, NewSecond = s, NewThird = t,
             IsBunt = true, Fielder = spot, ErrorBy = errorBy, ErrorPosition = errorAt,
+            Squeeze = squeeze, ThrownOutFrom = thrownOutFrom, ThrownOutAt = thrownOutAt,
         };
+        string squeezeName = suicide ? "squeeze" : "safety squeeze";
 
         // 1. He boots it (or throws it away): the batter is on and every runner moves up a base.
         if ((roll -= errorChance) < 0)
@@ -219,9 +243,16 @@ public class AtBatResolver
                 e.first, e.second, e.third, e.runs, 0, fielder, spot);
         }
 
-        // 2. He pops it up and it is caught: no runner moves.
+        // 2. He pops it up (or misses it) and it is caught. No runner moves, except on a suicide squeeze: the runner on third
+        // broke with the pitch and is doubled off.
         if ((roll -= odds.PopUp) < 0)
+        {
+            if (suicide)
+                return Result(OutcomeType.PopOut,
+                    $"{batter.Name} pops up the squeeze bunt and {third!.Player.Name} is doubled off third.",
+                    first, second, null, 0, 2, thrownOutFrom: 3, thrownOutAt: 3);
             return Result(OutcomeType.PopOut, $"{batter.Name} pops up a bunt.", first, second, third, 0, 1);
+        }
 
         // 3. He beats it out: a bunt single, with every runner moving up a base.
         if ((roll -= odds.Single) < 0)
@@ -230,6 +261,13 @@ public class AtBatResolver
             return Result(OutcomeType.Single, $"{batter.Name} bunts for a hit.{runsText(h.runs)}",
                 h.first, h.second, h.third, h.runs, 0);
         }
+
+        // 3b. A suicide squeeze the defense reads: the fielder takes the ball and throws home. The runner is out at the plate,
+        // the batter is safe at first, and the other runners move up.
+        if (suicide && (roll -= odds.FieldersChoice) < 0)
+            return Result(OutcomeType.FieldersChoice,
+                $"{batter.Name} bunts into a fielder's choice; {third!.Player.Name} is out at the plate.",
+                batterRunner, first, second, 0, 1, thrownOutFrom: 3, thrownOutAt: 4);
 
         // 4. The defense takes the lead runner instead: the batter is safe at first.
         if (targetFrom is int fromBase && (roll -= odds.FieldersChoice) < 0)
@@ -250,10 +288,24 @@ public class AtBatResolver
         // 5. Down in front of the plate and the batter is thrown out at first.
         if (sacrifice)
         {
+            // A safety squeeze: the runner goes only if the bunt is down, and the defense sometimes holds him at third.
+            if (squeeze == SqueezeKind.Safety
+                && _rng.NextDouble() >= BuntModel.SafetyScoreChance(batter, third!.Player, defense.Alignment))
+            {
+                // He holds at third. The others move up only where the base ahead is open.
+                var heldSecond = second ?? first;
+                var heldFirst = second is not null ? first : null;
+                return Result(OutcomeType.SacrificeBunt,
+                    $"{batter.Name} lays down a safety squeeze and {third.Player.Name} holds at third.", heldFirst, heldSecond, third, 0, 1);
+            }
+
             // Every runner moves up a base; the one on third scores (a squeeze).
             int runs = third is not null ? 1 : 0;
             return Result(OutcomeType.SacrificeBunt,
-                $"{batter.Name} lays down a sacrifice bunt.{runsText(runs)}", null, first, second, runs, 1);
+                squeeze != SqueezeKind.None
+                    ? $"{batter.Name} lays down a {squeezeName} bunt.{runsText(runs)}"
+                    : $"{batter.Name} lays down a sacrifice bunt.{runsText(runs)}",
+                null, first, second, runs, 1);
         }
         return Result(OutcomeType.GroundOut, $"{batter.Name} bunts and is thrown out.", first, second, third, 0, 1);
     }
@@ -262,6 +314,10 @@ public class AtBatResolver
         GameState state, DefensiveDecision defense,
         Player pitcher, PitcherStats pitcherStats)
     {
+        var plan = RunningRules.StealPlanFor(state);
+        if (plan is StealPlan.Third or StealPlan.Double)
+            return ResolveStealOfThird(state, defense, pitcherStats, plan);
+
         var runner = state.RunnerOnFirst!;
         // Find the catcher in the defense team
         var catcher = state.DefenderAt(Position.C)
@@ -298,14 +354,53 @@ public class AtBatResolver
         }
     }
 
-    private (BaseRunner? first, BaseRunner? second, BaseRunner? third, int runs, int outs)
+    // A runner on second goes for third (alone, or with the runner on first going to second: a double steal).
+    private PlayResult ResolveStealOfThird(GameState state, DefensiveDecision defense, PitcherStats pitcherStats, StealPlan plan)
+    {
+        var lead = state.RunnerOnSecond!;
+        var trailing = plan == StealPlan.Double ? state.RunnerOnFirst : null;
+        var catcher = state.DefenderAt(Position.C) ?? new Player { ArmStrength = 3 };
+        bool pitchout = defense.PitchType == PitchType.Pitchout;
+        double toThird = Math.Clamp(BaseRunningEngine.StealSuccessChance(lead.Player, catcher.ArmAt(Position.C),
+            pitcherStats.HoldRunners, pitchout) * RunningRules.StealOfThirdFactor, 0.05, 0.95);
+
+        PlayResult Done(OutcomeType outcome, string text, BaseRunner? first, BaseRunner? second, BaseRunner? third,
+                        int? outFrom = null, int? outAt = null) => new()
+        {
+            Outcome = outcome, Description = text, RunsScored = 0, OutsRecorded = outFrom is null ? 0 : 1,
+            NewFirst = first, NewSecond = second, NewThird = third, ThrownOutFrom = outFrom, ThrownOutAt = outAt,
+        };
+
+        if (trailing is null)
+            return _rng.NextDouble() < toThird
+                ? Done(OutcomeType.StolenBase, $"{lead.Player.Name} steals third.", state.RunnerOnFirst, null, lead)
+                : Done(OutcomeType.CaughtStealing, $"{lead.Player.Name} is caught stealing third.", state.RunnerOnFirst, null, null, 2, 3);
+
+        // A double steal: the catcher has to pick a base. Usually he goes to third after the lead runner, and the trailing
+        // runner is safe at second; sometimes he goes to second, and the lead runner is safe at third.
+        double toSecond = Math.Clamp(BaseRunningEngine.StealSuccessChance(trailing.Player, catcher.ArmAt(Position.C),
+            pitcherStats.HoldRunners, pitchout), 0.05, 0.95);
+        if (_rng.NextDouble() < RunningRules.DoubleStealThrowToThird)
+        {
+            return _rng.NextDouble() < toThird
+                ? Done(OutcomeType.StolenBase, $"{lead.Player.Name} and {trailing.Player.Name} pull off a double steal.", null, trailing, lead)
+                : Done(OutcomeType.CaughtStealing,
+                    $"Double steal: {lead.Player.Name} is caught at third; {trailing.Player.Name} takes second.", null, trailing, null, 2, 3);
+        }
+        return _rng.NextDouble() < toSecond
+            ? Done(OutcomeType.StolenBase, $"{lead.Player.Name} and {trailing.Player.Name} pull off a double steal.", null, trailing, lead)
+            : Done(OutcomeType.CaughtStealing,
+                $"Double steal: {trailing.Player.Name} is caught at second; {lead.Player.Name} takes third.", null, null, lead, 1, 2);
+    }
+
+    private (BaseRunner? first, BaseRunner? second, BaseRunner? third, int runs, int outs, ThrownOutRunner? thrownOut)
         ResolveBaseRunning(OutcomeType outcome, GameState state, Player batter, OffensiveStrategy strategy,
-                           int armPenalty, bool hitAndRun, PitcherStats pitcherStats)
+                           int armPenalty, bool hitAndRun, PitcherStats pitcherStats, Position? fielder = null)
     {
         if (outcome == OutcomeType.Error)
         {
             var e = BaseRunningEngine.OnError(state.RunnerOnFirst, state.RunnerOnSecond, state.RunnerOnThird, batter);
-            return (e.first, e.second, e.third, e.runs, 0);
+            return (e.first, e.second, e.third, e.runs, 0, null);
         }
 
         if (outcome is OutcomeType.GroundOut)
@@ -313,8 +408,9 @@ public class AtBatResolver
             var (f, s, t, runs, outs) = BaseRunningEngine.GroundOut(
                 state.RunnerOnFirst, state.RunnerOnSecond, state.RunnerOnThird,
                 state.IsTopOfInning ? state.HomeAlignment : state.VisitorAlignment,
-                state.Outs, _rng, runnerGoing: hitAndRun);
-            return (f, s, t, runs, outs);
+                state.Outs, _rng, runnerGoing: hitAndRun,
+                batterSpeed: batter.SpeedRating, groundBallRate: pitcherStats.GroundBallRate);
+            return (f, s, t, runs, outs, null);
         }
 
         if (outcome is OutcomeType.Strikeout or OutcomeType.FlyOut
@@ -325,9 +421,12 @@ public class AtBatResolver
             // never score him. Every outcome in this branch is exactly one out.
             int runs = 0;
             var third = state.RunnerOnThird;
-            if (outcome == OutcomeType.FlyOut && third is not null && state.Outs < 2)
+            // WHY: only an outfielder's catch is deep enough to tag up and score on; a pop-up caught in the infield or by
+            // the catcher holds the runner. (The fielder is unknown only for a line drive, which never scores him.)
+            bool deepEnough = fielder is null or Position.Left or Position.Center or Position.Right;
+            if (outcome == OutcomeType.FlyOut && third is not null && state.Outs < 2 && deepEnough)
             {
-                bool scores = SpeedCheck(third.Player, 65 - armPenalty);
+                bool scores = SpeedCheck(third.Player, RunningRules.TagUpFromThird - armPenalty);
                 if (scores) { runs++; third = null; }
             }
             var first = state.RunnerOnFirst;
@@ -353,7 +452,7 @@ public class AtBatResolver
                     outsMade = 2;
                 }
             }
-            return (first, second, third, runs, outsMade);
+            return (first, second, third, runs, outsMade, null);
         }
 
         // WHY: a hit and run called with no runner on first, or with second occupied, is not on (see IsHitAndRun): the
@@ -362,8 +461,8 @@ public class AtBatResolver
         var a = BaseRunningEngine.Advance(
             outcome,
             state.RunnerOnFirst, state.RunnerOnSecond, state.RunnerOnThird,
-            batter, effective, _rng, armPenalty);
-        return (a.first, a.second, a.third, a.runs, 0);
+            batter, effective, _rng, out var sentOut, armPenalty);
+        return (a.first, a.second, a.third, a.runs, sentOut is null ? 0 : 1, sentOut);
     }
 
     // NOTE: the weights need not add up to 1: the roll is scaled by their total. FlyOut is what is left when no earlier
@@ -439,11 +538,6 @@ public class AtBatResolver
         };
     }
 
-    // NOTE: the same formula as BaseRunningEngine.SpeedCheck (this one uses the resolver's seeded generator, so a test
-    // that seeds it gets repeatable tag-ups): keep the two in step.
-    private bool SpeedCheck(Player p, int baseChance)
-    {
-        int chance = baseChance + (p.SpeedRating - 3) * 8;
-        return _rng.Next(100) < chance;
-    }
+    // The resolver's own seeded generator, so a test that seeds it gets repeatable tag-ups.
+    private bool SpeedCheck(Player p, int baseChance) => RunningRules.SpeedCheck(p, _rng, baseChance);
 }

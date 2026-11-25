@@ -17,7 +17,7 @@ public class ManagerCatalogTests
         ManagerControl visitor = ManagerControl.Computer, ManagerControl home = ManagerControl.Computer)
     {
         var game = new GameService(new AtBatResolver(new Random(seed)), new ComputerManager(new Random(seed)),
-            new Random(seed), catalog);
+            new Random(seed), catalog, managerSeed: seed);   // seeded, so every run of the suite plays the same games
         game.StartGame(Load("1927-nyy.json"), Load("1975-cin.json"), visitor, home, options: GameOptions.None,
             visitorManagerId: visitorId, homeManagerId: homeId);
         return game;
@@ -251,6 +251,9 @@ public class ManagerCatalogTests
             foreach (var w in state.HomeBullpen) w.IsWarming = false;
             reliever.IsWarming = true;
             reliever.BattersFacedWarming = 5;
+            // WHY: league figures would scale him by his hit and home-run rates, not his ERA; the ladder steps ERA alone.
+            reliever.Player.PitchingOverall!.League = LeaguePitching.Default;
+            state.HomePitcher.Player.PitchingOverall!.League = LeaguePitching.Default;
             reliever.Player.PitchingOverall!.ERA = relieverEra;
             reliever.Player.PitchingVsLeft = null;
             reliever.Player.PitchingVsRight = null;

@@ -108,7 +108,7 @@ public class ShortcutTests : BunitContext, IAsyncLifetime
     [InlineData("KeyB", ShortcutKind.BoxScore)]
     [InlineData("KeyZ", ShortcutKind.None)]
     [InlineData("Digit0", ShortcutKind.None)]
-    [InlineData("Digit7", ShortcutKind.None)]    // no seventh offensive strategy
+    [InlineData("Digit9", ShortcutKind.None)]    // no ninth offensive strategy
     public void GameKeys_AndKeysThatDoNothing(string code, ShortcutKind expected)
     {
         Assert.Equal(expected, Shortcuts.Resolve(code, false, offense: true, defense: false).Kind);
@@ -280,7 +280,7 @@ public class ShortcutTests : BunitContext, IAsyncLifetime
         var (panel, decisions, counts) = RenderPanel(offense: true, defense: false);
 
         await Press(panel, "KeyZ");
-        await Press(panel, "Digit8");   // no eighth offensive strategy
+        await Press(panel, "Digit9");   // no ninth offensive strategy
 
         Assert.Empty(decisions);
         Assert.Equal((0, 0), (counts[0], counts[1]));

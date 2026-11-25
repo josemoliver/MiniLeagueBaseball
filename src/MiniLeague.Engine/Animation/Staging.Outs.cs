@@ -281,6 +281,9 @@ internal sealed partial class Staging
         // A hit and run that ends on a line drive: the runner was already off the bag and is doubled off first.
         if (moves.FirstOrDefault(m => m.FromBase == 1 && m.ToBase == 1 && m.IsOut) is { } doubledOff)
             DoubleOffAtFirst(doubledOff, id, tCatch + ready);
+        // A squeeze bunt popped up with the runner already breaking from third: doubled off there.
+        else if (moves.FirstOrDefault(m => m.FromBase == 3 && m.ToBase == 3 && m.IsOut) is { } doubledOffThird)
+            DoubleOffAt(3, doubledOffThird, id, tCatch + ready);
 
         _s.Cue(tCatch, CueKind.Sound, "out");
         if (platePop) _s.Cue(tCatch, CueKind.Hold, "0.2");

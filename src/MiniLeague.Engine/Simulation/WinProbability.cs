@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MiniLeague.Engine.Models;
 
 namespace MiniLeague.Engine.Simulation;
@@ -29,6 +30,25 @@ public static class WinProbability
         { 2.30, 1.54, 0.76 },   // bases loaded
     };
 
+    // The chance of scoring at least one run from here to the end of the half-inning, same layout. WHY: the average
+    // alone cannot tell "a runner on third with one out" (often exactly one run, by a fly ball or a grounder) from a
+    // bigger inning, and a one-run decision such as a sacrifice bunt turns on exactly that difference.
+    private static readonly double[,] ScoringChance =
+    {
+        { 0.27, 0.16, 0.07 },   // bases empty
+        { 0.42, 0.27, 0.13 },   // first
+        { 0.62, 0.41, 0.23 },   // second
+        { 0.63, 0.42, 0.23 },   // first and second
+        { 0.85, 0.66, 0.27 },   // third
+        { 0.87, 0.65, 0.29 },   // first and third
+        { 0.86, 0.69, 0.28 },   // second and third
+        { 0.87, 0.67, 0.33 },   // bases loaded
+    };
+
+    /// <summary>The chance of scoring at least once from this base and out state to the end of the half-inning.</summary>
+    public static double ChanceToScore(int baseState, int outs) =>
+        ScoringChance[Math.Clamp(baseState, 0, 7), Math.Clamp(outs, 0, 2)];
+
     public static double ExpectedRuns(int baseState, int outs) =>
         RunExpectancy[Math.Clamp(baseState, 0, 7), Math.Clamp(outs, 0, 2)];
 
@@ -44,11 +64,23 @@ public static class WinProbability
         return HomeWins(s.CurrentInning, s.IsTopOfInning, s.Outs, BaseState(s), margin);
     }
 
+    private static readonly ConcurrentDictionary<(int, bool, int, int, int), double> Table = new();
+
+    /// <summary>
+    /// <see cref="HomeWins(int, bool, int, int, int, double)"/> from a table filled on first use. WHY: the computer
+    /// managers look up many situations for every call they price; each full calculation walks every inning left.
+    /// Every inning from the ninth on is modelled the same way, and a margin beyond 15 runs is as good as decided.
+    /// </summary>
+    public static double HomeWinsCached(int inning, bool isTop, int outs, int baseState, int margin) =>
+        Table.GetOrAdd((Math.Clamp(inning, 1, 9), isTop, Math.Clamp(outs, 0, 2), Math.Clamp(baseState, 0, 7),
+                        Math.Clamp(margin, -15, 15)),
+            k => HomeWins(k.Item1, k.Item2, k.Item3, k.Item4, k.Item5));
+
     /// <param name="margin">Home runs minus visitor runs.</param>
     public static double HomeWins(int inning, bool isTop, int outs, int baseState, int margin,
                                   double freshRuns = FreshHalfInningRuns)
     {
-        var current = RunDistribution(ExpectedRuns(baseState, outs));
+        var current = RunDistribution(ExpectedRuns(baseState, outs), 1 - ChanceToScore(baseState, outs));
         var fresh = RunDistribution(freshRuns);
 
         // diff -> probability, with diff = home minus visitor (offset so it can index an array)
@@ -107,10 +139,11 @@ public static class WinProbability
     }
 
     // P(runs = k) for the rest of a half-inning with the given average: a scoreless chance, then a geometric tail.
-    private static double[] RunDistribution(double expected)
+    // The scoreless chance comes from the base and out state when it is known, else from the average.
+    private static double[] RunDistribution(double expected, double? scoreless = null)
     {
         var p = new double[MaxRuns + 1];
-        double zero = Math.Clamp(1 - expected * 0.55, 0.12, 0.97);
+        double zero = Math.Clamp(scoreless ?? 1 - expected * 0.55, 0.12, 0.97);
         double tail = expected > 0 ? Math.Clamp(1 - (1 - zero) / expected, 0.2, 0.8) : 0.45;
 
         p[0] = zero;

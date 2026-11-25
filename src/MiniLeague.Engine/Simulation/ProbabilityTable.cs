@@ -17,7 +17,8 @@ public static class ProbabilityTable
         PitchType pitch,
         DefensiveAlignment alignment,
         double pitcherFatigueMod,   // 1.0 = full strength, <1.0 = degraded
-        DefenseRatings? defense = null)
+        DefenseRatings? defense = null,
+        ThrowHand? pitcherHand = null)   // the pitcher's arm; enables the platoon effect (none when omitted)
     {
         int pa = batter.AtBats + batter.Walks + batter.HitByPitch;
         if (pa == 0) return OutcomeWeights.Default;
@@ -32,28 +33,53 @@ public static class ProbabilityTable
         double bHBP = (double)batter.HitByPitch / pa;
         double bSO = (double)batter.Strikeouts / pa;
 
-        // --- Pitcher modifier: scale batter rates by pitcher quality ---
-        // Reference ERA ≈ 4.00. Good pitcher (ERA=2) → hitMod=0.5 (fewer hits).
-        // Bad pitcher (ERA=6) → hitMod=1.5 (more hits). Clamped to avoid extremes.
+        // --- Pitcher modifier: scale batter rates by pitcher quality, against his own league ---
+        // WHY: a batter's line already includes the pitching of his league, so an average pitcher of any era must scale it by
+        // exactly 1. Each rate is the pitcher's divided by his league's (LeaguePitching). A team file without league figures
+        // falls back to the old fixed references (4.00 ERA, 7.0 strikeouts and 3.0 walks per nine).
+        // Hits and home runs are scaled by their own rates: ERA moves much more than hits do (strikeouts, walks, home runs and
+        // stranding all feed it), so scaling every hit by ERA made a good staff far too hard to hit.
         // WHY: FatigueModel returns effectiveness below 1 for a tired, cold, or overwarmed pitcher. Dividing
         // the hit rate by that effectiveness makes those conditions allow more hits; multiplying would make a
         // worn-out pitcher harder to hit and reward the manager for never using the bullpen.
-        double hitMod  = Math.Clamp(pitcher.ERA / 4.00, 0.40, 2.0)
-            / Math.Clamp(pitcherFatigueMod, 0.5, 1.0);
+        var league = pitcher.League;
+        double tiredness = 1 / Math.Clamp(pitcherFatigueMod, 0.5, 1.0);
+        double hitMod  = Math.Clamp(pitcher.ERA / league.Era, 0.40, 2.0) * tiredness;
+        double hrMod = hitMod, nonHrHitMod = hitMod;
+        if (league.HasHitRates && pitcher.InningsPitched > 0)
+        {
+            // WHY: the home-run rate of one pitcher over a season is noisy, so it is pulled halfway toward the league's.
+            nonHrHitMod = Math.Clamp(pitcher.NonHomeRunHitsPerNine / league.NonHomeRunHitsPerNine, 0.6, 1.5) * tiredness;
+            hrMod = Math.Clamp(0.5 + 0.5 * pitcher.HomeRunsPerNine / league.HomeRunsPerNine, 0.4, 2.0) * tiredness;
+        }
 
         // BB/9 reference ≈ 3.0. Good control (BB=1) → bbMod low. Wild (BB=5) → higher.
-        double bbMod   = Math.Clamp(pitcher.WalksPerNine / 3.0, 0.4, 2.5);
+        double bbMod   = Math.Clamp(pitcher.WalksPerNine / league.WalksPerNine, 0.4, 2.5);
 
         // K/9 reference ≈ 7.0. High K pitcher → soMod high.
-        double soMod   = Math.Clamp(pitcher.StrikeoutsPerNine / 7.0, 0.4, 2.5);
+        double soMod   = Math.Clamp(pitcher.StrikeoutsPerNine / league.StrikeoutsPerNine, 0.4, 2.5);
 
-        double hrW    = bHR  * hitMod;
-        double triW   = b3B  * hitMod;
-        double dblW   = b2B  * hitMod;
-        double sglW   = b1B  * hitMod;
+        double hrW    = bHR  * hrMod;
+        double triW   = b3B  * nonHrHitMod;
+        double dblW   = b2B  * nonHrHitMod;
+        double sglW   = b1B  * nonHrHitMod;
         double bbW    = bBB  * bbMod;
         double hbpW   = bHBP;
         double soW    = bSO  * soMod;
+
+        // --- Platoon: a batter hits a pitcher of the other hand better than one of his own ---
+        // WHY: the team data has only overall season lines (the Lahman database has no splits), so the matchup comes
+        // from a standard modifier around that line. A switch hitter always bats from the far side (BatsAgainst).
+        if (pitcherHand is ThrowHand arm)
+        {
+            var p = Platoon(batterHand, arm);
+            hrW *= p.Power;
+            triW *= p.Contact;
+            dblW *= p.Contact;
+            sglW *= p.Contact;
+            bbW *= p.Walk;
+            soW *= p.Strikeout;
+        }
 
         // --- Park factors ---
         // Hitters' own stats already carry some of their home park, so the overall run environment is
@@ -105,16 +131,42 @@ public static class ProbabilityTable
         };
     }
 
+    /// <summary>
+    /// The platoon modifier for a batter (the side he bats from in this matchup) against a pitcher's arm. Around his
+    /// overall line: a little better against the opposite hand, clearly worse against his own. Left-handed batters
+    /// have the larger split, as they do in the real game (they mostly face right-handers, so a lefty is the rarer test).
+    /// </summary>
+    public static (double Contact, double Power, double Walk, double Strikeout) Platoon(BatHand batter, ThrowHand pitcher)
+    {
+        bool sameHand = batter == BatHand.Left ? pitcher == ThrowHand.Left : pitcher == ThrowHand.Right;
+        return (batter == BatHand.Left, sameHand) switch
+        {
+            (true, true)   => (0.94, 0.88, 0.92, 1.12),   // lefty against a lefty
+            (true, false)  => (1.02, 1.04, 1.03, 0.96),
+            (false, true)  => (0.98, 0.96, 0.97, 1.04),   // righty against a righty
+            (false, false) => (1.03, 1.06, 1.04, 0.95),
+        };
+    }
+
     private static (double hr, double so, double bb, double sg) ApplyPitchType(
         PitchType pitch, double hr, double so, double bb, double sg, double db)
     {
         return pitch switch
         {
-            PitchType.Fastball   => (hr * 1.10, so * 1.10, bb * 0.90, sg),
-            PitchType.Curveball  => (hr * 0.85, so * 1.05, bb * 1.10, sg * 0.95),
-            PitchType.Slider     => (hr * 0.90, so * 1.15, bb * 1.05, sg * 0.90),
-            PitchType.Changeup   => (hr * 0.80, so * 0.90, bb * 0.95, sg * 1.10),
-            PitchType.Pitchout   => (hr * 0.10, so * 0.10, bb * 2.00, sg * 0.10),
+            // WHY: each pitch trades one thing for another, and the trades are worth the same for an ordinary hitter (a test checks
+            // it); what separates them is the batter in front of it. They were not: the slider and the curve gave up fewer home
+            // runs and singles for nothing, so a manager who picked the best pitch every time took about 8% off the other side's
+            // runs (calibration: scoring was 0.78 of real, 0.86 with pitch types switched off). The single multipliers below
+            // are what balance the trade, by linear weights for a .290 hitter (run values: single .47, double .77, triple 1.04,
+            // home run 1.40, walk .33, strikeout -.03 against an out in play).
+            PitchType.Fastball   => (hr * 1.10, so * 1.10, bb * 0.90, sg * 0.99),
+            PitchType.Curveball  => (hr * 0.85, so * 1.05, bb * 1.10, sg * 1.05),
+            PitchType.Slider     => (hr * 0.90, so * 1.15, bb * 1.05, sg * 1.045),
+            PitchType.Changeup   => (hr * 0.80, so * 0.90, bb * 0.95, sg * 1.125),
+            // WHY: a pitchout is a ball thrown wide on purpose. Against a runner who goes it is a steal attempt (see
+            // AtBatResolver); against one who stays it only puts the pitcher behind in the count, so the batter walks
+            // a little more often and nothing else changes. It once cut hits to 10%, which made it the best pitch.
+            PitchType.Pitchout   => (hr, so * 0.90, bb * 1.25, sg),
             _                    => (hr, so, bb, sg)
         };
     }
@@ -124,17 +176,21 @@ public static class ProbabilityTable
     {
         return alignment switch
         {
-            DefensiveAlignment.CornersIn     => (sg * 0.80, db, tr),                // bunt defence
-            DefensiveAlignment.InfieldIn     => (sg * 0.85, db * 1.10, tr),         // hole in IF
+            // WHY: every alignment buys outs in one place by giving up hits in another, so none beats Normal for an
+            // ordinary hitter with the bases empty (a test checks it). Their gains are situational.
+            // Corners charge the bunt (BuntModel makes bunting harder); a ball swung at gets past them more often.
+            DefensiveAlignment.CornersIn     => (sg * 1.06, db * 1.04, tr),
+            // The infield plays in to hold the runner on third (BaseRunningEngine.GroundOut); grounders get through.
+            DefensiveAlignment.InfieldIn     => (sg * 1.12, db, tr),
             DefensiveAlignment.ShiftPull     => (sg * 1.20, db * 0.90, tr),         // opposite-field hit more likely
-            // WHY: the next two are the other two sides of the same trade. Every alignment buys outs in one place
-            // by giving up hits in another, so none is a free upgrade over Normal.
             // Corner men hug the lines: balls down the line that would split them become outs, so fewer extra-base
             // hits (triples live in the corners), but more singles get through the wider gaps.
-            DefensiveAlignment.GuardLines    => (sg * 1.08, db * 0.82, tr * 0.80),
+            // It pays late with a runner on first, where a double down the line would score him.
+            DefensiveAlignment.GuardLines    => (sg * 1.12, db * 0.85, tr * 0.85),
             // Mirror of ShiftPull: the defense leans away from where the batter pulls, so the opposite-field
             // singles and gap shots he rarely hits turn into outs, while the pulled ball finds the open side for extra bases.
-            DefensiveAlignment.ShiftOpposite => (sg * 0.90, db * 1.15, tr),
+            // It pays against a slap hitter with few extra-base hits, not against an ordinary one.
+            DefensiveAlignment.ShiftOpposite => (sg * 0.95, db * 1.20, tr),
             _                                => (sg, db, tr)
         };
     }

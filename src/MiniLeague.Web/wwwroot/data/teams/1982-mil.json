@@ -8,6 +8,20 @@
   "stadium": "county-1982",
   "eraErrorsPerGame": 0.78,
   "eraStrikeoutsPerGame": 4.81,
+  "leaguePitching": {
+    "era": 4.073,
+    "nonHomeRunHitsPerNine": 8.182,
+    "homeRunsPerNine": 0.921,
+    "strikeoutsPerNine": 4.833,
+    "walksPerNine": 3.248
+  },
+  "leagueStealRate": 0.637,
+  "tendencies": {
+    "stealAttemptsPerGame": 0.834,
+    "sacrificesPerGame": 0.319,
+    "completeGameRate": 0.209,
+    "savesPerGame": 0.288
+  },
   "batters": [
     {
       "id": 1501,
@@ -27,6 +41,7 @@
       "rbi": 112,
       "cs": 7,
       "hbp": 4,
+      "sh": 5,
       "field": {
         "CF": [
           8,
@@ -53,6 +68,7 @@
       "rbi": 121,
       "cs": 3,
       "hbp": 0,
+      "sh": 4,
       "field": {
         "1B": [
           6,
@@ -79,6 +95,7 @@
       "rbi": 114,
       "cs": 3,
       "hbp": 1,
+      "sh": 4,
       "field": {
         "SS": [
           6,
@@ -105,6 +122,7 @@
       "rbi": 55,
       "cs": 2,
       "hbp": 1,
+      "sh": 5,
       "field": {
         "1B": [
           4,
@@ -136,6 +154,7 @@
       "rbi": 71,
       "cs": 9,
       "hbp": 1,
+      "sh": 10,
       "field": {
         "3B": [
           7,
@@ -162,6 +181,7 @@
       "rbi": 102,
       "cs": 5,
       "hbp": 4,
+      "sh": 0,
       "field": {
         "LF": [
           6,
@@ -188,6 +208,7 @@
       "rbi": 97,
       "cs": 0,
       "hbp": 2,
+      "sh": 1,
       "field": {
         "C": [
           6,
@@ -214,6 +235,7 @@
       "rbi": 43,
       "cs": 3,
       "hbp": 2,
+      "sh": 7,
       "field": {
         "2B": [
           6,
@@ -240,6 +262,7 @@
       "rbi": 45,
       "cs": 10,
       "hbp": 1,
+      "sh": 4,
       "field": {
         "C": [
           5,
@@ -271,6 +294,7 @@
       "rbi": 38,
       "cs": 2,
       "hbp": 0,
+      "sh": 1,
       "field": {}
     },
     {
@@ -291,6 +315,7 @@
       "rbi": 14,
       "cs": 4,
       "hbp": 0,
+      "sh": 5,
       "field": {
         "CF": [
           5,
@@ -322,6 +347,7 @@
       "rbi": 7,
       "cs": 0,
       "hbp": 0,
+      "sh": 3,
       "field": {
         "2B": [
           5,
@@ -353,6 +379,7 @@
       "rbi": 10,
       "cs": 3,
       "hbp": 2,
+      "sh": 3,
       "field": {
         "LF": [
           5,
@@ -378,12 +405,14 @@
       "bb": 58,
       "so": 75,
       "tiringFactor": 2,
+      "gs": 34,
       "role": "Starter",
       "wins": 17,
       "losses": 13,
       "saves": 0,
       "cg": 12,
-      "hr": 30
+      "hr": 30,
+      "bats": "Right"
     },
     {
       "id": 1551,
@@ -395,12 +424,14 @@
       "bb": 102,
       "so": 105,
       "tiringFactor": 3,
+      "gs": 30,
       "role": "Starter",
       "wins": 18,
       "losses": 6,
       "saves": 0,
       "cg": 9,
-      "hr": 14
+      "hr": 14,
+      "bats": "Right"
     },
     {
       "id": 1552,
@@ -412,12 +443,14 @@
       "bb": 39,
       "so": 104,
       "tiringFactor": 3,
+      "gs": 27,
       "role": "Starter",
       "wins": 11,
       "losses": 8,
       "saves": 1,
       "cg": 3,
-      "hr": 15
+      "hr": 15,
+      "bats": "Right"
     },
     {
       "id": 1553,
@@ -429,12 +462,14 @@
       "bb": 74,
       "so": 99,
       "tiringFactor": 3,
+      "gs": 26,
       "role": "Starter",
       "wins": 12,
       "losses": 7,
       "saves": 0,
       "cg": 5,
-      "hr": 21
+      "hr": 21,
+      "bats": "Right"
     },
     {
       "id": 1560,
@@ -451,7 +486,8 @@
       "losses": 6,
       "saves": 29,
       "cg": 0,
-      "hr": 5
+      "hr": 5,
+      "bats": "Right"
     },
     {
       "id": 1561,
@@ -468,7 +504,8 @@
       "losses": 6,
       "saves": 6,
       "cg": 0,
-      "hr": 14
+      "hr": 14,
+      "bats": "Right"
     },
     {
       "id": 1562,
@@ -485,7 +522,8 @@
       "losses": 7,
       "saves": 0,
       "cg": 1,
-      "hr": 12
+      "hr": 12,
+      "bats": "Left"
     }
   ]
 }

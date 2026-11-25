@@ -8,6 +8,20 @@
   "stadium": "shea-1969",
   "eraErrorsPerGame": 0.89,
   "eraStrikeoutsPerGame": 5.98,
+  "leaguePitching": {
+    "era": 3.595,
+    "nonHomeRunHitsPerNine": 7.761,
+    "homeRunsPerNine": 0.761,
+    "strikeoutsPerNine": 6.02,
+    "walksPerNine": 3.312
+  },
+  "leagueStealRate": 0.599,
+  "tendencies": {
+    "stealAttemptsPerGame": 0.673,
+    "sacrificesPerGame": 0.321,
+    "completeGameRate": 0.315,
+    "savesPerGame": 0.216
+  },
   "batters": [
     {
       "id": 701,
@@ -27,6 +41,7 @@
       "rbi": 32,
       "cs": 3,
       "hbp": 2,
+      "sh": 4,
       "field": {
         "2B": [
           5,
@@ -53,6 +68,7 @@
       "rbi": 76,
       "cs": 9,
       "hbp": 3,
+      "sh": 6,
       "field": {
         "CF": [
           8,
@@ -84,6 +100,7 @@
       "rbi": 75,
       "cs": 8,
       "hbp": 7,
+      "sh": 1,
       "field": {
         "1B": [
           4,
@@ -115,6 +132,7 @@
       "rbi": 47,
       "cs": 2,
       "hbp": 3,
+      "sh": 2,
       "field": {
         "1B": [
           5,
@@ -151,6 +169,7 @@
       "rbi": 52,
       "cs": 1,
       "hbp": 2,
+      "sh": 1,
       "field": {
         "LF": [
           5,
@@ -182,6 +201,7 @@
       "rbi": 49,
       "cs": 2,
       "hbp": 0,
+      "sh": 2,
       "field": {
         "1B": [
           4,
@@ -208,6 +228,7 @@
       "rbi": 40,
       "cs": 1,
       "hbp": 1,
+      "sh": 6,
       "field": {
         "C": [
           6,
@@ -234,6 +255,7 @@
       "rbi": 24,
       "cs": 3,
       "hbp": 2,
+      "sh": 5,
       "field": {
         "SS": [
           6,
@@ -260,6 +282,7 @@
       "rbi": 39,
       "cs": 2,
       "hbp": 3,
+      "sh": 6,
       "field": {
         "2B": [
           4,
@@ -296,6 +319,7 @@
       "rbi": 23,
       "cs": 3,
       "hbp": 0,
+      "sh": 6,
       "field": {
         "2B": [
           4,
@@ -327,6 +351,7 @@
       "rbi": 14,
       "cs": 3,
       "hbp": 2,
+      "sh": 7,
       "field": {
         "LF": [
           3,
@@ -363,6 +388,7 @@
       "rbi": 10,
       "cs": 1,
       "hbp": 1,
+      "sh": 4,
       "field": {
         "2B": [
           4,
@@ -394,6 +420,7 @@
       "rbi": 37,
       "cs": 2,
       "hbp": 2,
+      "sh": 2,
       "field": {
         "1B": [
           4,
@@ -414,12 +441,25 @@
       "bb": 82,
       "so": 208,
       "tiringFactor": 2,
+      "gs": 35,
       "role": "Starter",
       "wins": 25,
       "losses": 7,
       "saves": 0,
       "cg": 18,
-      "hr": 24
+      "hr": 24,
+      "bats": "Right",
+      "bat": {
+        "ab": 91,
+        "h": 11,
+        "d2": 3,
+        "d3": 0,
+        "hr": 0,
+        "bb": 7,
+        "so": 34,
+        "hbp": 2,
+        "sh": 4
+      }
     },
     {
       "id": 751,
@@ -431,12 +471,25 @@
       "bb": 81,
       "so": 154,
       "tiringFactor": 3,
+      "gs": 35,
       "role": "Starter",
       "wins": 13,
       "losses": 12,
       "saves": 0,
       "cg": 6,
-      "hr": 24
+      "hr": 24,
+      "bats": "Right",
+      "bat": {
+        "ab": 74,
+        "h": 6,
+        "d2": 1,
+        "d3": 0,
+        "hr": 0,
+        "bb": 1,
+        "so": 52,
+        "hbp": 1,
+        "sh": 7
+      }
     },
     {
       "id": 752,
@@ -448,12 +501,25 @@
       "bb": 68,
       "so": 180,
       "tiringFactor": 2,
+      "gs": 32,
       "role": "Starter",
       "wins": 17,
       "losses": 9,
       "saves": 0,
       "cg": 16,
-      "hr": 14
+      "hr": 14,
+      "bats": "Right",
+      "bat": {
+        "ab": 84,
+        "h": 4,
+        "d2": 0,
+        "d3": 0,
+        "hr": 0,
+        "bb": 1,
+        "so": 46,
+        "hbp": 0,
+        "sh": 4
+      }
     },
     {
       "id": 753,
@@ -465,12 +531,25 @@
       "bb": 47,
       "so": 60,
       "tiringFactor": 3,
+      "gs": 21,
       "role": "Starter",
       "wins": 8,
       "losses": 10,
       "saves": 0,
       "cg": 4,
-      "hr": 15
+      "hr": 15,
+      "bats": "Right",
+      "bat": {
+        "ab": 47,
+        "h": 8,
+        "d2": 0,
+        "d3": 0,
+        "hr": 1,
+        "bb": 0,
+        "so": 26,
+        "hbp": 1,
+        "sh": 2
+      }
     },
     {
       "id": 760,
@@ -487,7 +566,19 @@
       "losses": 4,
       "saves": 13,
       "cg": 0,
-      "hr": 7
+      "hr": 7,
+      "bats": "Right",
+      "bat": {
+        "ab": 4,
+        "h": 1,
+        "d2": 0,
+        "d3": 0,
+        "hr": 0,
+        "bb": 0,
+        "so": 2,
+        "hbp": 0,
+        "sh": 0
+      }
     },
     {
       "id": 761,
@@ -504,7 +595,19 @@
       "losses": 7,
       "saves": 0,
       "cg": 4,
-      "hr": 12
+      "hr": 12,
+      "bats": "Right",
+      "bat": {
+        "ab": 37,
+        "h": 5,
+        "d2": 1,
+        "d3": 0,
+        "hr": 0,
+        "bb": 3,
+        "so": 18,
+        "hbp": 0,
+        "sh": 5
+      }
     },
     {
       "id": 762,
@@ -521,7 +624,19 @@
       "losses": 3,
       "saves": 12,
       "cg": 1,
-      "hr": 6
+      "hr": 6,
+      "bats": "Right",
+      "bat": {
+        "ab": 24,
+        "h": 4,
+        "d2": 1,
+        "d3": 0,
+        "hr": 0,
+        "bb": 1,
+        "so": 6,
+        "hbp": 0,
+        "sh": 0
+      }
     }
   ]
 }

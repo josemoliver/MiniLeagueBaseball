@@ -310,7 +310,9 @@ public class PlayTemplateTests
     [Fact]
     public void Hits_HaveAnotherOutfielderMoveTowardTheBallWithoutTakingTheCatch()
     {
-        foreach (var (result, before) in Where((r, _) => r.Outcome is OutcomeType.Single or OutcomeType.Double or OutcomeType.Triple).Take(60))
+        // NOTE: a bunt single never leaves the infield, so no outfielder has a ball to chase.
+        foreach (var (result, before) in Where((r, _) => r.Outcome is OutcomeType.Single or OutcomeType.Double or OutcomeType.Triple
+                     && !r.IsBunt).Take(60))
         {
             var script = Script(result, before);
             var glove = script.Cues.First(c => c.Kind == CueKind.Effect && c.Value == "glove");
@@ -584,7 +586,9 @@ public class PlayTemplateTests
     [Fact]
     public void ScoringHits_ShowASafeSlideAndCatcherSwipeAcrossHome()
     {
+        // NOTE: a hit on which another runner is thrown out draws the throw to him instead (NoFreeOptionTests).
         var plays = Where((r, _) => (r.Outcome is OutcomeType.Single or OutcomeType.Double or OutcomeType.Triple) &&
+            r.ThrownOutFrom is null &&
             r.RunnerMoves.Any(m => m.Fate == RunnerFate.Scored && m.FromBase <= 2)).Take(30).ToList();
         Assert.NotEmpty(plays);
         foreach (var (result, before) in plays)
@@ -766,7 +770,8 @@ public class PlayTemplateTests
                 var keys = KeysOf(script, id);
                 var pickup = keys.First(k => k.T > cue.T && k.Pose == Poses.Crouch);
                 Assert.True(pickup.T >= cue.T + 0.49, $"{kind}: the fielder reacts before gathering the ball ({cue.T} -> {pickup.T})");
-                var throwKey = keys.First(k => k.Pose == Poses.Throw);
+                // NOTE: after the error: a pitcher's own pitch is also a throw.
+                var throwKey = keys.First(k => k.Pose == Poses.Throw && k.T > cue.T);
                 Assert.True(throwKey.T > pickup.T);
                 if (kind is "booted" or "dropped")
                     Assert.Contains(keys, k => k.Pose == Poses.Recover && k.T > cue.T && k.T < pickup.T);
@@ -828,7 +833,9 @@ public class PlayTemplateTests
     [Fact]
     public void ARunnerTakesALeadAsThePitcherWindsUp_MoreForAFastOne_AndGetsBackOnTheBagIfHeStays()
     {
-        var (r, b) = First((r, b) => r.Outcome == OutcomeType.Strikeout && b.First is not null && b.Second is null && b.Third is null);
+        // NOTE: not a hit and run: then he is meant to go with the pitch.
+        var (r, b) = First((r, b) => r.Outcome == OutcomeType.Strikeout && !r.HitAndRun
+            && b.First is not null && b.Second is null && b.Third is null);
         var s = Script(r, b);
         var keys = KeysOf(s, RunnerId(b.First!.Player));
 
@@ -899,10 +906,14 @@ public class PlayTemplateTests
 
     // ── Stolen bases ─────────────────────────────────────────────────────────
 
+    // WHY: these pictures are of a lone runner stealing second; steals of third and double steals have their own tests.
+    private static bool StealOfSecond(PlayResult r) =>
+        r.RunnerMoves.Count(m => m.FromBase > 0) == 1 && r.RunnerMoves.Any(m => m.FromBase == 1);
+
     [Fact]
     public void StolenBase_HasTheRunnerSlideInSafe_BeforeTheTagArrives()
     {
-        var steals = Where((r, _) => r.Outcome == OutcomeType.StolenBase).Take(20).ToList();
+        var steals = Where((r, _) => r.Outcome == OutcomeType.StolenBase && StealOfSecond(r)).Take(20).ToList();
         Assert.NotEmpty(steals);
         foreach (var (r, b) in steals)
             for (int seed = 0; seed < 5; seed++)
@@ -929,7 +940,7 @@ public class PlayTemplateTests
     [Fact]
     public void CaughtStealing_HasTheThrowBeatTheRunner_AndTheFielderTagHim()
     {
-        var plays = Where((r, _) => r.Outcome == OutcomeType.CaughtStealing).Take(20).ToList();
+        var plays = Where((r, _) => r.Outcome == OutcomeType.CaughtStealing && StealOfSecond(r)).Take(20).ToList();
         Assert.NotEmpty(plays);
         foreach (var (r, b) in plays)
             for (int seed = 0; seed < 5; seed++)

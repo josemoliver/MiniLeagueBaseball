@@ -50,17 +50,20 @@ public static class RunnerMoveBuilder
     // Who the engine retires on each kind of play (everyone else is safe or scores).
     private static (int ToBase, RunnerFate Fate)? OutFor(GameState before, PlayResult result, int from) => (result.Outcome, from) switch
     {
+        // A runner the result names as thrown out (sent for an extra base, caught stealing third, out at the plate on a squeeze,
+        // doubled off third on a popped-up one): he was out at the base the result gives, which may be where he started.
+        (_, > 0) when result.ThrownOutFrom == from => (result.ThrownOutAt!.Value, RunnerFate.TaggedOut),
         (OutcomeType.Strikeout or OutcomeType.FlyOut or OutcomeType.LineOut or OutcomeType.PopOut, 0) => (0, RunnerFate.Retired),
         (OutcomeType.GroundOut or OutcomeType.DoublePlay or OutcomeType.SacrificeBunt, 0) => (1, RunnerFate.ForcedOut),
         (OutcomeType.DoublePlay, 1) => (2, RunnerFate.ForcedOut),
-        (OutcomeType.CaughtStealing, 1) => (2, RunnerFate.TaggedOut),
+        (OutcomeType.CaughtStealing, 1) when result.ThrownOutFrom is null => (2, RunnerFate.TaggedOut),
         // A hit and run that goes wrong: the batter struck out and the runner was thrown out at second, or the batter
         // lined out and the runner, already off the bag, was doubled off first (he is out at the base he started from).
         (OutcomeType.Strikeout, 1) when result.OutsRecorded >= 2 => (2, RunnerFate.TaggedOut),
         (OutcomeType.LineOut, 1) when result.OutsRecorded >= 2 => (1, RunnerFate.TaggedOut),
         // A fielder's choice: the defense took the lead runner it could, at the next base. He was forced when he had
         // the batter or a runner behind him pushing him along; a lone runner on second is tagged.
-        (OutcomeType.FieldersChoice, > 0) when from == BuntModel.FieldersChoiceFrom(
+        (OutcomeType.FieldersChoice, > 0) when result.ThrownOutFrom is null && from == BuntModel.FieldersChoiceFrom(
                 before.RunnerOnFirst is not null, before.RunnerOnSecond is not null, before.RunnerOnThird is not null)
             => (from + 1, from == 1 || before.RunnerOnFirst is not null ? RunnerFate.ForcedOut : RunnerFate.TaggedOut),
         _ => null,

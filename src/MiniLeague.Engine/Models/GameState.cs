@@ -3,7 +3,7 @@ namespace MiniLeague.Engine.Models;
 public enum ManagerControl { Human, Computer }
 public enum GameStatus { Setup, InProgress, Final, Suspended }
 public enum PitchType { Fastball, Curveball, Slider, Changeup, Pitchout }
-public enum OffensiveStrategy { SwingAway, SwingAgressive, SwingSafe, Steal, HitAndRun, SacrificeBunt, SurpriseBunt }
+public enum OffensiveStrategy { SwingAway, SwingAgressive, SwingSafe, Steal, HitAndRun, SacrificeBunt, SurpriseBunt, Squeeze, SafetySqueeze }
 public enum DefensiveAlignment { Standard, CornersIn, InfieldIn, GuardLines, ShiftPull, ShiftOpposite }
 
 public class ActivePitcher

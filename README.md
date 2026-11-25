@@ -39,6 +39,7 @@ It runs **entirely in the browser** (Blazor WebAssembly), so it needs no server,
 - Pitchers tire by pitch count and their own durability, and a computer manager pulls them.
 - Fielding matters: range, error rates and arm strength per position. Errors happen at each season's real rate, and a bench bat playing shortstop is a liability.
 - Optional random events: injuries that force a replacement, rain delays that can end a game, and manager ejections that hand your team to the computer.
+- An optional designated hitter rule: a designated hitter for both teams (the default), the home team's league and year, or pitchers bat, with pinch hitters for the pitcher, pitcher bunts and the double switch.
 - Five computer managers to choose from, each a fictional person with a style and a profile: a numbers-driven analyst, an old-school "book" manager, a small-ball tactician, a let-them-swing slugger and a matchup-obsessed tinkerer. Pick one for each side the computer manages. They pinch hit, pinch run, warm up and change pitchers, and tidy the defense after substitutions.
 
 **Watching the game**

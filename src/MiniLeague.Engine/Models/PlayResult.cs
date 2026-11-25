@@ -65,6 +65,16 @@ public class PlayResult
     /// <summary>The runner on first was going on the pitch (a hit and run). Display and box score only.</summary>
     public bool HitAndRun { get; set; }
 
+    /// <summary>The play was a squeeze (a bunt with the runner on third coming home); null of the kind for any other play.</summary>
+    public SqueezeKind Squeeze { get; set; }
+
+    /// <summary>
+    /// A runner sent hard on this hit and thrown out: the base he started from (1 or 2) and where he was tagged
+    /// (3, or 4 for home). Null when nobody was. His out is in <see cref="OutsRecorded"/>.
+    /// </summary>
+    public int? ThrownOutFrom { get; set; }
+    public int? ThrownOutAt { get; set; }
+
     // For animations / display
     public bool IsHit => Outcome is OutcomeType.Single or OutcomeType.Double
                                   or OutcomeType.Triple or OutcomeType.HomeRun;

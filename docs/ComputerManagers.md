@@ -59,16 +59,16 @@ The id is what a saved game stores. It must never change once released.
 ### Profile ratings
 
 Each persona carries 1 to 5 ratings, shown on the setup screen as pips. They describe how much the manager leans on
-each part of the game. They are written by hand, not computed, so a test keeps them honest about the direction of the
-differences (see [Tests](#11-tests)).
+each part of the game. They are written by hand, not computed, so the benchmark (section 9) keeps them honest: where
+two personas' ratings for a trait differ by two or more, the higher-rated one must measurably do more of it.
 
-| Persona | Aggression on the bases | Small ball | Bench use | Quick with the bullpen | Intentional walks |
-|---|:-:|:-:|:-:|:-:|:-:|
-| Ellie Whitcombe | 3 | 2 | 3 | 3 | 2 |
-| Gus Halloran | 3 | 4 | 3 | 3 | 5 |
-| Rosa Delgado | 5 | 5 | 4 | 3 | 2 |
-| Duke Pruitt | 2 | 1 | 1 | 1 | 1 |
-| Marcus Delacroix | 3 | 2 | 5 | 5 | 4 |
+| Persona | Aggression on the bases | Small ball | Bench use | Quick with the bullpen | Intentional walks | Late defensive subs |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| Ellie Whitcombe | 3 | 3 | 3 | 3 | 2 | 1 |
+| Gus Halloran | 3 | 2 | 3 | 3 | 5 | 3 |
+| Rosa Delgado | 5 | 5 | 4 | 3 | 2 | 4 |
+| Duke Pruitt | 2 | 1 | 1 | 1 | 1 | 1 |
+| Marcus Delacroix | 3 | 2 | 5 | 5 | 4 | 4 |
 
 ### Ellie Whitcombe, "The Actuary" (`analyst`)
 
@@ -78,8 +78,8 @@ A former insurance actuary who took over a last-place club with a spreadsheet an
 steal or walk anyone unless the arithmetic says so, and the arithmetic usually says no.
 
 **In play.** The reference manager and the default for any side that has not been given a choice. Every dial is at its
-default. Per game she makes few bunts (about 0.2), almost no steals, some hit and runs, and almost never an
-intentional walk.
+default. She steals on about 8% of chances, bunts on about 11%, uses the hit and run often with a contact hitter up,
+and almost never walks anyone on purpose.
 
 ### Gus Halloran, "Ironhide" (`oldschool`)
 
@@ -89,8 +89,8 @@ Thirty-one years in the game, nineteen of them in the dugout, and he has never r
 bat with first base open, bunts with the weak hitter late, and sends a fast runner on a hunch.
 
 **In play.** Follows the fixed rules in [section 6](#6-the-old-school-manager). Walks power hitters often (about 1.7
-intentional walks a game), steals more than the others, and picks pitches at random. He is the weakest of the five by
-a wide margin, which makes him the natural "easy" opponent.
+intentional walks a game) and picks pitches at random. His bunting rules rarely fire, because pitchers never bat. He is
+the weakest of the five (about 41% in the round robin), which makes him the natural "easy" opponent.
 
 ### Rosa Delgado, "Spark" (`smallball`)
 
@@ -99,9 +99,13 @@ a wide margin, which makes him the natural "easy" opponent.
 A scrappy utility infielder who never hit over .240 and made a career of moving runners. She manages the way she
 played: bother the pitcher, take the extra base, and play for the one run.
 
-**In play.** Low bars for steals (0.010), hit and runs (0.010) and sacrifice bunts (0.0), and for aggressive running
-(0.0), so she makes those calls whenever they look even slightly better. A low pinch-run bar (0.02) puts a fast runner
-in early. On defense she calls a pitchout 45% of the time when a runner is likely to go.
+**In play.** Negative bars for steals (-0.015), hit and runs (-0.010), sacrifice bunts (-0.015) and aggressive running
+(-0.005): she makes those calls not only when they pay but when they cost a little, because playing for one run is
+how she manages. She steals on about 19% of chances and runs aggressively on about 40% of plate appearances with a
+runner on. A low pinch-run bar (0.02) puts a fast runner in early. On defense she calls a pitchout 45% of the time
+when a runner is likely to go. **Philosophy:** she presses when behind late (`SituationalRisk` 0.5, so her gambles cost 0.02
+less when trailing and 0.02 more when ahead), acts a little more readily in the big moments (`LeverageSensitivity` 0.3),
+keeps hitters guessing (`PitchMix` 0.02) and puts a better glove in to protect a lead from the eighth.
 
 ### Duke Pruitt, "Big Sky" (`slugger`)
 
@@ -112,8 +116,11 @@ leaves a good starter in, and would rather lose swinging than win bunting.
 
 **In play.** Steals, hit and runs and bunts are switched off (`ManagerTuning.Never`, a margin no call can reach). He
 pinch hits only from the seventh inning and only for a large gain, charges a high price for spending a bench player
-(1.6 times the normal cost), and walks a batter only on a large edge (0.10). He keeps a starter longer than anyone
-(bullpen margins of 0.07 and 0.14, warm-up not before the eighth inning or 90 pitches).
+(1.6 times the normal cost), and walks a batter only on a large edge (0.10). He keeps a starter longer than anyone:
+bullpen margins of 0.07 and 0.14, warm-up not before the eighth inning or 90 pitches, a tiring starter stays unless
+the reliever is clearly better (+0.06), and a starter is not "shelled" until he has allowed 6 runs. His starters
+finish about 20% of games, against about 1% for the Tinkerer's. **Philosophy:** he is stubborn, not changing his plan
+for the moment (`LeverageSensitivity` -0.3) and trusting his hitters over the platoon book (`PlatoonWeight` 0.3).
 
 ### Marcus Delacroix, "The Tinkerer" (`tinkerer`)
 
@@ -122,15 +129,16 @@ pinch hits only from the seventh inning and only for a large gain, charges a hig
 A pitching coach turned manager who keeps a binder on every hitter in the league. His bullpen door never stops
 swinging, his bench plays every night, and he will walk a star to face a lesser bat.
 
-**In play.** Pinch hitting from the fifth inning for a small gain (0.012) with a half-price bench. Walks a batter on a
-small edge (0.01). Starts a reliever warming from the fourth inning at 45 pitches, and from 60 pitches will swap a
+**In play.** Pinch hitting from the fifth inning for a small gain (0.012) with a half-price bench. Considers an
+intentional walk from the sixth inning, for a smaller gap between the batter and the next hitter (0.08 of OPS), and
+makes it on any edge. Starts a reliever warming from the fourth inning at 45 pitches, and from 60 pitches will swap a
 still-fresh starter for a warm reliever who looks at least as good (a margin of -0.02 in a close late game, 0.0
-otherwise). The swap needs a warm reliever who is about as good, which an ace starter usually rules out, so this
-manager's signature is the matchup change, not a high count of pitchers used.
-
-**Limit today.** The team data has no left/right splits and the engine applies no platoon effect (see
-[Known limits](#10-known-limits-and-engine-quirks)). His "matchups" therefore compare only overall season quality,
-and in measured play he behaves much like the Analyst. His style needs a platoon effect to show.
+otherwise). A tiring pitcher goes even for a somewhat worse arm (-0.20), and a starter is "shelled" after 4 runs. The
+platoon effect (section 4.1) gives his matchup changes something real to work on: he uses the most pitchers and pinch
+hitters of the five, and his starters finish the fewest games. **Philosophy:** the platoon book matters twice as much to
+him as it really does (`PlatoonWeight` 2.0), the big moments matter most (`LeverageSensitivity` 0.6), a starter is done at
+100 pitches (`StarterPitchLimit`), the closer comes in from the eighth (`CloserFromInning` 8), a glove goes in for a lead
+from the seventh, and he varies his calls a little (`PitchMix` 0.015).
 
 ## 3. Architecture
 
@@ -180,14 +188,32 @@ replaces (`plannedBatter`).
 
 `ManagerDecisionModel.AtBat` builds the outcome weights for a matchup with `ProbabilityTable.Build` (the same builder
 the resolver rolls on), so a choice depends on this batter's and this pitcher's season statistics, the pitcher's fatigue,
-the ballpark and the alignment. The code asks for each player's statistics against the other's throwing or batting hand,
-but the team data has no splits, so the overall season line is used for both hands. The batter's side changes only the
-ballpark's home-run factor. It then turns each outcome into the value of the situation that follows, using a run-expectancy table
-(`WinProbability.ExpectedRuns`) for the base and out state. The value is expected runs for the **batting** side: the
-batting manager maximizes it, the fielding manager minimizes it.
+the **platoon** matchup between them, the ballpark and the alignment.
 
-A late tied or one-run-behind situation (the eighth inning or later) blends run expectancy with the chance of scoring at
-least once: `0.35 * expected + 0.65 * (1 - e^-expected)`. A single run is worth more than the second one there.
+**Platoon.** The team data has only overall season lines (the Lahman database has no splits), so the matchup comes
+from a standard modifier around that line (`ProbabilityTable.Platoon`): a little better against a pitcher of the other
+hand, clearly worse against his own. Left-handed batters have the larger split. A switch hitter always bats from the far
+side. The resolver applies the same modifier, so it is part of the game, not only of the managers' estimates.
+
+| Matchup | Hits | Home runs | Walks | Strikeouts |
+|---|--:|--:|--:|--:|
+| Left-handed batter against a left-hander | ×0.94 | ×0.88 | ×0.92 | ×1.12 |
+| Left-handed batter against a right-hander | ×1.02 | ×1.04 | ×1.03 | ×0.96 |
+| Right-handed batter against a right-hander | ×0.98 | ×0.96 | ×0.97 | ×1.04 |
+| Right-handed batter against a left-hander | ×1.03 | ×1.06 | ×1.04 | ×0.95 |
+
+**Win probability.** Each outcome becomes the situation that follows (bases, outs, runs scored), and that situation is
+valued by the **batting side's chance of winning** from it (`WinProbability.HomeWinsCached`, a table filled on first
+use), divided by what one more run is worth at the moment of the decision. Dividing keeps every value in runs, so the
+dials in section 5 keep their meaning, while the shape follows the game: early on a run is a run; late and close, the
+first run is worth far more than the second, a lead protects itself, and a walk-off ends it. In a game already decided
+(one more run changes the win chance by less than 1%), plain run expectancy is used instead. The value is for the
+**batting** side: the batting manager maximizes it, the fielding manager minimizes it.
+
+The win chances come from the run expectancy and the **chance of scoring at least once** for each base and out state
+(`WinProbability.ChanceToScore`). The second table matters for one-run decisions: a runner on third with one out scores
+more often than a runner on second with nobody out (0.66 against 0.62), though fewer runs on average, which is exactly
+what makes a late sacrifice bunt worth it.
 
 The model never rolls dice and never changes the game. Its base-running transitions mirror the resolver's rules in
 expectation; they do not need to predict a single roll, only to compare two calls fairly.
@@ -206,6 +232,14 @@ In order:
      for a contact hitter if it beats the best swing by `HitAndRunMargin`.
    * With a runner on first or second, no one on third, and nobody out: a **sacrifice bunt** if it beats the best swing
      by `BuntMargin`, except when the side is down two or more from the seventh inning on.
+   * With a runner on second and third open (a **steal of third**) or runners on first and second (a **double steal**): valued
+     like a steal of second, with the steal of third made harder (`RunningRules.StealOfThirdFactor`). It takes a strong
+     runner, a weak battery and a close game.
+   * With a runner on third and fewer than two out: a **squeeze** (the runner breaks with the pitch; a popped-up bunt
+     doubles him off, a read play puts him out at the plate) or a **safety squeeze** (he waits for the bunt; it scores less
+     often and never loses him). Each is valued by what the on-deck hitter makes of the situation it leaves, against a
+     swing, and made if it wins by `SqueezeMargin`.
+   * Bunts, squeezes and intentional walks look one hitter ahead: the on-deck man bats in the state they leave.
 3. **Pinch hitter.** From `PinchHitFromInning`, when the batting side leads by at most 2 or trails by at most 4. Each
    bench bat with 100 or more at-bats is valued against the man due up: the matchup gain, plus 20% of the OPS gap, minus
    the fielding lost (at the position he would take), a reserve cost (more if the bench is thin) and a cost for losing a
@@ -216,42 +250,100 @@ In order:
 
 ### 4.3 Fielding side
 
-1. **Intentional walk.** Only with first base open, fewer than two out, a runner in scoring position, the seventh inning
-   or later, within two runs, a batter with OPS of at least .800 who is at least .150 better than the next hitter. It is
+1. **Intentional walk.** Only with first base open, fewer than two out, a runner in scoring position, from
+   `IntentionalWalkFromInning` (the seventh by default), within two runs, a batter with OPS of at least .800 who is at
+   least `IntentionalWalkOpsGap` (.150 by default) better than the next hitter. It is
    priced as a forced runner plus a bounded credit for the weaker on-deck bat (at most 0.35), and made if it beats
    facing the batter by `IntentionalWalkMargin`.
 2. **Pitch and alignment.** Every available alignment is evaluated with each of the four ordinary pitches and the lowest
-   value wins. Ties within 0.004 are broken at random (20% chance to switch) so the choice is not predictable.
+   value wins. Ties within 0.004 are broken at random (20% chance to switch) so the choice is not predictable. A manager
+   with `PitchMix` above zero instead picks among all the options at random, each weighted by `exp(-(worse by)/PitchMix)`
+   (a softmax whose temperature is in runs): the best stays the most likely and a clearly bad one almost never comes up.
    * Always available: Standard.
-   * Infield In: runner on third, fewer than two out.
+   * Infield In: runner on third, fewer than two out. It lets more singles through but holds an unforced runner on
+     third on most ground balls (section 10).
    * Corners In: runner on first or second, fewer than two out, a batter who bunts well (bunting or sacrifice rated 4
-     or more). Today every player has the default rating of 3, so Corners In is never offered.
+     or more). The ratings come from sacrifice hits (section 10); the team files in the repository predate that field,
+     so every player has the default of 3 and Corners In is not offered until they are regenerated.
    * Guard Lines: the seventh inning or later, within two runs.
    * Shift Pull when the batter's power rating is 3 or more, Shift Opposite when it is 2 or less. There are no spray
      charts, so power is only a rough clue and Standard stays available and wins ties.
-3. **Pitchout.** Considered only with a runner on first, second empty, fewer than two out, and within two runs. A pitchout
-   is **priced as a wasted ball** (`PitchoutBallCost` = 0.05 runs), not as a plate appearance. The runner is assumed to
-   go with probability 0.5 if the computer offense's own steal rule would send him, else 0.05
-   (`ManagerDecisionModel.RunnerGoChance`). It is called only when it beats the normal pitch by 0.02, and then only
-   `PitchoutShare` of the time, so a human or computer runner can still succeed.
+3. **Pitchout.** Considered only with a runner on first, second empty, fewer than two out, and within two runs. If the
+   runner goes, it is a steal attempt the catcher is ready for. If he stays, it is a plate appearance with the pitcher
+   behind in the count: the pitch table's Pitchout row (a few more walks, nothing else changed), so a pitchout is a
+   **wasted ball**. The runner is assumed to go with probability 0.5 if the computer offense's own steal rule would send
+   him, else 0.05 (`ManagerDecisionModel.RunnerGoChance`). It is called only when it beats the normal pitch by 0.02, and
+   then only `PitchoutShare` of the time, so a human or computer runner can still succeed.
 
 ### 4.4 Bullpen
 
 Run after each play for the side that fields next.
 
-* **Closer.** A closer is held for a save (the ninth inning with a lead of 1 to 3) and valued with a 0.20 penalty outside
-  one, and a 0.08 bonus inside one.
+* **Closer.** A closer is held for a save (a lead of 1 to 3 from `CloserFromInning`, the ninth by default) and valued with
+  a 0.20 penalty outside one, and a 0.08 bonus inside one. A fireman has an earlier `CloserFromInning`.
 * **Candidates.** Each warm reliever is valued against the next three hitters, using his best pitch against each, with
   his warm-up modifier. The same value is computed for the current pitcher with his fatigue.
 * **A change** is made when there is a warm reliever and any of these holds: a closer is ready in a save spot; the
-  pitcher is spent (Tired or worse once settled) or **shelled** (at least five batters faced, runs allowed at least 5 for
-  a starter or 3 for a reliever, and at least 0.18 runs per batter); he is Tiring and the reliever is not worse by more
-  than 0.08; or he is Ok (or past `QuickHookPitchCount`) and the reliever beats him by `ReliefEdgeClose` in a close late
-  game or `ReliefEdgeOther` otherwise.
+  pitcher is spent (Tired or worse once settled) or **shelled** (at least five batters faced, runs allowed at least
+  `ShelledRuns` for a starter or 3 for a reliever, and at least 0.18 runs per batter); he is Tiring and the reliever
+  beats him by `TiringSwapMargin` (by default he goes unless the reliever is worse by more than 0.08); or he is Ok (or
+  past `QuickHookPitchCount`) and the reliever beats him by `ReliefEdgeClose` in a close late game or `ReliefEdgeOther`
+  otherwise. Each move carries its reason (section 4.5).
+* **Pitch limit.** A starter who has thrown `StarterPitchLimit` pitches is replaced if a reliever is ready, however well he
+  is pitching, and a reliever starts warming 15 pitches before. Unlimited by default.
 * **Emergency.** A spent or shelled pitcher with nobody warm is replaced by the best arm available, cold or not.
 * **Warming.** If nobody is already warming (an over-warmed arm does not count), start the closer in the eighth inning
   with a save in sight, or start the best other reliever once the pitcher is no longer fresh, is shelled, or (in a close
   game from `WarmUpFromInning`) has thrown `WarmUpPitchCount` pitches.
+
+### 4.5 Explanations
+
+Every computer call carries a `DecisionExplanation` (`Why` on the offensive and defensive decision): a sentence for the
+player and the options weighed, each with its gain in runs over the ordinary call. For example, "Sacrifice bunt: worth
++0.04 runs over swinging away with T. Lazzeri up." A pinch hitter or runner adds a sentence of its own. A pitching move
+carries a reason (`PitchingMove.Why`). Gus Halloran's explanations name the rule he followed ("By the book: ...").
+`GameService.LastOffense` and `LastDefense` hold the calls behind the latest play. Nothing shows them in the game yet;
+they are the basis for manager feedback.
+
+### 4.6 Late defensive replacements
+
+As a computer-managed side takes the field (the first play of each half-inning in which it fields), its manager may swap
+a weak glove for a better one (`ComputerManager.ChooseDefensiveReplacement`, applied through `GameService.Replace`, at
+most one a half-inning). It happens only from `DefensiveReplaceFromInning`, only with a lead of 1 to
+`DefensiveReplaceMaxLead` (3), and only to a bench player who is a natural at the position. The gain is the better glove
+(`DefenseModel.PositionValue`, the fielding value weighted by the position) minus the bat he gives up (the OPS difference
+times 20, or 8 in the ninth, when the spot rarely bats again); it must beat `DefensiveReplaceGain` (1.0 points). Off by
+default. Gus Halloran makes this one book move, in the ninth only.
+
+### 4.7 When the pitcher bats
+
+With the **Designated hitter** option off (or *Historical* for a year and league without one) the starting pitcher is in the
+batting order, ninth by default, at position P, and the order has no DH. `GameState.DHRule` is false for the game, and a
+saved game works the rule out again from its options and the home team. The pitcher is a real hitter: his batting line
+comes from the team file (`bat`, which the generator writes from the Lahman batting rows), or an ordinary pitcher's
+(about .147, little power) when the file has none, with bunting and sacrifice ratings of at least 4.
+
+* **The order follows the pitcher.** A pitching change puts the new pitcher in the old one's spot and position, and on
+  base if he was running. The pitcher is never a fielder to replace or swap, and the computer's position swaps skip him.
+  An injured pitcher at bat is replaced by a reliever in his spot, not a bench player.
+* **Pinch hitting for the pitcher** takes him out of the game: the pinch hitter holds the pitcher's spot and position, and
+  when the side next takes the field a reliever is brought in by the manager who made the move (a human's by the default
+  manager, who prefers a reliever who is already warm). It is refused when the bullpen is empty.
+  A computer manager does it only when it is behind or tied from the sixth inning, or the pitcher has thrown 90 pitches
+  or is tiring, and only with a reliever to bring in; the pitcher's poor bat would otherwise make it worth doing every
+  time. Gus Halloran does it only from the seventh, behind or tied.
+* **The double switch** (`GameService.DoubleSwitch`, offered in the Substitutions dialog's Pitching tab): the new pitcher
+  bats in the spot of a fielder who leaves, and a bench player takes that fielder's position and bats in the pitcher's
+  old spot, which comes up sooner. A computer manager makes one with a pitching change when the pitcher's spot is due
+  within three batters, a bench bat who is a natural at the fielder's position is worth more than the fielder's bat lost
+  (a far-off spot rarely bats) and the bench player used (`ChooseDoubleSwitch`, `DoubleSwitchGain`).
+* **Pitcher bunts** need no new rule: the pitcher's bunting rating and weak bat make the sacrifice bunt the best call
+  for the expected-run managers in many situations, and Gus Halloran's book (bunt with the pitcher, runner on, nobody
+  out) now fires.
+
+Measured with `--dh pitchers` (1,800 games): pinch hitters rise from about 0.5 to about 1.6 a game, pitching changes from
+about 1.2 to 1.6–1.9, bunts from about 10% to 14% of chances for the Analyst, and starters finish about 4% of games
+instead of 11%, with runs about the same. The personas keep their order.
 
 ## 5. The tuning dials
 
@@ -270,12 +362,32 @@ no call can clear the bar.
 | `BenchReserveScale` | 1.0 | Multiplier on the cost of spending a bench player; above 1 hoards the bench |
 | `PinchRunGain` | 0.05 | Net gain a pinch runner must show |
 | `IntentionalWalkMargin` | 0.04 | Edge needed over facing the batter for an intentional walk |
+| `IntentionalWalkFromInning` | 7 | First inning an intentional walk is considered |
+| `IntentionalWalkOpsGap` | 0.15 | OPS by which the batter must beat the next hitter before a walk is considered |
+| `TiringSwapMargin` | -0.08 | Edge a reliever needs over a tiring pitcher (negative: a slightly worse arm is taken) |
+| `ShelledRuns` | 5 | Runs a starter may allow before he is pulled as shelled |
 | `ReliefEdgeClose` | 0.035 | Edge a reliever needs over a tiring pitcher in a close late game |
 | `ReliefEdgeOther` | 0.085 | The same bar earlier, or when the game is not close |
 | `WarmUpPitchCount` | 65 | Pitches after which a reliever is warmed early in a close game |
 | `WarmUpFromInning` | 7 | First inning that early warm-up applies |
 | `QuickHookPitchCount` | `int.MaxValue` | Pitches after which a still-fresh pitcher may be swapped for a warm reliever |
 | `PitchoutShare` | 0.30 | Share of the time a favorable pitchout is actually called |
+| `SituationalRisk` | 0 | From the seventh inning, gambles (steal, hit and run, run hard) cost 0.04 × this less when behind and more when ahead; negative reverses it |
+| `LeverageSensitivity` | 0 | Positive: acts on smaller edges in important moments (late, close), larger in blowouts and early; negative: stubborn when it matters |
+| `PitchMix` | 0 | Temperature (runs) of a random pick among pitch and alignment options; 0 always takes the best |
+| `StarterPitchLimit` | `int.MaxValue` | Pitches after which a ready reliever replaces a starter regardless of how he pitches |
+| `CloserFromInning` | 9 | First inning a lead of 1 to 3 is a save spot (earlier means a fireman) |
+| `PlatoonWeight` | 1.0 | Weight on the platoon matchup in pinch-hit and bullpen choices (0 ignores it, 2 doubles it) |
+| `DefensiveReplaceFromInning` | `int.MaxValue` | First inning he swaps a weak glove for a better one with a lead (never, by default) |
+| `DefensiveReplaceMaxLead` | 3 | Largest lead at which he does |
+| `DefensiveReplaceGain` | 1.0 | Net fielding points a replacement must add after the bat he loses |
+| `DoubleSwitchGain` | 0.02 | Net runs a double switch must show (only when the pitcher bats); a huge value means never |
+
+**How leverage and risk change a margin.** Leverage is how much more the moment matters than the first inning of a tied game
+(`ManagerDecisionModel.Leverage`: about 1 at the start, about 3 for a tight ninth, near 0 in a blowout). A manager with
+`LeverageSensitivity` s multiplies a positive margin by `leverage^-s` (and divides a negative one by it), so he acts more readily
+when it matters. The scaled margin applies to steals, hit and runs, bunts, running hard, pinch hitters and runners,
+intentional walks and bullpen changes. `SituationalRisk` is added separately, to the gambles only.
 
 ### Values per persona
 
@@ -283,15 +395,27 @@ Blank means the default. `OldSchoolManager` has no dials; see [section 6](#6-the
 
 | Dial | Analyst | Small ball | Slugger | Tinkerer |
 |---|--:|--:|--:|--:|
-| `StealMargin` | 0.035 | **0.010** | **Never** | 0.035 |
-| `HitAndRunMargin` | 0.035 | **0.010** | **Never** | 0.035 |
-| `BuntMargin` | 0.025 | **0.0** | **Never** | 0.025 |
-| `AggressiveRunMargin` | 0.005 | **0.0** | **0.012** | 0.005 |
+| `StealMargin` | 0.035 | **-0.015** | **Never** | 0.035 |
+| `HitAndRunMargin` | 0.035 | **-0.010** | **Never** | 0.035 |
+| `BuntMargin` | 0.025 | **-0.015** | **Never** | 0.025 |
+| `AggressiveRunMargin` | 0.005 | **-0.005** | **0.012** | 0.005 |
 | `PinchHitFromInning` | 6 | 6 | **7** | **5** |
 | `PinchHitGain` | 0.025 | 0.025 | **0.05** | **0.012** |
 | `BenchReserveScale` | 1.0 | 1.0 | **1.6** | **0.5** |
 | `PinchRunGain` | 0.05 | **0.02** | **0.10** | 0.05 |
-| `IntentionalWalkMargin` | 0.04 | 0.04 | **0.10** | **0.01** |
+| `IntentionalWalkMargin` | 0.04 | 0.04 | **0.10** | **0.0** |
+| `IntentionalWalkFromInning` | 7 | 7 | 7 | **6** |
+| `IntentionalWalkOpsGap` | 0.15 | 0.15 | 0.15 | **0.08** |
+| `TiringSwapMargin` | -0.08 | -0.08 | **0.06** | **-0.20** |
+| `ShelledRuns` | 5 | 5 | **6** | **4** |
+| `SituationalRisk` | 0 | **0.5** | 0 | 0 |
+| `LeverageSensitivity` | 0 | **0.3** | **-0.3** | **0.6** |
+| `PitchMix` | 0 | **0.02** | 0 | **0.015** |
+| `StarterPitchLimit` | off | off | off | **100** |
+| `CloserFromInning` | 9 | 9 | 9 | **8** |
+| `PlatoonWeight` | 1.0 | 1.0 | **0.3** | **2.0** |
+| `DefensiveReplaceFromInning` | off | **8** | off | **7** |
+| `DoubleSwitchGain` | 0.02 | 0.02 | **Never** | **0.0** |
 | `ReliefEdgeClose` | 0.035 | 0.035 | **0.07** | **-0.02** |
 | `ReliefEdgeOther` | 0.085 | 0.085 | **0.14** | **0.0** |
 | `WarmUpPitchCount` | 65 | 65 | **90** | **45** |
@@ -325,6 +449,11 @@ from fixed rules. Injury replacement and position swaps are inherited from `Comp
 * Infield in: a runner on third, fewer than two out, within two runs. Corners in: a runner on first, nobody out, a batter
   who bunts well (never true today, since every player has the default bunting rating). Otherwise Standard. No shifts.
 * Pitch: random, weighted toward the fastball (fastball twice, then curveball, slider, changeup once each).
+
+**Defensive replacement**
+
+In the ninth inning, leading by one to three runs, a better glove for the weakest fielder, using the same rule as in
+section 4.6. It is the only decision of his that is not overridden.
 
 **Pitching**
 
@@ -407,12 +536,107 @@ Checklist for a new persona:
 
 ## 9. Measured results
 
-Measured on 2026-11-24 over whole games between computer-managed sides, all 15 teams (seven fixed pairings each), both
-home and visitor seats.
+### The benchmark
 
-### Expected-run manager against the old rules
+`tools/MiniLeague.ManagerBench` plays seeded computer-versus-computer games between every pair of personas, over every
+team (each against the team seven places along the list), with each persona in both seats. Every random source is seeded
+(`GameService`'s `managerSeed` seeds each side's persona), so the same options give the same numbers on every run.
 
-3,000 games. Both sides ran on the same engine.
+```
+dotnet run -c Release --project tools/MiniLeague.ManagerBench -- --games 20 --check
+```
+
+It prints each persona's win rate with a 95% interval, runs for and against, and how often it makes each call: steals,
+bunts and hit and runs per chance, aggressive running per plate appearance with a runner on, runners thrown out,
+intentional walks per chance, pitchouts, pinch hitters and runners, pitching changes and complete games. With
+`--check` it compares them with `expected-ranges.json` and with the profile ratings (section 2), and exits with 1 on any
+mismatch. `--dh designated|historical|pitchers` sets the designated hitter rule for every game (the default is the
+designated hitter); the ranges are for that default, so `--check` refuses another rule. With `--summary FILE` it also writes the report and any failures to FILE as Markdown (CI passes
+`$GITHUB_STEP_SUMMARY`). It is not in the solution and takes a minute or two; run it after any change to the managers or
+the engine's rules, and update the ranges only for a change that is meant to move them.
+
+The tool's logic lives in `ManagerBenchmark.cs` (`Run`, `Report`, `CheckRanges`, `CheckProfiles`, `Metric`), with
+`Program.cs` as the command line, so that tests can call it.
+
+**Two safety nets.**
+
+* *Every build:* `ManagerBenchmarkTests` (in the engine test project, which references the tool) runs a tiny benchmark
+  (two personas, 30 games, a few seconds) and checks the tool itself: every pairing is played in both seats, the counts
+  add up (one winner per game, one side's runs are the other's runs allowed), the same seed gives byte-identical output
+  and a different seed does not, the Wilson interval and every metric are right, and the range and profile checks pass
+  and fail when they should. It does not check the persona results, which need thousands of games.
+* *In CI:* the **Manager benchmark** workflow (`.github/workflows/manager-benchmark.yml`) runs the full 6,000-game
+  benchmark with `--check` and writes the report to the run's summary page. It runs when the engine, the team data or
+  the tool changes (on a pull request to `main`), every Monday, and on demand from the Actions tab (with a choice of
+  games per pairing). Like the browser tests it reports on its own and holds up nothing. Because every random source is
+  seeded the numbers are exact, so a failure is a real change in behavior, not noise.
+
+### Current results
+
+Measured on 2026-11-25: 6,000 games (`--games 20`), after pitchers were scaled against their own league and
+starters were given a stamina from their real starts (the calibration below). Scoring is now about 4.4 runs a team a game, up from 3.2. Also since the first measurement: the pitch types were balanced
+(no free pitch), the double-play chance raised to 0.52, and the team files gained sacrifice hits and pitchers' batting lines
+(see [ModelingStatisticsProbability.md](ModelingStatisticsProbability.md)).
+
+| Manager | Win rate (95% CI) | Runs | Allowed | Steal % | Bunt % | H&R % | Aggressive % | IBB % | PH a game | Pitching changes | Complete games | Defensive subs a game |
+|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| Ellie Whitcombe (analyst) | 54.2% (52.3-56.2) | 4.52 | 4.02 | 6.8 | 5.6 | 31.1 | 19.8 | 0.2 | 0.52 | 0.89 | 34.2% | 0.00 |
+| Marcus Delacroix (tinkerer) | 53.3% (51.3-55.3) | 4.57 | 4.35 | 7.3 | 5.5 | 29.0 | 17.7 | 1.3 | 0.77 | 1.75 | 0.2% | 0.21 |
+| Rosa Delgado (small ball) | 52.3% (50.3-54.3) | 4.43 | 4.28 | 14.9 | 9.9 | 29.4 | 34.3 | 0.3 | 0.53 | 0.95 | 31.8% | 0.23 |
+| Duke Pruitt (slugger) | 49.5% (47.5-51.5) | 4.34 | 4.15 | 0.0 | 0.0 | 0.0 | 10.5 | 0.2 | 0.28 | 0.80 | 34.5% | 0.00 |
+| Gus Halloran (old school) | 40.6% (38.6-42.6) | 4.07 | 5.11 | 4.9 | 0.4 | 1.4 | 10.3 | 11.2 | 0.54 | 1.21 | 15.8% | 0.15 |
+
+Steal and hit-and-run percentages are of chances (a runner on first, second open, fewer than two out); bunt, of
+runner on first or second, third open, nobody out; aggressive, of plate appearances with a runner on; IBB, of first base
+open with a runner in scoring position and fewer than two out.
+
+The four expected-run personas are within about three points of each other and each is clearly itself: Spark runs and
+bunts the most, Duke never does and lets his starters finish, Marcus uses the most bench players and pitchers (and his
+starters almost never finish). Spark, Marcus and Gus are the ones who make defensive replacements, Gus only in the ninth.
+Gus is the easy opponent.
+
+### Calibration against the real seasons
+
+`--calibrate` (in `Calibration.cs`) plays every team against each of the others, home and away, with one manager on both
+sides, and compares each team's per-game numbers with the real season's (`lahman-reference.json`, written by
+`tools/export_lahman_reference.py` from the Lahman database; the file is committed, so the check runs offline).
+`--games` sets games per matchup (default 10) and `--persona` the manager. It reports ratios (simulated over real); it
+does not pass or fail.
+
+The first run found the engine scoring only 62% of the real runs. The cause was the pitcher scaling in
+`ProbabilityTable`: it divided a pitcher's ERA by a fixed 4.00, his strikeouts by 7.0 per nine and his walks by 3.0, but
+a batter's line already includes the pitching of his own league (league ERA ran from 2.98 in 1968 to 4.14 in 1927, and
+league strikeouts from 2.8 to 6.1 per nine), so every hitter was penalized a second time. Pitchers are now scaled by
+their own rate over their league's (`LeaguePitching`, written by the generator into each team file as `leaguePitching`),
+with hits and home runs scaled by their own rates rather than by ERA, which moves far more than hits do. An average
+pitcher of any era leaves a batter's line alone (`LeaguePitchingTests`).
+
+| Measure (simulated / real) | Before | After |
+|---|--:|--:|
+| Runs | 0.62 | 0.84 |
+| Hits | 0.74 | 0.93 |
+| Home runs | 0.78 | 1.03 |
+| Strikeouts | 0.75 | 1.06 |
+| Walks | 0.84 | 0.84 |
+
+A perfect model would score about 0.90 here, not 1.00: every opponent is a pennant winner whose staff allowed about 10%
+fewer runs than its league. Still open: steals are about 1.5 times the real rate, and sacrifices and double plays are low (about 0.5 and 0.7).
+
+**Starter fatigue.** The first calibration also showed starters leaving too early (complete games about 0.1 of real).
+The tiring factor, whole innings per start taken from 10, gave nearly every starter a 2, 3 or 4: Cuellar of the 1970
+Orioles, who finished more than half his starts, and Nolan of the 1975 Reds, who finished five of 32, differed by one step
+(15 pitches on the threshold). A starter's stamina is now worked out from his real starts (`FatigueModel.Stamina`): his
+outs per start (the team files carry games started, `gs`) times the engine's 5.6 pitches an out, less 18, plus 15 for
+the share of his starts he finished. His effectiveness drops 8% at that pitch count, 20% twenty pitches later and 35%
+fifteen after that. Relievers and files without `gs` keep the tiring factor. With one manager on both sides the starter's
+outs a start are now 1.02 of real and complete games 0.94 of real, per team within about 0.8 to 1.2 of real outs a start
+(the 1979 Pirates and 1967 Cardinals, whose staffs are hit hard by the strong opposition, run shortest). Managers pull
+starters by their condition, so the same stamina gives each persona its own completion rate (section 9, above).
+
+### Before: expected-run manager against the old rules
+
+Measured before the free options were removed, so aggressive running cost nothing. 3,000 games, both sides on the same
+engine.
 
 | Setup | New win % (95% CI) | Run margin per game |
 |---|---|---|
@@ -422,73 +646,62 @@ home and visitor seats.
 | New manager's aggressive running off | 59.4% (57.7 to 61.2) | +0.92 |
 | Both of the last two off | 55.1% (53.3 to 56.9) | +0.49 ± 0.14 |
 
-Shifts and Guard Lines add nothing measurable. The old manager's intentional walks cost it a lot, and aggressive running
-is worth about 0.45 runs a game to the new manager (see [limits](#10-known-limits-and-engine-quirks)). What remains is a
-real edge of about 55% from the bunt, hit-and-run, pinch-hitting, bullpen and pitch-choice rules.
-
-### The five personas against each other
-
-About 2,400 games per manager.
-
-| Manager | Overall win rate |
-|---|---|
-| Rosa Delgado (small ball) | 54.8% |
-| Marcus Delacroix (tinkerer) | 53.9% |
-| Ellie Whitcombe (analyst) | 53.6% |
-| Duke Pruitt (slugger) | 52.2% |
-| Gus Halloran (old school) | 35.5% |
-
-The four expected-run personas are within three points of each other, so none dominates. Gus loses to each of them by
-about 1.5 runs a game.
-
-### Typical behavior per game, new against old (3,000 games)
-
-| | New (Analyst) | Old school |
-|---|--:|--:|
-| Sacrifice bunts | 0.17 | 0.02 |
-| Hit and runs | 0.29 | 0.07 |
-| Steals | 0.00 | 0.30 |
-| Aggressive running calls | 17.0 | 5.0 |
-| Intentional walks | 0.00 | 1.66 |
-| Pitching changes | 1.17 | 1.35 |
+At that point the old manager's intentional walks cost it a lot, and free aggressive running was worth about 0.45 runs a
+game to the new manager. The round robin then had the four expected-run personas at 52–55% and Gus at 35.5%.
 
 ## 10. Known limits and engine quirks
 
-* **Aggressive running is free.** In this engine it can take an extra base but cannot be thrown out, so every
-  expected-run manager calls it constantly. It accounts for a large share of their edge over Gus. It is a rules flaw,
-  not good managing, and a human can use it too. A downside (a chance to be thrown out) would fix it.
-* **The Analyst almost never steals.** With ordinary rosters the steal estimate rarely clears the 0.035 bar. The
-  Small-ball dials do steal; the steal bar may be worth lowering for the default.
-* **A pitchout is a poor ordinary pitch in the pitch table.** The engine resolves a pitchout against a batter who is not
-  running as a plate appearance with hits cut to 10% and walks doubled, which makes it look like the best pitch in the
-  game. The managers therefore price it as a wasted ball instead (section 4.3), and a human fielder can still exploit the
-  table.
-* **Guard Lines is never worse for the defense.** It trades singles for extra-base hits at weights that reduce total
-  bases, so a manager that evaluates it will choose it whenever it is available (late and close). The data has no spray
-  charts, so shifts are only rough clues.
+* **Fixed: free options.** Aggressive running could take an extra base but never be thrown out; the infield in cut
+  singles and never held the runner on third; Corners In cut singles on every swing; Guard Lines and Shift Opposite beat
+  Normal on average; and a pitchout to a batter whose runner stayed cut hits to 10%. Now a failed aggressive send is
+  thrown out 60% of the time (`BaseRunningEngine.SentRunnerThrownOut`, at most one runner a play); with the infield in
+  an unforced runner on third scores on a ground out only about 25% of the time (`InfieldInScoreChance`, by speed) while
+  12% more singles get through; Corners In charges the bunt and gives up a few more hits on a swing; Guard Lines and
+  Shift Opposite were re-weighted; and a pitchout without a runner going only adds walks. A test
+  (`NoFreeOptionTests`) checks that no alignment beats Normal against an ordinary hitter with the bases empty.
+* **Fixed: steal odds.** The success chance once multiplied the runner's record by 0.6 twice for an average battery, so
+  an average runner made it about one time in four and stealing never paid. It now starts from his record, steadied
+  toward the league rate of 67% when the record is short, and adjusts for the pitcher's hold and the catcher's arm
+  around the average (`BaseRunningEngine.StealSuccessChance`, shared by the engine and the managers).
+* **Fixed: tag-ups.** Any caught fly ball used to let the runner on third tag up and score, a pop-up to the catcher
+  included. Now only an outfielder's catch can score him.
+* **Fixed: platoon matchups.** There were none; a standard platoon modifier now applies (section 4.1).
+* **Shifts are rough.** The data has no spray charts, so the shifts are uniform trades chosen by power alone.
+* **Philosophy dials are blunt.** Risk by the score is a fixed shift for the gambles only, leverage scales margins by one
+  formula, and the pitch mix is a temperature over the same values the manager already computes. A defensive replacement
+  weighs one glove against one bat; it ignores who is due up and whether the lineup spot comes round again.
+* **Platoon is generic.** Every hitter gets the same modifier for his side; a player's own split would need a source
+  beyond the Lahman database.
 * **Tired pitchers.** A tired pitcher now allows **more** hits (the hit rate is divided by his effectiveness). Before
   this change it was multiplied, which made a tired pitcher harder to hit. This is an engine change that affects every
   game, not only the managers.
-* **No platoon effect.** `TeamLoader` gives each player the same statistics against left- and right-handers, and the
-  probability table uses the batter's side only for the ballpark's home-run factor. Same-hand and opposite-hand
-  matchups are therefore identical, which leaves the Tinkerer's style and reliever matchups with little to work on.
-* **Ratings with no data behind them.** Bunting, sacrifice, hold-runners and ground-ball rate are not in the team data,
-  so every player has the default. Bunt and steal odds vary only through speed and the steal record, and Corners In is
-  never offered.
-* **Pitchers never bat.** Lineups are the first nine position players in every era, which amounts to a universal
-  designated hitter, and `GameState.DHRule` is never set. Pinch-hitting for the pitcher, double switches and pitcher
-  bunts cannot happen, although 11 of the 15 teams played without a DH.
-* **Infield In and Corners In.** Infield In cuts singles by 15% and removes the double play, but the runner on third
-  still scores on every ground out with fewer than two out. Corners In cuts singles by 20% on every swing, not only on
-  bunts. Both are close to free for the defense.
+* **Ratings waiting for regenerated data.** The generator now writes each batter's sacrifice hits (`sh`), from which
+  the loader sets the bunting and sacrifice ratings (`TeamLoader.BuntRating`), and each team's tendencies (steal attempts,
+  sacrifices, complete games and saves per game, `Team.Tendencies`). The team files in the repository were generated
+  before these fields, and the Lahman files are needed to regenerate them, so until then every player bunts at the
+  default 3 and Corners In is not offered. The generator now also writes each pitcher's own batting line and handedness
+  (`bat`, `bats`), which the loader reads for games where the pitcher bats; until the files are regenerated every pitcher
+  bats as an ordinary .147 hitter. Hold-runners and ground-ball rate have no Lahman source; a team file may set
+  `holdRunners` by hand.
+* **Pitchers bat only if the game is set that way.** The **Designated hitter** game option decides: *Designated hitter*
+  (the default, and what every game was before the option) gives both teams one; *Historical* follows the home team's
+  league and year (none in the National League before 2022 or the American League before 1973); *Pitchers bat* removes
+  it. 11 of the 15 teams played without one. The default has not been switched to *Historical* yet: that waits for the
+  team files to be regenerated with each pitcher's own batting line (see "Ratings waiting for regenerated data"), until
+  which every pitcher bats as an ordinary .147 hitter. See section 4.7.
+* **Infield In with the bases loaded.** A forced runner on third cannot hold, and there is no force play at the plate in
+  the engine, so with the bases loaded the run still scores on a ground out and the batter is out.
 * **Pitch types.** Each pitch type is a fixed multiplier for every pitcher (a changeup, for example, cuts home runs by
   20%), with no repertoire. The fielding manager therefore throws the same pitch to the same kind of batter.
-* **Model estimates.** The valuation uses average transitions, not rolls, and a run-expectancy table from the modern
-  game for every era. The base-running constants it uses are copies of the resolver's.
+* **Model estimates.** The valuation uses average transitions, not rolls, and run-expectancy and scoring tables from the
+  modern game for every era. Some base-running constants it uses are still copies of the resolver's.
+
+* **Repeatable games.** In the app each side's manager uses shared randomness, as a real game should. Pass
+  `managerSeed` to `GameService` (the benchmark and the tests do) to replay a computer-versus-computer game exactly.
+* **Few pitching changes.** About 0.24 changes per team per game in the long computer-game test. With fewer runs
+  scoring since the fixes above, fewer starters are shelled, and that test's floor was lowered from 0.25 to 0.2.
 
 Recommendations for all of these are in [ComputerManagers-Review.md](ComputerManagers-Review.md).
-* **The per-game `Random`.** A side's manager uses `Random.Shared` unless a test builds it itself, so computer-versus-
-  computer games are not repeatable from the game's own seed.
 
 ## 11. Tests
 
@@ -501,6 +714,34 @@ Recommendations for all of these are in [ComputerManagers-Review.md](ComputerMan
   * the temperaments: small ball attempts more small-ball plays than the Analyst, and the Slugger attempts none; the
     Tinkerer changes pitchers on smaller edges than the Analyst, and the Analyst than the Slugger; the old-school manager
     walks the big bat about half the time and the Analyst does not
+* `tests/MiniLeague.Engine.Tests/ManagerModelTests.cs`: the platoon effect (other hand better, lefties the larger split,
+  switch hitters from the far side); steal odds near the runner's record and moved by the battery; only an outfield fly
+  scores a tag-up; the first run is worth more late and close, so a ninth-inning bunt looks better than a first-inning
+  one; a decided game falls back to run expectancy; every computer call explains itself; a seeded game replays
+  exactly; the bunting rating from sacrifice hits, and team files with and without the new fields.
+* `tests/MiniLeague.Engine.Tests/ManagerDialsTests.cs`: one test per philosophy dial, each changing only the dial in a fixed
+  situation: leverage (a tight ninth is worth more than the opening and a blowout almost nothing; a leverage-sensitive
+  manager changes pitchers on a smaller edge); risk by the score (steals when behind late, not when tied); pitch mix
+  (spreads calls but still favors the better ones); the pitch limit and early warm-up; a fireman against a classic closer;
+  platoon weight (a platoon manager pinch hits for a bad matchup, one who ignores it does not); defensive replacements
+  (needs a lead, a late inning, a natural at the position, and a glove worth more than the bat, made once a half-inning
+  by a computer side); and Gus Halloran's ninth-inning-only rule.
+* `tests/MiniLeague.Engine.Tests/ManagerBenchmarkTests.cs`: the benchmark tool's own smoke tests (section 9).
+* `tests/MiniLeague.Engine.Tests/PitchersBatTests.cs`: the setting (every choice for every league and year, the default
+  unchanged, Historical following the home team for both teams); the batting order and its rules, editing and fitting
+  to the rule; pitchers' batting lines; whole computer games under the rule (the order stays sound after every play);
+  a pinch hitter for the pitcher forcing a reliever, and refused with an empty bullpen; a pitching change and an injury
+  moving the order; the double switch (and when it is refused); the pitcher not being replaceable or swappable; when the
+  managers pinch hit, bunt and double switch; and a saved game keeping its rule.
+* `tests/MiniLeague.Web.Tests/GameRoomTests.cs` (the last tests): the Game Options choice and its help, the lineup
+  editor and card with the pitcher in the order, and the Substitutions dialog offering a double switch only without a
+  designated hitter.
+* `tools/MiniLeague.ManagerBench`: the benchmark and its `--check` (section 9).
+* `tests/MiniLeague.Engine.Tests/NoFreeOptionTests.cs`: an aggressive send is thrown out at about the expected rate and
+  a runner who is not sent never is; only one runner is thrown out on a hit; such a play is an out in the result, a tag
+  in the runner moves and a throw that beats him in the animation; the infield in holds the runner on third and cuts runs
+  with one there but costs runs with the bases empty; no alignment beats Normal against an ordinary hitter with the bases
+  empty; a pitchout to a batter whose runner stays does not suppress hits.
 * `tests/MiniLeague.Engine.Tests/ComputerManagerDecisionTests.cs`: the Analyst's decisions (steals depend on the runner
   and the battery, bunts, intentional walks, pitch choice, reliever matchups) and the pitchout regression (never against
   a runner who will not go, mixed in rather than constant, rare over whole games).
@@ -521,3 +762,8 @@ Recommendations for all of these are in [ComputerManagers-Review.md](ComputerMan
 | `src/MiniLeague.Engine/Models/GameState.cs`, `Services/GameSnapshot.cs` | The saved manager ids |
 | `src/MiniLeague.Web/Components/Game/ManagerChooser.razor` (+ `.css`) | The setup chooser and persona card |
 | `src/MiniLeague.Web/Pages/GameRoom.razor` | Selection state, passing the ids on, the "is deciding" message |
+| `src/MiniLeague.Engine/Models/AtBatDecision.cs` | `DecisionExplanation` and `DecisionOption` |
+| `src/MiniLeague.Engine/Simulation/WinProbability.cs` | Run expectancy, chance to score, win probability and its table |
+| `tools/MiniLeague.ManagerBench/` | The benchmark (`ManagerBenchmark.cs`, `Program.cs`) and `expected-ranges.json` |
+| `.github/workflows/manager-benchmark.yml` | Runs the full benchmark with `--check` in CI (non-blocking) |
+| `tools/generate_teams.py`, `src/MiniLeague.Engine/Services/TeamLoader.cs` | Sacrifice hits, bunting ratings, team tendencies |

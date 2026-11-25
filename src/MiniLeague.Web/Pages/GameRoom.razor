@@ -129,6 +129,13 @@
                                         }
                                     </MudSelect>
                                 }
+                                <MudSelect T="DesignatedHitterSetting" Label="Designated hitter" data-testid="dh-setting"
+                                           @bind-Value="_dhSetting" ToStringFunc="@DesignatedHitterLabel" HelperText="@DesignatedHitterHelp">
+                                    @foreach (var choice in Enum.GetValues<DesignatedHitterSetting>())
+                                    {
+                                        <MudSelectItem Value="@choice">@DesignatedHitterLabel(choice)</MudSelectItem>
+                                    }
+                                </MudSelect>
                                 <MudSelect T="FieldViewMode" Label="Field view" data-testid="field-view-select"
                                            Value="@ViewPrefs.View" ValueChanged="SetView">
                                     <MudSelectItem Value="FieldViewMode.Classic">Classic (overhead)</MudSelectItem>
@@ -138,11 +145,11 @@
                                            Label="Random events: injuries, rain delays, ejections" />
                                 <MudStack Row="true" Spacing="2">
                                     <MudButton Variant="Variant.Outlined" FullWidth="true" Size="Size.Small"
-                                               OnClick="@(() => EditLineup(_teamOptions[_visitorIdx]))">
+                                               OnClick="@(() => EditLineup(_teamOptions[_visitorIdx], visitor: true))">
                                         Visitor lineup
                                     </MudButton>
                                     <MudButton Variant="Variant.Outlined" FullWidth="true" Size="Size.Small"
-                                               OnClick="@(() => EditLineup(_teamOptions[_homeIdx]))">
+                                               OnClick="@(() => EditLineup(_teamOptions[_homeIdx], visitor: false))">
                                         Home lineup
                                     </MudButton>
                                 </MudStack>
@@ -367,6 +374,8 @@ else
                         <DecisionPanel ShowOffense="@_game.OffenseIsHuman"
                                        ShowDefense="@_game.DefenseIsHuman"
                                        CanSteal="@(s.RunnerOnFirst is not null && s.RunnerOnSecond is null)"
+                                       StealCall="@RunningRules.StealPlanFor(s)"
+                                       CanSqueeze="@(s.RunnerOnThird is not null && s.Outs < 2)"
                                        AlignmentMoving="@_animating"
                                        OnAlignmentChanged="PreviewAlignmentAsync"
                                        OnDecision="HandleDecision"
@@ -482,6 +491,28 @@ else
     private string _stadiumChoice = HomePark;
     private bool _randomEvents = true;
 
+    // The designated hitter rule for the game. WHY: the default keeps every game as it was; "Historical" lets the home
+    // team's league and year decide, and "Pitchers bat" removes the designated hitter for both teams.
+    private DesignatedHitterSetting _dhSetting = DesignatedHitterSetting.DesignatedHitter;
+
+    private bool UsesDesignatedHitter => DesignatedHitterRules.Applies(_dhSetting, _teamOptions[_homeIdx]);
+
+    private static string DesignatedHitterLabel(DesignatedHitterSetting setting) => setting switch
+    {
+        DesignatedHitterSetting.DesignatedHitter => "Designated hitter (both teams)",
+        DesignatedHitterSetting.Historical => "Historical (the home team's league and year)",
+        _ => "Pitchers bat (no designated hitter)",
+    };
+
+    private string DesignatedHitterHelp => _dhSetting switch
+    {
+        DesignatedHitterSetting.DesignatedHitter => "A designated hitter bats for the pitcher on both teams.",
+        DesignatedHitterSetting.PitchersBat => "The pitchers bat: expect bunts, pinch hitters for the pitcher and double switches.",
+        _ => UsesDesignatedHitter
+            ? $"The {_teamOptions[_homeIdx].Season} {_teamOptions[_homeIdx].League} used a designated hitter, so both teams have one."
+            : $"The {_teamOptions[_homeIdx].Season} {_teamOptions[_homeIdx].League} had no designated hitter, so the pitchers bat.",
+    };
+
     // Which computer manager runs each side when the computer manages it (ids from the manager catalog).
     private string _visitorManagerId = ManagerCatalog.DefaultId;
     private string _homeManagerId = ManagerCatalog.DefaultId;
@@ -570,9 +601,9 @@ else
             visitorHuman ? ManagerControl.Human : ManagerControl.Computer,
             homeHuman ? ManagerControl.Human : ManagerControl.Computer,
             stadium: ChosenPark(),
-            visitorLineupSlots: LineupFor(_teamOptions[_visitorIdx]),
-            homeLineupSlots: LineupFor(_teamOptions[_homeIdx]),
-            options: _randomEvents ? GameOptions.Standard : GameOptions.None,
+            visitorLineupSlots: LineupFor(_teamOptions[_visitorIdx], visitor: true),
+            homeLineupSlots: LineupFor(_teamOptions[_homeIdx], visitor: false),
+            options: (_randomEvents ? GameOptions.Standard : GameOptions.None) with { DesignatedHitter = _dhSetting },
             visitorStarterId: StarterFor(_teamOptions[_visitorIdx], visitor: true),
             homeStarterId: StarterFor(_teamOptions[_homeIdx], visitor: false),
             visitorManagerId: _visitorManagerId,
@@ -648,15 +679,24 @@ else
         _resumeError = null;
     }
 
-    private IReadOnlyList<LineupSlot> LineupFor(Team team) =>
-        _customLineups.TryGetValue(team.Id, out var custom) ? custom : LineupRules.Default(team);
+    // The order for the rule in force: an edited one is fitted to it (a lineup made for the other rule goes back to the
+    // default, and when the pitcher bats the starter chosen now takes the pitcher's spot).
+    private IReadOnlyList<LineupSlot> LineupFor(Team team, bool visitor)
+    {
+        _customLineups.TryGetValue(team.Id, out var custom);
+        return LineupRules.Adapt(team, custom, UsesDesignatedHitter, StarterOf(team, visitor));
+    }
 
-    private async Task EditLineup(Team team)
+    private Player StarterOf(Team team, bool visitor) => team.Pitchers.First(p => p.Id == StarterFor(team, visitor));
+
+    private async Task EditLineup(Team team, bool visitor)
     {
         var parameters = new DialogParameters<LineupEditorDialog>
         {
             { x => x.Team, team },
-            { x => x.Current, LineupFor(team) },
+            { x => x.Current, LineupFor(team, visitor) },
+            { x => x.UsesDesignatedHitter, UsesDesignatedHitter },
+            { x => x.Starter, StarterOf(team, visitor) },
         };
         var dialog = await DialogService.ShowAsync<LineupEditorDialog>(
             "Lineup", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });

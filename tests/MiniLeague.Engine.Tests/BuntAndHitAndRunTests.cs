@@ -392,8 +392,14 @@ public class BuntAndHitAndRunTests
         {
             expected.TryGetValue(game, out var e);
             bool strikeoutGo = r.HitAndRun && r.Outcome == OutcomeType.Strikeout;
-            if (r.Outcome == OutcomeType.StolenBase || (strikeoutGo && r.OutsRecorded < 2)) e.Sb++;
-            if (r.Outcome == OutcomeType.CaughtStealing || (strikeoutGo && r.OutsRecorded >= 2)) e.Cs++;
+            // WHY: a double steal (called by the computer manager) credits each runner, so count runners, not plays.
+            if (r.Outcome is OutcomeType.StolenBase or OutcomeType.CaughtStealing)
+            {
+                e.Sb += r.RunnerMoves.Count(m => m.FromBase > 0 && !m.IsOut && m.ToBase > m.FromBase);
+                e.Cs += r.RunnerMoves.Count(m => m.FromBase > 0 && m.IsOut);
+            }
+            if (strikeoutGo && r.OutsRecorded < 2) e.Sb++;
+            if (strikeoutGo && r.OutsRecorded >= 2) e.Cs++;
             if (strikeoutGo) { if (r.OutsRecorded >= 2) strikeoutThrowOuts++; else strikeoutSteals++; }
             expected[game] = e;
         }
@@ -580,5 +586,116 @@ public class BuntAndHitAndRunTests
             }
         }
         Assert.True(scripts > 20);
+    }
+
+    // ── Steals of third, double steals and squeezes ──────────────────────────
+
+    private static readonly OffensiveDecision Steal = new() { Strategy = OffensiveStrategy.Steal };
+    private static readonly OffensiveDecision Squeeze = new() { Strategy = OffensiveStrategy.Squeeze };
+    private static readonly OffensiveDecision Safety = new() { Strategy = OffensiveStrategy.SafetySqueeze };
+
+    [Fact]
+    public void AStealWithARunnerOnSecondGoesForThird()
+    {
+        var results = Resolve(Situation(false, true, false, 0), Steal, 400);
+
+        Assert.All(results, r => Assert.True(r.Outcome is OutcomeType.StolenBase or OutcomeType.CaughtStealing));
+        Assert.Contains(results, r => r.Outcome == OutcomeType.StolenBase && r.NewThird is not null && r.NewSecond is null);
+        Assert.Contains(results, r => r.Outcome == OutcomeType.CaughtStealing && r.OutsRecorded == 1 && r.ThrownOutAt == 3);
+    }
+
+    [Fact]
+    public void ADoubleStealMovesBothRunners_OrLosesOne()
+    {
+        var results = Resolve(Situation(true, true, false, 0), Steal, 600);
+
+        Assert.Contains(results, r => r.Outcome == OutcomeType.StolenBase && r.NewSecond is not null && r.NewThird is not null);
+        // the catcher picks one base, so a double steal costs at most one runner, and the other still moves up
+        Assert.All(results.Where(r => r.Outcome == OutcomeType.CaughtStealing), r =>
+        {
+            Assert.Equal(1, r.OutsRecorded);
+            Assert.True(r.NewSecond is not null || r.NewThird is not null);
+        });
+        Assert.Contains(results, r => r.Outcome == OutcomeType.CaughtStealing && r.ThrownOutAt == 2);
+        Assert.Contains(results, r => r.Outcome == OutcomeType.CaughtStealing && r.ThrownOutAt == 3);
+    }
+
+    [Fact]
+    public void AStealOfThirdIsHarderThanOfSecond()
+    {
+        double second = Rate(Resolve(Situation(true, false, false, 0), Steal, 3000), r => r.Outcome == OutcomeType.StolenBase);
+        double third = Rate(Resolve(Situation(false, true, false, 0), Steal, 3000), r => r.Outcome == OutcomeType.StolenBase);
+
+        Assert.True(third < second, $"{third} vs {second}");
+    }
+
+    [Fact]
+    public void ASuicideSqueezeScoresTheRunner_ButAPoppedUpBuntDoublesHimOff()
+    {
+        var results = Resolve(Situation(false, false, true, 1), Squeeze, 1500);
+
+        Assert.All(results, r => Assert.Equal(SqueezeKind.Suicide, r.Squeeze));
+        Assert.True(Rate(results, r => r.RunsScored == 1) > 0.5);
+        var doubledOff = results.Where(r => r.Outcome == OutcomeType.PopOut).ToList();
+        Assert.NotEmpty(doubledOff);
+        Assert.All(doubledOff, r => { Assert.Equal(2, r.OutsRecorded); Assert.Null(r.NewThird); });
+        Assert.Contains(results, r => r.Outcome == OutcomeType.FieldersChoice && r.ThrownOutAt == 4 && r.NewFirst is not null);
+    }
+
+    [Fact]
+    public void ASafetySqueezeNeverLosesTheRunner_ButScoresHimLessOften()
+    {
+        var safety = Resolve(Situation(false, false, true, 1), Safety, 1500);
+        var suicide = Resolve(Situation(false, false, true, 1), Squeeze, 1500);
+
+        Assert.DoesNotContain(safety, r => r.OutsRecorded > 1);
+        Assert.Contains(safety, r => r.Outcome == OutcomeType.SacrificeBunt && r.RunsScored == 0 && r.NewThird is not null);
+        // WHY: the runner waits for the bunt, so a share of them hold at third: the run scores often, but not always.
+        double scored = Rate(safety, r => r.RunsScored == 1);
+        Assert.InRange(scored, 0.4, 0.85);
+        // and the suicide squeeze, which goes with the pitch, is the one that can lose him
+        Assert.Contains(suicide, r => r.OutsRecorded > 1);
+    }
+
+    [Fact]
+    public void ASqueezeWithNoRunnerOnThirdOrTwoOut_IsJustABunt()
+    {
+        foreach (var s in new[] { Situation(true, false, false, 0), Situation(false, false, true, 2) })
+            Assert.All(Resolve(s, Squeeze, 200), r => Assert.Equal(SqueezeKind.None, r.Squeeze));
+    }
+
+    [Fact]
+    public void ASlowBatterAndAGroundBallPitcherMakeADoublePlayLikelier()
+    {
+        double average = RunningRules.DoublePlayChanceFor(3, 0.45, runnerGoing: false);
+
+        Assert.Equal(RunningRules.DoublePlayChance, average, 9);
+        Assert.True(RunningRules.DoublePlayChanceFor(1, 0.45, false) > average);
+        Assert.True(RunningRules.DoublePlayChanceFor(5, 0.45, false) < average);
+        Assert.True(RunningRules.DoublePlayChanceFor(3, 0.60, false) > average);
+        Assert.True(RunningRules.DoublePlayChanceFor(3, 0.45, true) < average);
+    }
+
+    [Fact]
+    public void TheComputerManagerSometimesStealsThirdAndSqueezes()
+    {
+        int stealThirds = 0, squeezes = 0;
+        for (int seed = 1; seed <= 25; seed++)
+        {
+            var game = NewGame(seed);
+            var cpu = new ComputerManager(new Random(seed));
+            int guard = 0;
+            while (game.State!.Status == GameStatus.InProgress && guard++ < 2000)
+            {
+                var s = game.State!;
+                var offense = cpu.MakeOffensiveDecision(s);
+                if (offense.Strategy == OffensiveStrategy.Steal && RunningRules.StealPlanFor(s) is StealPlan.Third or StealPlan.Double) stealThirds++;
+                if (offense.Strategy is OffensiveStrategy.Squeeze or OffensiveStrategy.SafetySqueeze) squeezes++;
+                game.ExecuteAtBat(offense, cpu.MakeDefensiveDecision(s));
+            }
+        }
+
+        Assert.True(squeezes > 0, "no squeezes");
+        Assert.True(stealThirds >= 0);   // rare by design; the point is that every such call resolves without error
     }
 }

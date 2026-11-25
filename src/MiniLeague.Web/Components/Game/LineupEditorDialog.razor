@@ -28,7 +28,7 @@
                                Style="width:90px"
                                Value="@_rows[idx].Position"
                                ValueChanged="@((FieldPosition pos) => SetPosition(idx, pos))">
-                        @foreach (var pos in LineupRules.RequiredPositions)
+                        @foreach (var pos in LineupRules.RequiredFor(UsesDesignatedHitter))
                         {
                             <MudSelectItem T="FieldPosition" Value="@pos">@LineupRules.Label(pos)</MudSelectItem>
                         }
@@ -69,6 +69,10 @@
     [Parameter, EditorRequired] public Team Team { get; set; } = null!;
     [Parameter, EditorRequired] public IReadOnlyList<LineupSlot> Current { get; set; } = [];
 
+    /// <summary>With no designated hitter the starting pitcher is in the order, at P, and the order has no DH.</summary>
+    [Parameter] public bool UsesDesignatedHitter { get; set; } = true;
+    [Parameter] public Player? Starter { get; set; }
+
     private sealed class Row { public int PlayerId; public FieldPosition Position; }
 
     private List<Row> _rows = [];
@@ -78,6 +82,7 @@
     protected override void OnInitialized()
     {
         _candidates = [.. Team.Batters];
+        if (!UsesDesignatedHitter && Starter is not null) _candidates.Add(Starter);
         Load(Current);
     }
 
@@ -113,9 +118,9 @@
         Revalidate();
     }
 
-    private void ResetToDefault() => Load(LineupRules.Default(Team));
+    private void ResetToDefault() => Load(LineupRules.Default(Team, UsesDesignatedHitter, Starter));
 
-    private void Revalidate() => _errors = LineupRules.Validate(Team, ToSlots());
+    private void Revalidate() => _errors = LineupRules.Validate(Team, ToSlots(), UsesDesignatedHitter, Starter?.Id);
 
     private List<LineupSlot> ToSlots() => _rows.Select(r => new LineupSlot(r.PlayerId, r.Position)).ToList();
 

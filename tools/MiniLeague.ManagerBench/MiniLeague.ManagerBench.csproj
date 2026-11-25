@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Computer-manager benchmark: plays seeded computer-versus-computer games and reports each persona's results and
+       habits. Deliberately not in MiniLeagueBaseball.slnx (it takes a minute or more); run it on its own with
+       "dotnet run -c Release (project path) (options)". Program.cs lists the options. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MiniLeague.Engine\MiniLeague.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="expected-ranges.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="lahman-reference.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

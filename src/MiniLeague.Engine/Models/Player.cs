@@ -17,6 +17,9 @@ public class Player
 
     // Ratings (1–9 scale unless noted)
     public int SpeedRating { get; set; } = 3;         // 1–5
+
+    /// <summary>Share of steal attempts that succeeded in his league and season; his own record is steadied toward it.</summary>
+    public double LeagueStealRate { get; set; } = Simulation.RunningRules.DefaultLeagueStealRate;
     public int PowerRating { get; set; } = 2;         // 1–4
     public int FieldingRating { get; set; } = 2;      // 0–3
     public int FieldingRange { get; set; } = 5;       // 1–9

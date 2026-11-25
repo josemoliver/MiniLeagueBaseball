@@ -11,6 +11,7 @@ using MiniLeague.Web.Pages;
 using MiniLeague.Web.Services;
 using MudBlazor;
 using MudBlazor.Services;
+using FieldPosition = MiniLeague.Engine.Models.Position;
 
 namespace MiniLeague.Web.Tests;
 
@@ -982,5 +983,118 @@ public class GameRoomTests : BunitContext, IAsyncLifetime
 
         Assert.Equal("slugger", _store.Snapshot!.HomeManagerId);
         Assert.Equal(ManagerCatalog.DefaultId, _store.Snapshot.VisitorManagerId);
+    }
+
+    // ── The designated hitter setting ────────────────────────────────────────
+
+    // Opens the "Designated hitter" select in Game Options and picks a choice by its text.
+    // NOTE: MudSelect puts a data-testid on its hidden input, so the control is found by its label.
+    private static AngleSharp.Dom.IElement DhControl(IRenderedComponent<GameRoom> room) =>
+        room.FindAll(".mud-select .mud-input-control").First(c => c.TextContent.Contains("Designated hitter"));
+
+    private void ChooseDesignatedHitter(IRenderedComponent<GameRoom> room, string choice)
+    {
+        DhControl(room).MouseDown();
+        _popovers.WaitForState(() => _popovers.FindAll(".mud-list-item").Count > 0);
+        _popovers.FindAll(".mud-list-item").First(i => i.TextContent.Contains(choice)).Click();
+    }
+
+    [Fact]
+    public void TheDesignatedHitterIsTheDefault_AndTheGameOptionsOfferTheOtherRules()
+    {
+        RenderProviders();
+        var room = OpenGameRoom();
+
+        Assert.Contains("Designated hitter (both teams)", DhControl(room).QuerySelector("input")!.GetAttribute("value"));
+        Assert.Contains("on both teams", DhControl(room).TextContent);   // the help under the select
+
+        Click(room, "PLAY BALL");
+        Assert.Equal(DesignatedHitterSetting.DesignatedHitter, _store.Snapshot!.Options.DesignatedHitter);
+        Assert.Contains(FieldPosition.DH, _store.Snapshot.VisitorPositions.Values);
+    }
+
+    [Fact]
+    public void ChoosingPitchersBat_StartsAGameWithThePitcherInTheOrder()
+    {
+        RenderProviders();
+        var room = OpenGameRoom();
+
+        ChooseDesignatedHitter(room, "Pitchers bat");
+        Assert.Contains("pitchers bat", DhControl(room).TextContent);
+        Click(room, "PLAY BALL");
+
+        var snap = _store.Snapshot!;
+        Assert.Equal(DesignatedHitterSetting.PitchersBat, snap.Options.DesignatedHitter);
+        foreach (var positions in new[] { snap.VisitorPositions, snap.HomePositions })
+        {
+            Assert.Contains(FieldPosition.P, positions.Values);
+            Assert.DoesNotContain(FieldPosition.DH, positions.Values);
+        }
+        // The lineup card shows the pitcher in the order.
+        Assert.Contains("P", room.FindAll(".lineup-table td").Select(td => td.TextContent.Trim()));
+    }
+
+    [Fact]
+    public void HistoricalFollowsTheHomeTeamsLeagueAndYear_AndSaysSo()
+    {
+        RenderProviders();
+        var room = OpenGameRoom();
+
+        ChooseDesignatedHitter(room, "Historical");
+        string help = DhControl(room).TextContent;
+        Assert.Matches("(used a designated hitter|had no designated hitter)", help);
+        Click(room, "PLAY BALL");
+
+        var state = _store.Snapshot!;
+        Assert.Equal(DesignatedHitterSetting.Historical, state.Options.DesignatedHitter);
+        bool dh = state.HomePositions.Values.Contains(FieldPosition.DH);
+        Assert.Equal(dh, help.Contains("used a designated hitter"));
+    }
+
+    [Fact]
+    public void WithAPitcherInTheOrder_TheSubstitutionsOfferADoubleSwitch_AndDoNotOfferThePitcherAsAFielder()
+    {
+        var providers = RenderProviders();
+        var room = OpenGameRoom();
+        ChooseDesignatedHitter(room, "Pitchers bat");
+        Click(room, "PLAY BALL");
+
+        Click(room, "SUBS");
+        providers.WaitForState(() => providers.Markup.Contains("Substitutions"));
+        providers.FindAll(".mud-tab").First(t => t.TextContent.Contains("Pitching")).Click();
+        providers.WaitForState(() => providers.Markup.Contains("Double switch"));
+
+        Assert.Contains("takes the old one's place in the batting order", providers.Markup);
+        Assert.Contains("New pitcher", providers.Markup);
+        Assert.Contains("Fielder leaving", providers.Markup);
+    }
+
+    [Fact]
+    public void WithADesignatedHitter_ThereIsNoDoubleSwitch()
+    {
+        var providers = RenderProviders();
+        var room = StartedGame();
+
+        Click(room, "SUBS");
+        providers.WaitForState(() => providers.Markup.Contains("Substitutions"));
+        providers.FindAll(".mud-tab").First(t => t.TextContent.Contains("Pitching")).Click();
+
+        Assert.DoesNotContain("Double switch", providers.Markup);
+    }
+
+    [Fact]
+    public void TheLineupEditorForAGameWithoutADesignatedHitterListsThePitcherAtP()
+    {
+        var providers = RenderProviders();
+        var room = OpenGameRoom();
+        ChooseDesignatedHitter(room, "Pitchers bat");
+
+        room.FindAll("button").First(b => b.TextContent.Contains("Visitor lineup")).Click();
+        providers.WaitForState(() => providers.Markup.Contains("Lineup"));
+
+        // Nine rows, the pitcher among them, and no "DH" choice in the position lists.
+        Assert.DoesNotContain("designated hitter", providers.Markup);
+        Assert.Contains("pitcher", providers.Markup);
+        Assert.Empty(providers.FindAll(".mud-alert-text-error"));   // the default order for the rule is valid
     }
 }

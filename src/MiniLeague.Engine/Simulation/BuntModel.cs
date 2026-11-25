@@ -63,6 +63,37 @@ public static class BuntModel
     }
 
     /// <summary>
+    /// The odds of a squeeze. A <b>suicide</b> squeeze has the runner on third break with the pitch, so the batter must bunt
+    /// whatever is thrown: more bunts are missed or popped up (and the runner is then dead), and the defense can field the
+    /// ball and throw home (the "fielder's choice" here is the runner out at the plate). A <b>safety</b> squeeze has the
+    /// runner wait for the bunt to be down, so it fails no worse than a sacrifice but the run is not certain (see
+    /// <see cref="SafetyScoreChance"/>).
+    /// </summary>
+    public static BuntOdds SqueezeOdds(Player batter, DefensiveAlignment alignment, SqueezeKind kind, Player runnerOnThird)
+    {
+        var plain = Odds(batter, alignment, sacrifice: true, targetRunner: null);
+        if (kind != SqueezeKind.Suicide) return plain;
+
+        double skill = (batter.BuntingAbility + batter.SacrificeAbility) / 2.0;
+        double popUp = Math.Clamp(plain.PopUp * 1.4 + 0.04, 0.08, 0.30);
+        double home = 0.20 * (1 - 0.06 * (runnerOnThird.SpeedRating - 3)) * (1 - 0.08 * (skill - 3));
+        home *= alignment switch { DefensiveAlignment.CornersIn => 1.5, DefensiveAlignment.InfieldIn => 1.3, _ => 1.0 };
+        return new BuntOdds(popUp, plain.Single, Math.Clamp(home, 0.06, 0.40));
+    }
+
+    /// <summary>
+    /// A safety squeeze: the chance the runner on third scores on a bunt that is down and fielded. A fast runner and a good
+    /// bunter get him home more often; Corners In, which charges the plate, holds him more often.
+    /// </summary>
+    public static double SafetyScoreChance(Player batter, Player runnerOnThird, DefensiveAlignment alignment)
+    {
+        double skill = (batter.BuntingAbility + batter.SacrificeAbility) / 2.0;
+        double chance = 0.62 + 0.07 * (runnerOnThird.SpeedRating - 3) + 0.03 * (skill - 3);
+        if (alignment == DefensiveAlignment.CornersIn) chance *= 0.8;
+        return Math.Clamp(chance, 0.30, 0.90);
+    }
+
+    /// <summary>
     /// Who fields a bunt: the pitcher most often, then the corner men, then the catcher. Only spots that are manned
     /// can field it (the pitcher always is).
     /// </summary>

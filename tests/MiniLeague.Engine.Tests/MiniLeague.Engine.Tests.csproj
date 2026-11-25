@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\MiniLeague.Engine\MiniLeague.Engine.csproj" />
+    <!-- The computer-manager benchmark tool (it is not in the .slnx): ManagerBenchmarkTests runs a small one. -->
+    <ProjectReference Include="..\..\tools\MiniLeague.ManagerBench\MiniLeague.ManagerBench.csproj" />
   </ItemGroup>
 
 </Project>

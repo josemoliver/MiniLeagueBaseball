@@ -52,8 +52,8 @@ public sealed class ManagerCatalog
                 + "She will not bunt, steal or walk anyone unless the arithmetic says so, and the arithmetic usually says no.",
             Traits:
             [
-                new("Aggression on the bases", 3), new("Small ball", 2), new("Bench use", 3),
-                new("Quick with the bullpen", 3), new("Intentional walks", 2),
+                new("Aggression on the bases", 3), new("Small ball", 3), new("Bench use", 3),
+                new("Quick with the bullpen", 3), new("Intentional walks", 2), new("Late defensive subs", 1),
             ],
             Create: rng => new ComputerManager(rng)),
 
@@ -67,8 +67,8 @@ public sealed class ManagerCatalog
                 + "He walks the big bat with first base open, bunts with the weak hitter late, and sends a fast runner on a hunch.",
             Traits:
             [
-                new("Aggression on the bases", 3), new("Small ball", 4), new("Bench use", 3),
-                new("Quick with the bullpen", 3), new("Intentional walks", 5),
+                new("Aggression on the bases", 3), new("Small ball", 2), new("Bench use", 3),
+                new("Quick with the bullpen", 3), new("Intentional walks", 5), new("Late defensive subs", 3),
             ],
             Create: rng => new OldSchoolManager(rng)),
 
@@ -83,12 +83,15 @@ public sealed class ManagerCatalog
             Traits:
             [
                 new("Aggression on the bases", 5), new("Small ball", 5), new("Bench use", 4),
-                new("Quick with the bullpen", 3), new("Intentional walks", 2),
+                new("Quick with the bullpen", 3), new("Intentional walks", 2), new("Late defensive subs", 4),
             ],
             Create: rng => new ComputerManager(rng, new ManagerTuning
             {
-                StealMargin = 0.010, HitAndRunMargin = 0.010, BuntMargin = 0.0, AggressiveRunMargin = 0.0,
+                StealMargin = -0.015, HitAndRunMargin = -0.010, BuntMargin = -0.015, AggressiveRunMargin = -0.005,
+                SqueezeMargin = -0.01,
                 PinchRunGain = 0.02, PitchoutShare = 0.45,
+                // Presses when behind, keeps the hitters guessing, and puts a glove in to protect a lead from the eighth.
+                SituationalRisk = 0.5, LeverageSensitivity = 0.3, PitchMix = 0.02, DefensiveReplaceFromInning = 8,
             })),
 
         new ManagerPersona(
@@ -102,14 +105,18 @@ public sealed class ManagerCatalog
             Traits:
             [
                 new("Aggression on the bases", 2), new("Small ball", 1), new("Bench use", 1),
-                new("Quick with the bullpen", 1), new("Intentional walks", 1),
+                new("Quick with the bullpen", 1), new("Intentional walks", 1), new("Late defensive subs", 1),
             ],
             Create: rng => new ComputerManager(rng, new ManagerTuning
             {
                 StealMargin = ManagerTuning.Never, HitAndRunMargin = ManagerTuning.Never, BuntMargin = ManagerTuning.Never,
+                SqueezeMargin = ManagerTuning.Never,
                 AggressiveRunMargin = 0.012, PinchHitFromInning = 7, PinchHitGain = 0.05, BenchReserveScale = 1.6,
                 PinchRunGain = 0.10, IntentionalWalkMargin = 0.10, ReliefEdgeClose = 0.07, ReliefEdgeOther = 0.14,
                 WarmUpPitchCount = 90, WarmUpFromInning = 8, PitchoutShare = 0.15,
+                TiringSwapMargin = 0.06, ShelledRuns = 6, DoubleSwitchGain = ManagerTuning.Never,
+                // Stubborn: the moment does not change his plan, and he trusts his hitters over the platoon book.
+                LeverageSensitivity = -0.3, PlatoonWeight = 0.3,
             })),
 
         new ManagerPersona(
@@ -123,13 +130,19 @@ public sealed class ManagerCatalog
             Traits:
             [
                 new("Aggression on the bases", 3), new("Small ball", 2), new("Bench use", 5),
-                new("Quick with the bullpen", 5), new("Intentional walks", 4),
+                new("Quick with the bullpen", 5), new("Intentional walks", 4), new("Late defensive subs", 4),
             ],
             Create: rng => new ComputerManager(rng, new ManagerTuning
             {
                 PinchHitFromInning = 5, PinchHitGain = 0.012, BenchReserveScale = 0.5,
-                IntentionalWalkMargin = 0.01, ReliefEdgeClose = -0.02, ReliefEdgeOther = 0.0, WarmUpPitchCount = 45, WarmUpFromInning = 4,
-                QuickHookPitchCount = 60,
+                IntentionalWalkMargin = 0.0, IntentionalWalkFromInning = 6, IntentionalWalkOpsGap = 0.08,
+                ReliefEdgeClose = -0.02, ReliefEdgeOther = 0.0, WarmUpPitchCount = 45, WarmUpFromInning = 4,
+                QuickHookPitchCount = 60, TiringSwapMargin = -0.20, ShelledRuns = 4,
+                // The platoon book matters most to him, and the tight spots matter most: a pitch limit, the closer from the
+                // eighth, a glove for a lead from the seventh, and some variety in what he calls.
+                PlatoonWeight = 2.0, LeverageSensitivity = 0.6, CloserFromInning = 8, StarterPitchLimit = 100,
+                DoubleSwitchGain = 0.0,
+                DefensiveReplaceFromInning = 7, PitchMix = 0.015,
             })),
     ];
 

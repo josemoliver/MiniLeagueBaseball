@@ -90,6 +90,8 @@ public class ComputerManagerDecisionTests
         batter.Overall = new BatterStats { AtBats = 400, Hits = 180, HomeRuns = 55, Walks = 100 };
         batter.VsLeft = null;
         batter.VsRight = null;
+        next.VsLeft = null;
+        next.VsRight = null;
         next.Overall = new BatterStats { AtBats = 400, Hits = 55, HomeRuns = 1, Walks = 15 };
 
         Assert.True(new ComputerManager(new Random(2)).MakeDefensiveDecision(state).IntentionalWalk);
@@ -143,7 +145,7 @@ public class ComputerManagerDecisionTests
     public void AnOverwarmedRelieverDoesNotPreventAnotherArmFromWarming()
     {
         var state = Game();
-        state.HomePitcher.PitchCount = 100;
+        state.HomePitcher.PitchCount = (int)FatigueModel.Stamina(state.HomePitcher.Player.PitchingOverall) + 5;   // past his first threshold
         state.HomePitcher.BattersFaced = 20;
         var stale = state.HomeBullpen[0];
         stale.IsWarming = true;
@@ -200,7 +202,7 @@ public class ComputerManagerDecisionTests
     public void ComputerPitchoutsAreRareOverWholeGames()
     {
         // Regression for the symptom: about 3.8 pitchouts per game, so every hit and run was thrown out.
-        int pitchouts = 0, plays = 0, caught = 0;
+        int pitchouts = 0, plays = 0, caught = 0, stolen = 0;
         const int games = 60;
         for (int seed = 0; seed < games; seed++)
         {
@@ -216,11 +218,16 @@ public class ComputerManagerDecisionTests
                 plays++;
                 if (play.Pitch == PitchType.Pitchout) pitchouts++;
                 if (play.Outcome == OutcomeType.CaughtStealing) caught++;
+                if (play.Outcome == OutcomeType.StolenBase) stolen++;
             }
         }
 
         Assert.True(plays > 0);
-        Assert.True(pitchouts <= games * 0.5, $"{pitchouts} pitchouts in {games} games");
-        Assert.True(caught <= games * 0.15, $"{caught} caught stealing in {games} games");
+        // NOTE: the bug threw about 3.8 a game. Now that steals are worth trying, a pitchout is a real answer to a
+        // likely runner, so up to one a game (both teams together) is expected.
+        Assert.True(pitchouts <= games * 1.0, $"{pitchouts} pitchouts in {games} games");
+        // The symptom was runners thrown out nearly every time they went. Steals are a real option now, so check the
+        // share that succeed rather than a count.
+        Assert.True(stolen > caught, $"{stolen} stolen and {caught} caught stealing in {games} games");
     }
 }

@@ -31,15 +31,19 @@
                     var strategy = s;
                     <MudButton Color="@(SelectedOffense == strategy ? Color.Primary : Color.Default)"
                                Variant="@(SelectedOffense == strategy ? Variant.Filled : Variant.Outlined)"
-                               Disabled="@(NeedsRunnerGoing(strategy) && !CanSteal)"
+                               Disabled="@(!Allowed(strategy))"
                                OnClick="@(() => SelectedOffense = strategy)">
-                        @Shortcuts.Label(strategy)<span class="key-hint">@Shortcuts.KeyFor(strategy)</span>
+                        @StrategyLabel(strategy)<span class="key-hint">@Shortcuts.KeyFor(strategy)</span>
                     </MudButton>
                 }
             </MudButtonGroup>
-            @if (!CanSteal)
+            @if (!Allowed(OffensiveStrategy.Steal) || !Allowed(OffensiveStrategy.HitAndRun) || !CanSqueeze)
             {
-                <span class="decision-tip">Steal and Hit &amp; Run need a runner on first and an open second base.</span>
+                <span class="decision-tip">
+                    Steal needs a runner who can move up to an open base (a runner on second can steal third, and runners on first and
+                    second a double steal). Hit &amp; Run needs a runner on first and an open second base. A squeeze needs a runner on third
+                    and fewer than two out.
+                </span>
             }
         </div>
     }
@@ -99,7 +103,12 @@
     [Parameter] public bool ShowOffense { get; set; }
     /// <summary>A human chooses the fielding side's pitch and alignment.</summary>
     [Parameter] public bool ShowDefense { get; set; }
+    /// <summary>A runner on first with second open: a steal of second or a hit and run can be called.</summary>
     [Parameter] public bool CanSteal { get; set; }
+    /// <summary>What a steal call would send (second, third, or both runners); None when there is nothing to steal.</summary>
+    [Parameter] public StealPlan StealCall { get; set; }
+    /// <summary>A runner on third with fewer than two out: a squeeze can be called.</summary>
+    [Parameter] public bool CanSqueeze { get; set; }
     [Parameter] public bool AlignmentMoving { get; set; }
     [Parameter] public EventCallback<DefensiveAlignment> OnAlignmentChanged { get; set; }
 
@@ -112,7 +121,7 @@
 
     protected override void OnParametersSet()
     {
-        if (!CanSteal && NeedsRunnerGoing(SelectedOffense))
+        if (!Allowed(SelectedOffense))
             SelectedOffense = OffensiveStrategy.SwingAway;
     }
 
@@ -135,7 +144,7 @@
         switch (action.Kind)
         {
             case ShortcutKind.Offense:
-                if (NeedsRunnerGoing(action.Strategy) && !CanSteal) return;
+                if (!Allowed(action.Strategy)) return;
                 SelectedOffense = action.Strategy;
                 break;
             case ShortcutKind.Pitch: SelectedPitch = action.Pitch; break;
@@ -187,15 +196,29 @@
         OffensiveStrategy.SwingSafe,
     ];
 
-    // WHY: a steal and a hit and run both send the runner on first with the pitch, so both need him there and second open.
-    private static bool NeedsRunnerGoing(OffensiveStrategy strategy) =>
-        strategy is OffensiveStrategy.Steal or OffensiveStrategy.HitAndRun;
+    // WHY: a hit and run sends the runner on first with the pitch, so it needs him there and second open. A steal can also send
+    // the runner on second (third open), or both on a double steal. A squeeze needs a runner on third and fewer than two out.
+    private bool Allowed(OffensiveStrategy strategy) => strategy switch
+    {
+        OffensiveStrategy.Steal => CanSteal || StealCall != StealPlan.None,
+        OffensiveStrategy.HitAndRun => CanSteal,
+        OffensiveStrategy.Squeeze or OffensiveStrategy.SafetySqueeze => CanSqueeze,
+        _ => true,
+    };
+
+    // The steal button says what it would send.
+    private string StrategyLabel(OffensiveStrategy strategy) =>
+        strategy == OffensiveStrategy.Steal && !CanSteal
+            ? StealCall switch { StealPlan.Third => "Steal 3rd", StealPlan.Double => "Double steal", _ => Shortcuts.Label(strategy) }
+            : Shortcuts.Label(strategy);
 
     private static readonly OffensiveStrategy[] RunningOptions =
     [
         OffensiveStrategy.Steal,
         OffensiveStrategy.HitAndRun,
         OffensiveStrategy.SacrificeBunt,
+        OffensiveStrategy.Squeeze,
+        OffensiveStrategy.SafetySqueeze,
     ];
 
     private static readonly PitchType[] PitchOptions =

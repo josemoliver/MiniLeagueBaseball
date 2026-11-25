@@ -14,11 +14,12 @@ internal sealed partial class Staging
 
     // WHY: A runner coming from first or second needs time to round third while the outfielder fields and throws.
     // The closer arrival also lets the decided safe result read as a real play at the plate.
-    private Dictionary<int, double>[] MoveHitRunners(Func<RunnerMove, bool> otherSlide)
+    private Dictionary<int, double>[] MoveHitRunners(Func<RunnerMove, bool> otherSlide, RunnerMove? sentOut = null)
     {
         var moves = _result.RunnerMoves;
+        // NOTE: a runner thrown out is moved later, by TagOut, once the throw's arrival is known.
         var times = MoveAll(Contact + 0.1, SecondsPerBase, slide: otherSlide,
-            skip: m => m.Fate == RunnerFate.Scored && m.FromBase <= 2);
+            skip: m => m.Fate == RunnerFate.Scored && m.FromBase <= 2 || ReferenceEquals(m, sentOut));
         for (int i = 0; i < moves.Count; i++)
             if (moves[i].Fate == RunnerFate.Scored && moves[i].FromBase <= 2)
                 times[i] = MoveRunner(moves[i], Contact + 0.1, HomePlaySecondsPerBase, slide: true);
@@ -52,15 +53,19 @@ internal sealed partial class Staging
 
         // Runners go on contact.
         var moves = _result.RunnerMoves;
-        var times = MoveHitRunners(SlidesHome);
+        var sentOut = SentOut(moves);
+        var times = MoveHitRunners(SlidesHome, sentOut);
 
-        // Where the throw goes, and when it has to arrive for the runner to be safe.
-        var (receiver, receiverPoint, arriveAfter) = ChooseThrowTarget(kind, fielder, moves, times);
+        // Where the throw goes, and when it has to arrive for the runner to be safe (or to beat the one sent hard).
+        var (receiver, receiverPoint, arriveAfter) = sentOut is not null
+            ? SentOutTarget(sentOut, id)
+            : ChooseThrowTarget(kind, fielder, moves, times);
         if (receiver == id) (receiver, receiverPoint, arriveAfter) = ("pitcher", FieldGeometry.Mound, null);
         double arrive = ThrowTo(id, receiverPoint, tField + 0.25, arriveAfter);
         Receive(receiver, receiverPoint, arrive, facing: receiver == "catcher" ? (landing.X < 0 ? "left" : "right") : null);
         BackUpThrow(id, receiver, receiverPoint, arrive);
-        double? plateCall = ClosePlayAtHome(receiver, arrive, moves, times);
+        double? plateCall = sentOut is null ? ClosePlayAtHome(receiver, arrive, moves, times) : null;
+        if (sentOut is not null) TagOut(sentOut, receiver, receiverPoint, arrive, moves, times);
 
         _s.Cue(Contact, CueKind.Sound, "hit");
         _s.Cue(Contact + 0.12, CueKind.Banner, kind == Kind.Bloop ? "BALL IN THE AIR..." : "GROUND BALL IN PLAY...");
@@ -160,6 +165,39 @@ internal sealed partial class Staging
     private static double? HomeThrowAfter(IReadOnlyList<RunnerMove> moves, Dictionary<int, double>[] times) =>
         LatestAt(moves, times, 4, m => m.Fate == RunnerFate.Scored) is double home ? home + 0.18 : null;
 
+    // ── A runner sent hard and thrown out ────────────────────────────────────
+
+    // The runner (not the batter) the defense threw out on this hit, if any.
+    private static RunnerMove? SentOut(IReadOnlyList<RunnerMove> moves) =>
+        moves.FirstOrDefault(m => m.FromBase > 0 && m.IsOut);
+
+    // The throw goes to the base he was sent to: the catcher at the plate, the third baseman at third (the shortstop
+    // covers when the third baseman is the one throwing).
+    private (string Receiver, FieldPoint Point, double? ArriveAfter) SentOutTarget(RunnerMove m, string thrower)
+    {
+        if (m.ToBase == 4) return ("catcher", new FieldPoint(0, -2), null);
+        var cover = Has(Position.Third) && IdOf(Position.Third) != thrower ? Position.Third : Position.Short;
+        return Has(cover) ? (IdOf(cover), FieldGeometry.BaseSpot(3), null) : ("pitcher", FieldGeometry.BaseSpot(3), null);
+    }
+
+    // WHY: the out is decided; the picture has to agree. The runner is timed to slide in just after the ball arrives,
+    // the fielder puts the tag on, and the call is the out.
+    private void TagOut(RunnerMove m, string receiver, FieldPoint bag, double throwArrival,
+        IReadOnlyList<RunnerMove> moves, Dictionary<int, double>[] times)
+    {
+        double perBase = m.ToBase == 4 ? HomePlaySecondsPerBase : SecondsPerBase;
+        var ran = MoveRunner(m, Contact + 0.1, perBase, minArrival: throwArrival + 0.14, slide: true);
+        int index = -1;
+        for (int i = 0; i < moves.Count; i++) if (ReferenceEquals(moves[i], m)) index = i;
+        if (index >= 0) times[index] = ran;
+        if (!ran.TryGetValue(m.ToBase, out double tagged)) return;
+        // NOTE: the tag goes down as he arrives, a beat after the slide reaches the bag.
+        Put(receiver, tagged + 0.05, bag, pose: Poses.Tag);
+        _s.Cue(Math.Max(Contact + 0.15, tagged - 0.45), CueKind.Banner, "HERE COMES THE THROW!");
+        _s.Cue(tagged, CueKind.Sound, "caught");
+        _s.Cue(tagged + 0.05, CueKind.Banner, m.ToBase == 4 ? "OUT AT THE PLATE!" : "OUT AT THIRD!");
+    }
+
     // ── Double and triple ────────────────────────────────────────────────────
 
     // The ball goes to the gap or down a line, rolls toward the wall, an outfielder runs it down and
@@ -208,12 +246,15 @@ internal sealed partial class Staging
 
         // The runners go on contact; the batter slides into the base he takes.
         var moves = _result.RunnerMoves;
-        var times = MoveHitRunners(m => m.FromBase == 0 && m.ToBase >= 2 || SlidesHome(m));
+        var sentOut = SentOut(moves);
+        var times = MoveHitRunners(m => m.FromBase == 0 && m.ToBase >= 2 || SlidesHome(m), sentOut);
 
         // Relay: the shortstop takes it on the left side, the second baseman on the right.
         var cutPos = rest.X < 0 ? Position.Short : Position.Second;
         if (!Has(cutPos)) cutPos = cutPos == Position.Short ? Position.Second : Position.Short;
-        var (target, targetPoint, arriveAfter) = ChooseRelayTarget(moves, times, cutPos);
+        var (target, targetPoint, arriveAfter) = sentOut is not null
+            ? SentOutTarget(sentOut, IdOf(cutPos))
+            : ChooseRelayTarget(moves, times, cutPos);
 
         double arrive;
         string finalThrower = id;
@@ -230,7 +271,8 @@ internal sealed partial class Staging
             arrive = ThrowTo(id, targetPoint, tField + Transfer, arriveAfter);
         Receive(target, targetPoint, arrive, facing: target == "catcher" ? (rest.X < 0 ? "left" : "right") : null);
         BackUpThrow(finalThrower, target, targetPoint, arrive);
-        double? plateCall = ClosePlayAtHome(target, arrive, moves, times);
+        double? plateCall = sentOut is null ? ClosePlayAtHome(target, arrive, moves, times) : null;
+        if (sentOut is not null) TagOut(sentOut, target, targetPoint, arrive, moves, times);
 
         _s.Cue(Contact, CueKind.Sound, "hit");
         _s.Cue(Contact + 0.12, CueKind.Banner, "DEEP TO THE OUTFIELD...");

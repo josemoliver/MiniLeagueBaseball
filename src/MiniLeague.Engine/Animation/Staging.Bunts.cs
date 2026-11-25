@@ -30,18 +30,21 @@ internal sealed partial class Staging
     // He takes his lead as the pitcher winds up, then breaks for second as the ball is released and is well on his way
     // when it reaches the plate. What happens next (a hit that sends him on, or a ball he has to come back from) is
     // staged by the play itself; a runner who has to come back is returned to his base at the end (ReturnToBases).
-    private void RunnerBreaks()
+    //
+    // The same break is a suicide squeeze, from third: the runner is on his way to the plate as the pitch is delivered.
+    private void RunnerBreaks(int fromBase = 1)
     {
-        var goer = _result.RunnerMoves.FirstOrDefault(m => m.FromBase == 1);
+        var goer = _result.RunnerMoves.FirstOrDefault(m => m.FromBase == fromBase);
         if (goer is null) return;
 
         TakeLeads();
         string id = ActorId(goer);
         double go = Math.Max(Release, _s.TimeOf(id));
         _s.Move(id, go, _s.PointOf(id), pose: Poses.Run);
-        _s.Move(id, Math.Max(go + 0.05, Contact),
-            FieldGeometry.First.Towards(FieldGeometry.Second, 0.4), pose: Poses.Run);
-        _s.Cue(Release, CueKind.Banner, "HIT AND RUN!");
+        var start = FieldGeometry.BaseSpot(fromBase);
+        var ahead = fromBase == 3 ? FieldGeometry.Home : FieldGeometry.Second;
+        _s.Move(id, Math.Max(go + 0.05, Contact), start.Towards(ahead, 0.4), pose: Poses.Run);
+        _s.Cue(Release, CueKind.Banner, fromBase == 3 ? "SQUEEZE PLAY!" : "HIT AND RUN!");
     }
 
     // ── A bunt for a hit ─────────────────────────────────────────────────────
@@ -71,18 +74,23 @@ internal sealed partial class Staging
         // and the throw is slowed (or held) until just after the runner is on the bag, so the picture agrees with "safe".
         var first = FieldGeometry.First;
         string firstId = Has(Position.First) ? FielderId(Position.First) : "pitcher";
+        double settled = tField + 0.25;
         if (id == firstId)
-            Put(id, tField + 0.25, landing, pose: Poses.Stand);
+            Put(id, settled, landing, pose: Poses.Stand);
         else
         {
             var gloveSpot = firstId == FielderId(Position.First) ? new FieldPoint(first.X + 3.5, first.Y + 1) : first;
-            double arrive = ThrowTo(id, gloveSpot, SetForRelay(id, gloveSpot, tField), arriveAfter: safeAt + 0.12);
-            Receive(firstId, gloveSpot, arrive, firstId == FielderId(Position.First) ? Poses.Reach : Poses.Catch);
-            BackUpThrow(id, firstId, first, arrive);
+            settled = ThrowTo(id, gloveSpot, SetForRelay(id, gloveSpot, tField), arriveAfter: safeAt + 0.12);
+            Receive(firstId, gloveSpot, settled, firstId == FielderId(Position.First) ? Poses.Reach : Poses.Catch);
+            BackUpThrow(id, firstId, first, settled);
         }
 
+        // WHY: the result is shown once the play is over: the throw has arrived and every runner has stopped.
+        int batterIndex = -1;
+        for (int i = 0; i < moves.Count; i++) if (ReferenceEquals(moves[i], batterMove)) batterIndex = i;
+        if (batterIndex >= 0) times[batterIndex] = ran;
         _s.Cue(safeAt, CueKind.Sound, "steal");
-        _s.Cue(safeAt + 0.1, CueKind.Banner, _result.Description);
+        AnnounceHitAfterPlay(settled, moves, times);
         CheerForRuns(moves, times);
     }
 
@@ -115,13 +123,24 @@ internal sealed partial class Staging
         // The other runners go with the contact; the one who is out is slowed so that the throw beats him.
         var times = MoveAll(Contact + 0.1, SecondsPerBase, slide: SlidesHome, skip: m => m == batterMove || m == outMove);
 
-        // The infielder covering the bag takes the throw with his glove on the infield side of it.
+        // The infielder covering the bag takes the throw with his glove on the infield side of it. Out at the plate (a squeeze the
+        // defense read), the catcher takes it; if the catcher fielded the bunt himself he just puts the tag on.
+        bool atPlate = outMove.ToBase == 4;
         var bag = FieldGeometry.BaseSpot(outMove.ToBase);
-        string cover = CoverFor(outMove.ToBase, id);
-        var glove = new FieldPoint(bag.X + (bag.X < 0 ? 3 : -3), bag.Y - 1);
-        double arrive = ThrowTo(id, glove, SetForRelay(id, glove, tField));
-        Receive(cover, glove, arrive);
-        Put(cover, arrive + 0.08, glove, pose: Poses.Tag);
+        string cover = atPlate ? "catcher" : CoverFor(outMove.ToBase, id);
+        var glove = atPlate ? HomeCatcher : new FieldPoint(bag.X + (bag.X < 0 ? 3 : -3), bag.Y - 1);
+        double arrive;
+        if (cover == id)
+        {
+            arrive = tField + 0.25;
+            Put(id, arrive, glove, pose: Poses.Tag);
+        }
+        else
+        {
+            arrive = ThrowTo(id, glove, SetForRelay(id, glove, tField));
+            Receive(cover, glove, arrive);
+            Put(cover, arrive + 0.08, glove, pose: Poses.Tag);
+        }
 
         MoveRunner(outMove, Contact + 0.1, SecondsPerBase, minArrival: arrive + 0.12, slide: true);
         MoveRunner(batterMove, Contact + 0.1, SecondsPerBase);
@@ -147,24 +166,33 @@ internal sealed partial class Staging
 
     // The ball is caught on a line and the runner, who was going, has to turn around and get back: the throw to first
     // gets there ahead of him. The runner stays where the hit and run left him until the catch, then runs back.
-    private void DoubleOffAtFirst(RunnerMove runner, string catcherId, double caughtAt)
+    private void DoubleOffAtFirst(RunnerMove runner, string catcherId, double caughtAt) => DoubleOffAt(1, runner, catcherId, caughtAt);
+
+    // The same turn at third, for the runner of a suicide squeeze whose bunt is popped up: he is on his way home, the fielder who
+    // catches it throws to the third baseman, and he dives back too late.
+    private void DoubleOffAt(int bas, RunnerMove runner, string catcherId, double caughtAt)
     {
         string id = ActorId(runner);
-        var first = FieldGeometry.First;
-        string firstId = Has(Position.First) ? FielderId(Position.First) : "pitcher";
+        var first = FieldGeometry.BaseSpot(bas);
+        var coverPos = bas == 3 ? Position.Third : Position.First;
+        string firstId = Has(coverPos) ? FielderId(coverPos) : "pitcher";
 
-        var mid = _s.PointOf(id).Towards(FieldGeometry.Second, 0.15);
+        var mid = _s.PointOf(id).Towards(bas == 3 ? FieldGeometry.Home : FieldGeometry.Second, 0.15);
         Put(id, caughtAt, mid, pose: Poses.Run);
 
         // The catcher of the line drive turns and throws across to first.
-        var gloveSpot = firstId == FielderId(Position.First) ? new FieldPoint(first.X + 3.5, first.Y + 1) : first;
+        var gloveSpot = firstId == FielderId(coverPos) ? new FieldPoint(first.X + (bas == 3 ? -3.5 : 3.5), first.Y + 1) : first;
         double arrive = catcherId == firstId
             ? caughtAt + 0.25
             : ThrowTo(catcherId, gloveSpot, SetForRelay(catcherId, gloveSpot, caughtAt));
         if (catcherId != firstId)
-            Receive(firstId, gloveSpot, arrive, firstId == FielderId(Position.First) ? Poses.Reach : Poses.Catch);
+            Receive(firstId, gloveSpot, arrive, firstId == FielderId(coverPos) ? Poses.Reach : Poses.Catch);
         else
+        {
+            // WHY: the first baseman caught it himself; he carries the ball to the bag, so it must go with him.
             Put(firstId, arrive, first, pose: Poses.Tag);
+            _s.Move("ball", arrive, first, 1.5);
+        }
 
         // He turns on the spot, runs back and dives for the bag a beat after the ball is there.
         double back = Math.Max(arrive + 0.12, caughtAt + 0.1 + mid.DistanceTo(first) / 70);

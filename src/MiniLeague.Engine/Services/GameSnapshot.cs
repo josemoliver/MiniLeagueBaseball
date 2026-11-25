@@ -212,6 +212,7 @@ public static class GameSnapshots
             HomeTeam = home,
             Stadium = findStadium?.Invoke(snap.StadiumId) ?? Stadium.Generic,
             Options = snap.Options,
+            DHRule = DesignatedHitterRules.Applies(snap.Options.DesignatedHitter, home),
             VisitorControl = snap.VisitorControl,
             HomeControl = snap.HomeControl,
             VisitorManagerId = snap.VisitorManagerId,

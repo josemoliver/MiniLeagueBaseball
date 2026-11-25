@@ -148,6 +148,34 @@ def era_rates(lahman, year, lg_id):
     return (round(e / g, 2), round(so / g, 2)) if g else (0.8, 4.0)
 
 
+def league_pitching(lahman, year, lg_id):
+    """What an average pitcher did in the league that season, per nine innings (the engine scales each pitcher by it)."""
+    er = ha = hra = bba = soa = outs = 0
+    for r in rows(lahman / "Teams.csv"):
+        if int(r["yearID"]) == year and r["lgID"] == lg_id:
+            er += n(r, "ER")
+            ha += n(r, "HA")
+            hra += n(r, "HRA")
+            bba += n(r, "BBA")
+            soa += n(r, "SOA")
+            outs += n(r, "IPouts")
+    if not outs:
+        return None  # the engine falls back to a 4.00 ERA, 7.0 strikeouts and 3.0 walks per nine
+    return dict(era=round(27 * er / outs, 3), nonHomeRunHitsPerNine=round(27 * (ha - hra) / outs, 3),
+                homeRunsPerNine=round(27 * hra / outs, 3), strikeoutsPerNine=round(27 * soa / outs, 3),
+                walksPerNine=round(27 * bba / outs, 3))
+
+
+def league_steal_rate(lahman, year, lg_id):
+    """Share of steal attempts that succeeded in the league that season; None when caught stealing was not recorded."""
+    sb = cs = 0
+    for r in rows(lahman / "Teams.csv"):
+        if int(r["yearID"]) == year and r["lgID"] == lg_id:
+            sb += n(r, "SB")
+            cs += n(r, "CS")
+    return round(sb / (sb + cs), 3) if sb + cs and cs else None
+
+
 def park_factors(lahman, year, tid):
     for r in rows(lahman / "Teams.csv"):
         if int(r["yearID"]) == year and r["teamID"] == tid:
@@ -228,9 +256,10 @@ def build_team(lahman, people, field, slug, tid, year, city, nick, abbr, lg, sta
     # ── Batters ───────────────────────────────────────────────────────────
     batters = {}
     for pid, rs in bat_rows.items():
-        s = sum_rows(rs, ["AB", "H", "2B", "3B", "HR", "RBI", "SB", "CS", "BB", "SO", "HBP"])
+        s = sum_rows(rs, ["AB", "H", "2B", "3B", "HR", "RBI", "SB", "CS", "BB", "SO", "HBP", "SH"])
         batters[pid] = dict(pid=pid, ab=s["AB"], h=s["H"], d2=s["2B"], d3=s["3B"], hr=s["HR"],
-                            rbi=s["RBI"], sb=s["SB"], cs=s["CS"], bb=s["BB"], so=s["SO"], hbp=s["HBP"])
+                            rbi=s["RBI"], sb=s["SB"], cs=s["CS"], bb=s["BB"], so=s["SO"], hbp=s["HBP"],
+                            sh=s["SH"])
 
     # Fielding games by position (Appearances), position players only.
     pitchers_only = {pid for pid, rs in pit_rows.items()
@@ -274,7 +303,7 @@ def build_team(lahman, people, field, slug, tid, year, city, nick, abbr, lg, sta
             throws="Left" if p["throws"] == "L" else "Right",
             ab=b["ab"], h=b["h"], hr=b["hr"], bb=b["bb"], so=b["so"], d2=b["d2"], d3=b["d3"],
             sb=b["sb"], speed=speed_rating(b["ab"], b["sb"], b["d3"]),
-            rbi=b["rbi"], cs=b["cs"], hbp=b["hbp"],
+            rbi=b["rbi"], cs=b["cs"], hbp=b["hbp"], sh=b["sh"],
             field=fielding_map(b["pid"], year, tid, lg, field, app))
 
     def bench_pos(b):
@@ -307,20 +336,46 @@ def build_team(lahman, people, field, slug, tid, year, city, nick, abbr, lg, sta
             tf = max(1, min(9, int(10 - p["ipouts"] / 3 / max(p["gs"], 1) + 0.5)))
         else:
             tf = 5
-        return dict(
+        # His own batting line (a pitcher bats when a game has no designated hitter). Pitchers have Batting rows too.
+        brs = bat_rows.get(p["pid"], [])
+        bs = sum_rows(brs, ["AB", "H", "2B", "3B", "HR", "BB", "SO", "HBP", "SH"]) if brs else None
+        bat = None if not bs or bs["AB"] == 0 else dict(
+            ab=bs["AB"], h=bs["H"], d2=bs["2B"], d3=bs["3B"], hr=bs["HR"], bb=bs["BB"], so=bs["SO"],
+            hbp=bs["HBP"], sh=bs["SH"])
+        bats = {"L": "Left", "R": "Right", "B": "Switch"}.get(people[p["pid"]]["bats"])
+        out = dict(
             id=team_no * 100 + pid_num, name=display_name(p["pid"]),
             throws="Left" if people[p["pid"]]["throws"] == "L" else "Right",
             era=round(p["er"] * 9 / ip, 2), ip=round(ip, 1), h=p["h"], bb=p["bb"], so=p["so"],
             tiringFactor=tf, role=role, wins=p["w"], losses=p["l"], saves=p["sv"], cg=p["cg"], hr=p["hr"])
+        if role == "Starter":
+            out["gs"] = p["gs"]   # games started: how long his real starts were sets when he tires (FatigueModel.Stamina)
+        if bats:
+            out["bats"] = bats
+        if bat:
+            out["bat"] = bat
+        return out
 
     pitcher_out = [pitcher_json(p, "Starter", 50 + i) for i, p in enumerate(starters_p)]
     if closer:
         pitcher_out.append(pitcher_json(closer, "Closer", 60))
     pitcher_out += [pitcher_json(p, "Reliever", 61 + i) for i, p in enumerate(others)]
 
+    # ── How the club was managed that season (team totals) ────────────────
+    team_row = load(lahman, "Teams.csv", tid, year)[0]
+    games = max(n(team_row, "G"), 1)
+    tendencies = dict(
+        stealAttemptsPerGame=round((n(team_row, "SB") + n(team_row, "CS")) / games, 3),
+        sacrificesPerGame=round(sum(b["sh"] for b in batters.values()) / games, 3),
+        completeGameRate=round(n(team_row, "CG") / games, 3),
+        savesPerGame=round(n(team_row, "SV") / games, 3))
+
     return dict(id=team_no, city=city, nickname=nick, abbreviation=abbr, season=year, league=lg,
                 stadium=stadium, eraErrorsPerGame=era_rates(lahman, year, lg)[0],
                 eraStrikeoutsPerGame=era_rates(lahman, year, lg)[1],
+                leaguePitching=league_pitching(lahman, year, lg),
+                leagueStealRate=league_steal_rate(lahman, year, lg),
+                tendencies=tendencies,
                 batters=batter_out, pitchers=pitcher_out)
 
 

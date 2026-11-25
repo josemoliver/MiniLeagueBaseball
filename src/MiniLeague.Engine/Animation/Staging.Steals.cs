@@ -2,18 +2,24 @@ using MiniLeague.Engine.Models;
 
 namespace MiniLeague.Engine.Animation;
 
-// A runner breaking for second, and the catcher's throw.
+// A runner breaking for second or third (or both runners, on a double steal), and the catcher's throw.
 internal sealed partial class Staging
 {
     private void Steal()
     {
-        var runner = _result.RunnerMoves.FirstOrDefault(m => m.FromBase == 1);
+        // WHY: any runner can go. The throw is to the base of the runner the play is about: the one who was caught, else the
+        // lead runner. On a double steal the other runner simply runs, to the base he reached (or the one he was thrown out at).
+        var goers = _result.RunnerMoves
+            .Where(m => m.FromBase > 0 && (m.IsOut || m.ToBase > m.FromBase))
+            .OrderByDescending(m => m.FromBase).ToList();
+        var caughtMove = goers.FirstOrDefault(m => m.IsOut);
+        var runner = caughtMove ?? goers.FirstOrDefault();
         if (runner is null)
         {
             Basic();
             return;
         }
-        bool caught = _result.Outcome == OutcomeType.CaughtStealing;
+        bool caught = caughtMove is not null;
 
         // The pitch goes to the catcher, and the runner breaks as the pitcher delivers.
         Pitch(new FieldPoint(0, -4), 2.5);
@@ -27,10 +33,14 @@ internal sealed partial class Staging
     private void StealThrow(RunnerMove runner, bool caught)
     {
         var bag = FieldGeometry.BaseSpot(runner.ToBase);
-        var coverPos = _rng.NextDouble() < 0.5 ? Position.Short : Position.Second;
-        if (!Has(coverPos)) coverPos = coverPos == Position.Short ? Position.Second : Position.Short;
+        // At second the shortstop or the second baseman covers (it varies); at third, the third baseman.
+        var coverPos = runner.ToBase == 3
+            ? Position.Third
+            : _rng.NextDouble() < 0.5 ? Position.Short : Position.Second;
+        if (!Has(coverPos))
+            coverPos = coverPos == Position.Short ? Position.Second : Position.Short;
         string cover = Has(coverPos) ? IdOf(coverPos) : "pitcher";
-        var gloveSide = new FieldPoint(bag.X + (coverPos == Position.Short ? -4 : 4), bag.Y - 1);
+        var gloveSide = new FieldPoint(bag.X + (coverPos == Position.Short ? -4 : coverPos == Position.Third ? 3 : 4), bag.Y - 1);
 
         // WHY: The catcher gets upright and sets his feet; the covering infielder reaches second before the throw.
         var coverFrom = _s.PointOf(cover);

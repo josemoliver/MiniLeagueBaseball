@@ -332,7 +332,8 @@ public class GameFlowTests
         var game = NewGame();
         var s = game.State!;
         s.HomePitcher.BattersFaced = 20;
-        s.HomePitcher.PitchCount = 100;  // past the first threshold, not yet tiring
+        // past the first threshold, not yet tiring (a starter's first threshold is his own stamina, from his real starts)
+        s.HomePitcher.PitchCount = (int)FatigueModel.Stamina(s.HomePitcher.Player.PitchingOverall) + 5;
 
         var move = new ComputerManager(new Random(1)).DecidePitching(s, visitor: false);
 
@@ -435,7 +436,9 @@ public class GameFlowTests
         Assert.True(walkOffs > 0, "expected at least one walk-off in 120");
         // With fatigue and hooks working, relievers appear regularly but starters still go deep
         // (the ace starts every game, so this is a floor, not a real-world average).
-        Assert.InRange(pitchingChanges / (games * 2.0), 0.25, 3.0);
+        // NOTE: lowered from 0.25 when aggressive sends could be thrown out and the infield in began holding the
+        // runner on third: fewer runs score, so fewer starters are shelled and pulled.
+        Assert.InRange(pitchingChanges / (games * 2.0), 0.2, 3.0);
     }
 
     // ── Save and resume ──────────────────────────────────────────────────────

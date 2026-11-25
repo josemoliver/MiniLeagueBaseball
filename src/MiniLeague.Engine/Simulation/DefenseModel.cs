@@ -32,6 +32,10 @@ public static class DefenseModel
         (Position.C, 0.02),
     ];
 
+    /// <summary>The share of fly outs caught by an outfielder: the only ones deep enough to tag up and score on.</summary>
+    public static double OutfieldFlyShare { get; } = FlyBalls
+        .Where(f => f.Pos is Position.Left or Position.Center or Position.Right).Sum(f => f.Share);
+
     // Errors per chance relative to the average fielder at that spot (infielders, who throw, err more).
     private static double PositionPropensity(Position pos) => pos switch
     {
@@ -101,6 +105,10 @@ public static class DefenseModel
     public static double DefensiveValue(IEnumerable<(Player Player, Position Position)> lineup) =>
         lineup.Where(x => x.Position != Position.DH)
               .Sum(x => PositionWeight(x.Position) * x.Player.FieldingAt(x.Position).Value);
+
+    /// <summary>What a player's glove is worth at one position: his fielding value weighted by how much the position matters.</summary>
+    public static double PositionValue(Position position, Player player) =>
+        position is Position.DH or Position.P ? 0 : PositionWeight(position) * player.FieldingAt(position).Value;
 
     private static double PositionWeight(Position pos) => pos switch
     {

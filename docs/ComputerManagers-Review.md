@@ -3,6 +3,13 @@
 Reviewed 2026-11-24 against [ComputerManagers.md](ComputerManagers.md) and the code in the working tree at that date.
 This is an analysis for future work. No code was changed for it.
 
+**Status.** The P0 recommendations (1 to 4), the P1 recommendations (5 to 9) and recommendation 12 and the P3 recommendations (15 to 18) are done; see
+[P0](#p0-remove-free-options-engine), [P1](#p1-give-the-personas-real-inputs-and-make-results-measurable) and the
+measurements in [ComputerManagers.md, section 9](ComputerManagers.md#9-measured-results). Findings 1, 2, 3, 7, 9, 10 and
+12 are resolved, and 4 is resolved in code but waits for the team files to be regenerated. Three engine flaws found on
+the way were also fixed: steal odds far below real rates, tag-ups on infield pop-ups, and a win-probability model that
+could not see one-run situations. The rest of this document is unchanged from the review.
+
 **Goal.** The aim is not an unbeatable computer opponent but intelligent, believable managers whose decisions reflect
 different baseball philosophies, strategic preferences and situational judgment, while staying challenging and fun to
 play against.
@@ -79,6 +86,14 @@ Complexity: **S** is under a day, **M** is a few days, **L** is a week or more.
 
 Do these first. Every persona result depends on them.
 
+> **Done (2026-11-24).** A failed aggressive send is thrown out 60% of the time (at most one runner a play, shown in
+> the animation as a throw that beats him and a tag). With the infield in, an unforced runner on third scores on a ground
+> out only about 25% of the time, and 12% more singles get through. Corners In gives up a few more hits on a swing and
+> only helps against the bunt. Guard Lines and Shift Opposite were re-weighted. A pitchout to a batter whose runner stays
+> only adds walks. `NoFreeOptionTests` checks that no alignment beats Normal against an ordinary hitter with the bases
+> empty, and covers the rest. Measured effect: aggressive calls fell from about 17 to about 2 per team and game, the
+> four expected-run personas now range from 49% to 55%, and Gus Halloran rose from 35.5% to 40.7%.
+
 1. **Give aggressive running a cost (S, engine).** When the speed check fails on a hard send, the runner is thrown out
    at a rate that depends on the outfield arm and his speed. Expected effect: aggressive calls fall from about 17 a game
    to a handful, Small ball's style starts to carry risk, and Gus Halloran's win rate rises toward roughly 42–45%.
@@ -93,6 +108,20 @@ Do these first. Every persona result depends on them.
 4. **Correct `ComputerManagers.md` on platoon splits (S, docs only).**
 
 ### P1: give the personas real inputs, and make results measurable
+
+> **Done (2026-11-24).**
+> * 5: a standard platoon modifier in `ProbabilityTable` (lefties have the larger split), used by the engine and the managers.
+> * 6: the generator writes sacrifice hits and team tendencies, and the loader turns sacrifice hits into bunting
+>   ratings and reads the tendencies. The team files must be regenerated from the Lahman data for these to take effect.
+> * 7: calls are valued by win probability (a cached table), scaled to runs, with a chance-to-score table per base and
+>   out state so one-run decisions come out right.
+> * 8: `tools/MiniLeague.ManagerBench`, a seeded benchmark with stored ranges and a profile-consistency check;
+>   `GameService` takes a `managerSeed` so computer games replay exactly.
+> * 9: every computer call carries a `DecisionExplanation` (and pitching moves a reason); not yet shown in the game.
+>
+> Also fixed: steal odds (an average runner made it about one time in four), tag-ups on infield pop-ups, and new
+> dials (`TiringSwapMargin`, `ShelledRuns`, `IntentionalWalkFromInning`, `IntentionalWalkOpsGap`) so every persona's
+> profile now holds in the benchmark.
 
 5. **Add a platoon effect (M, engine and data).** The Lahman database has no splits, so apply a standard same-hand
    versus opposite-hand modifier in `ProbabilityTable`. Optionally add each player's own split later from a licensed
@@ -120,19 +149,23 @@ Do these first. Every persona result depends on them.
 
 ### P2: historical realism and personality depth
 
-10. **Let pitchers bat outside DH leagues and eras (L, engine and UI).** Use the home league's rule. Pinch-hitting for
+10. **Let pitchers bat outside DH leagues and eras (L, engine and UI).** *(Done 2026-11-24 as a game option, **Designated
+    hitter**, with the default still the designated hitter: see [ComputerManagers.md, section 4.7](ComputerManagers.md#47-when-the-pitcher-bats).
+    Left to do: regenerate the team files with each pitcher's own batting line, then make *Historical* the default.)** Use the home league's rule. Pinch-hitting for
     the pitcher then forces a pitching change. Add the double switch and pitcher sacrifice bunts. This is the largest
     realism gain, for 11 of the 15 teams.
 11. **Add an era overlay or a "Historical" persona (M).** Adjust the settings from each team's real tendencies in the
     Lahman data: steal attempts per game, complete-game rate, saves, sacrifice hits, intentional walks (recorded from
     1955). Do not use real managers' names. The 1927 Yankees' starters would go deep, the 1980 Royals would run, and the
     1968 Tigers would play for one run.
-12. **Add more persona settings.**
+12. **Add more persona settings.** *(Done 2026-11-24: `SituationalRisk`, `LeverageSensitivity`, `PitchMix`,
+    `StarterPitchLimit`, `CloserFromInning`, `PlatoonWeight` and `DefensiveReplaceFromInning` / `MaxLead` / `Gain`; see
+    [ComputerManagers.md, section 5](ComputerManagers.md#5-the-tuning-dials).)*
     * Risk attitude: preference for or against variance.
     * Leverage sensitivity.
     * Predictability: a random choice between near-equal options, weighted by a temperature.
     * Starter loyalty: pitch-count tolerance.
-    * Closer philosophy: save situations only, or a multi-inning fireman.
+    * Closer philosophy: save situations only, or a fireman used in tight spots from the eighth.
     * Late-inning defensive replacements.
     * Platoon emphasis.
 13. **Separate difficulty from personality (M).** Make difficulty a mistake rate and a decision temperature that can be
@@ -143,11 +176,11 @@ Do these first. Every persona result depends on them.
 
 ### P3: depth and efficiency
 
-15. **Add more running plays (M–L, engine):** steals of third, double steals, the squeeze and safety squeeze, and
+15. **Add more running plays (M–L, engine).** *(Done 2026-11-24: steals of third and double steals (`RunningRules.StealPlanFor`), the suicide and safety squeezes (keys 7 and 8, `SqueezeKind`), and double-play odds from the batter's speed and the pitcher's ground-ball rate; animated, with the box score crediting each runner.)* steals of third, double steals, the squeeze and safety squeeze, and
     double-play odds that depend on the batter's speed and the pitcher's ground-ball rate.
-16. **Look further ahead (M).** Value bunts and intentional walks over the next two or three hitters in the batting
+16. **Look further ahead (M).** *(Done 2026-11-24: bunt, squeeze and intentional-walk values continue into the on-deck hitter, memoized per state.)* Value bunts and intentional walks over the next two or three hitters in the batting
     order, not over the average run-expectancy state.
-17. **Cut repeated work per decision (S–M).**
+17. **Cut repeated work per decision (S–M).** *(Done 2026-11-24: one cache scope per decision; measured 38.6 to 17.6 ms a game.)*
     * Build one decision context per decision and cache `DefenseModel.RatingsFor`, which is called up to four times per
       evaluation.
     * Memoize `ProbabilityTable.Build` results within a decision.
@@ -155,30 +188,30 @@ Do these first. Every persona result depends on them.
 
     `DecidePitching` builds about 12 probability tables per reliever on every play. This has not been profiled: profile
     in WebAssembly first, and move this item up if it shows.
-18. **Share one set of engine rule constants (S)** between the resolver and the managers' model.
+18. **Share one set of engine rule constants (S)** between the resolver and the managers' model. *(Done 2026-11-24: `RunningRules`.)*
 
 ### Summary table
 
 | # | Recommendation | Priority | Size | Engine change |
 |--:|---|:-:|:-:|:-:|
-| 1 | Aggressive running can be thrown out | P0 | S | Yes |
-| 2 | Fix Infield In, Corners In, Guard Lines; no-free-option test | P0 | S–M | Yes |
-| 3 | Pitchout without a runner is a wasted ball | P0 | S | Yes |
-| 4 | Correct the platoon claims in the spec | P0 | S | No |
-| 5 | Platoon effect | P1 | M | Yes |
-| 6 | Load bunting, hold, ground-ball and team tendencies from data | P1 | M | Data and loader |
-| 7 | Win-probability table for decisions | P1 | M | No |
-| 8 | Reproducible benchmarks with stored ranges | P1 | S–M | Seed plumbing |
-| 9 | Decision explanations | P1 | M | No |
-| 10 | Pitchers bat; DH by league and era; double switch | P2 | L | Yes |
+| 1 | Aggressive running can be thrown out (**done**) | P0 | S | Yes |
+| 2 | Fix Infield In, Corners In, Guard Lines; no-free-option test (**done**) | P0 | S–M | Yes |
+| 3 | Pitchout without a runner is a wasted ball (**done**) | P0 | S | Yes |
+| 4 | Correct the platoon claims in the spec (**done**) | P0 | S | No |
+| 5 | Platoon effect (**done**) | P1 | M | Yes |
+| 6 | Load bunting, hold, ground-ball and team tendencies from data (**done in code; data to regenerate**) | P1 | M | Data and loader |
+| 7 | Win-probability table for decisions (**done**) | P1 | M | No |
+| 8 | Reproducible benchmarks with stored ranges (**done**) | P1 | S–M | Seed plumbing |
+| 9 | Decision explanations (**done**) | P1 | M | No |
+| 10 | Pitchers bat; DH by league and era; double switch (**done as an option; default unchanged**) | P2 | L | Yes |
 | 11 | Era overlay or Historical persona | P2 | M | Data |
-| 12 | More persona settings | P2 | M | No |
+| 12 | More persona settings (**done**) | P2 | M | No |
 | 13 | Difficulty separate from personality | P2 | M | No |
 | 14 | Pitch repertoires or mixed pitch choice | P2 | M | Yes |
-| 15 | More running plays | P3 | M–L | Yes |
-| 16 | Lookahead over the batting order | P3 | M | No |
-| 17 | Cache work per decision | P3 | S–M | No |
-| 18 | Shared rule constants | P3 | S | Small refactor |
+| 15 | More running plays (**done**) | P3 | M–L | Yes |
+| 16 | Lookahead over the batting order (**done**) | P3 | M | No |
+| 17 | Cache work per decision (**done**) | P3 | S–M | No |
+| 18 | Shared rule constants (**done**) | P3 | S | Small refactor |
 
 ## 4. Tests and benchmarks to add
 

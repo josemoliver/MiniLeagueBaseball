@@ -1,3 +1,4 @@
+@using FieldPosition = MiniLeague.Engine.Models.Position
 @* In-game moves for a human manager: pinch hit, pinch run, replace a fielder, swap
    fielding positions, and manage the pitching staff. A removed player cannot return. *@
 
@@ -6,7 +7,8 @@
     var team = s.TeamFor(_visitor);
     bool batting = s.IsTopOfInning == _visitor;
     var bench = s.Bench(_visitor).ToList();
-    var lineup = s.LineupPlayers(_visitor).ToList();
+    // WHY: the pitcher is not a fielder to replace or move; a pitching change (or a double switch) replaces him.
+    var lineup = s.LineupPlayers(_visitor).Where(x => x.Position != FieldPosition.P).ToList();
     var pitcher = s.PitcherFor(_visitor);
     var pen = s.BullpenFor(_visitor);
 }
@@ -50,6 +52,13 @@
                     {
                         <MudStack Spacing="2">
                             <MudText>At bat: <b>@s.CurrentBatter.Name</b> (@LineupRules.Label(s.CurrentBatterPosition))</MudText>
+                            @if (s.CurrentBatterPosition == FieldPosition.P)
+                            {
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    A pinch hitter for the pitcher takes his spot, so the pitcher is out of the game and a
+                                    reliever (a warm one if you have one) takes the mound when your team next takes the field.
+                                </MudText>
+                            }
                             <MudSelect T="int" Label="Pinch hitter" Dense="true" Variant="Variant.Outlined"
                                        @bind-Value="_phBench">
                                 @foreach (var p in bench)
@@ -216,7 +225,52 @@
                         <MudText Typo="Typo.caption" Class="mud-text-secondary">
                             A reliever needs 4–10 batters of warm-up. Coming in cold or overwarmed costs him effectiveness
                             for his first few batters, and the pitcher he replaces cannot return.
+                            @if (!s.DHRule) { <text> The new pitcher takes the old one's place in the batting order.</text> }
                         </MudText>
+
+                        @if (!s.DHRule && pen.Count > 0 && bench.Count > 0)
+                        {
+                            <MudDivider />
+                            <MudText Typo="Typo.subtitle2">Double switch</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                The new pitcher bats in the spot of the fielder who leaves, and a bench player takes that fielder's
+                                position and bats in the pitcher's old spot, so a hitter gets the turn that comes up sooner.
+                            </MudText>
+                            <MudSelect T="int" Label="New pitcher" Dense="true" Variant="Variant.Outlined" @bind-Value="_dsReliever"
+                                       ToStringFunc="@(id => pen.FirstOrDefault(w => w.Player.Id == id)?.Player.Name ?? string.Empty)">
+                                @foreach (var w in pen)
+                                {
+                                    <MudSelectItem T="int" Value="@w.Player.Id">@PlayerLabels.Pitcher(w.Player) · @w.Status</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudSelect T="int" Label="Fielder leaving" Dense="true" Variant="Variant.Outlined" @bind-Value="_dsOut"
+                                       ToStringFunc="@(id => lineup.Where(x => x.Player.Id == id).Select(x => $"{LineupRules.Label(x.Position)} — {x.Player.Name}").FirstOrDefault() ?? string.Empty)">
+                                @foreach (var (p, pos) in lineup)
+                                {
+                                    <MudSelectItem T="int" Value="@p.Id">@LineupRules.Label(pos) — @p.Name (bats @(s.LineupFor(_visitor).IndexOf(p.Id) + 1))</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudSelect T="int" Label="Replacement" Dense="true" Variant="Variant.Outlined" @bind-Value="_dsIn"
+                                       ToStringFunc="@(id => bench.FirstOrDefault(b => b.Id == id)?.Name ?? string.Empty)">
+                                @foreach (var p in bench)
+                                {
+                                    <MudSelectItem T="int" Value="@p.Id">@PlayerLabels.Line(p)</MudSelectItem>
+                                }
+                            </MudSelect>
+                            @if (_dsOut != 0 && _dsIn != 0)
+                            {
+                                var leaving = lineup.First(x => x.Player.Id == _dsOut);
+                                var incoming = bench.First(b => b.Id == _dsIn);
+                                <MudText Typo="Typo.caption" Class="@(incoming.IsNaturalAt(leaving.Position) ? "mud-text-secondary" : "mud-warning-text")">
+                                    At @LineupRules.Label(leaving.Position): @incoming.Name — @PlayerLabels.Fielding(incoming, leaving.Position)
+                                </MudText>
+                            }
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       Disabled="@(_dsReliever == 0 || _dsOut == 0 || _dsIn == 0)"
+                                       OnClick="@(() => Apply(() => Game.DoubleSwitch(_visitor, _dsReliever, _dsOut, _dsIn), "Double switch made."))">
+                                Double switch
+                            </MudButton>
+                        }
                     </MudStack>
                 </MudTabPanel>
             </MudTabs>
@@ -244,9 +298,10 @@
     {
         _visitor = visitor;
         _message = null;
-        _phBench = _prBase = _prBench = _repOut = _repIn = _swapA = _swapB = 0;
+        _phBench = _prBase = _prBench = _repOut = _repIn = _swapA = _swapB = _dsReliever = _dsOut = _dsIn = 0;
     }
 
+    private int _dsReliever, _dsOut, _dsIn;
     private int _phBench, _prBase, _prBench, _repOut, _repIn, _swapA, _swapB;
     private string? _message;
     private bool _isError;
@@ -258,7 +313,7 @@
             action();
             _message = success;
             _isError = false;
-            _phBench = _prBase = _prBench = _repOut = _repIn = _swapA = _swapB = 0;
+            _phBench = _prBase = _prBench = _repOut = _repIn = _swapA = _swapB = _dsReliever = _dsOut = _dsIn = 0;
         }
         catch (InvalidOperationException ex)
         {

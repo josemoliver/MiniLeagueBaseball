@@ -7,9 +7,12 @@ namespace MiniLeague.Engine.AI;
 /// The original rule-based computer manager, kept as a choice of its own. It follows fixed rules for each situation
 /// (bunt with the weak hitter late, walk the big bat with first open, send a fast runner now and then) and never
 /// prices a call or looks at the matchup in front of it. It is the baseline the expected-run managers are measured
-/// against. Injury replacements and position swaps are the shared ones from <see cref="ComputerManager"/>.
+/// against. Injury replacements and position swaps are the shared ones from <see cref="ComputerManager"/>. He does make
+/// one move the book calls for: with a lead in the ninth, a better glove for the weakest fielder.
 /// </summary>
-public class OldSchoolManager(Random? rng = null) : ComputerManager(rng)
+// NOTE: only DefensiveReplaceFromInning is read from the tuning; every other call is overridden below.
+public class OldSchoolManager(Random? rng = null)
+    : ComputerManager(rng, new ManagerTuning { DefensiveReplaceFromInning = 9 })
 {
     // ── Defensive decisions ─────────────────────────────────────────────────
 
@@ -22,7 +25,11 @@ public class OldSchoolManager(Random? rng = null) : ComputerManager(rng)
 
         // Intentional walk: avoid a dangerous hitter with first base open.
         if (ShouldIntentionalWalk(state, batter))
-            return new DefensiveDecision { IntentionalWalk = true };
+            return new DefensiveDecision
+            {
+                IntentionalWalk = true,
+                Why = DecisionExplanation.Rule($"By the book: walk {batter.Name}, a power hitter, with first base open."),
+            };
 
         // Infield in: runner on third, fewer than two out, close game.
         var alignment = DefensiveAlignment.Standard;
@@ -31,7 +38,18 @@ public class OldSchoolManager(Random? rng = null) : ComputerManager(rng)
         else if (state.RunnerOnFirst is not null && state.Outs == 0 && IsBunter(batter))
             alignment = DefensiveAlignment.CornersIn;
 
-        return new DefensiveDecision { PitchType = SelectPitch(pitcher, batter, lateInning), Alignment = alignment };
+        string where = alignment switch
+        {
+            DefensiveAlignment.InfieldIn => "infield in to cut off the run at the plate",
+            DefensiveAlignment.CornersIn => "corners in for the bunt",
+            _ => "a normal defense",
+        };
+        return new DefensiveDecision
+        {
+            PitchType = SelectPitch(pitcher, batter, lateInning),
+            Alignment = alignment,
+            Why = DecisionExplanation.Rule($"By the book: {where}, and mix the pitches."),
+        };
     }
 
     // ── Offensive decisions ─────────────────────────────────────────────────
@@ -41,6 +59,20 @@ public class OldSchoolManager(Random? rng = null) : ComputerManager(rng)
         var decision = ChooseStrategy(state);
         PinchRun(state, decision);
         PinchHit(state, decision);
+        var notes = new List<string>();
+        if (decision.PinchRunnerPlayerId is int runnerId)
+            notes.Add($"Pinch runner {state.OffenseTeam.Roster.First(p => p.Id == runnerId).Name}: speed on the bases late.");
+        if (decision.PinchHitterPlayerId is int hitterId)
+            notes.Add($"Pinch hitter {state.OffenseTeam.Roster.First(p => p.Id == hitterId).Name}: a better bat late in a close game.");
+        string rule = decision.Strategy switch
+        {
+            OffensiveStrategy.SacrificeBunt => "By the book: bunt the runner over.",
+            OffensiveStrategy.Steal => "A hunch: send the fast runner.",
+            OffensiveStrategy.HitAndRun => "A hunch: put on the hit and run.",
+            OffensiveStrategy.SwingAgressive => "Close and late: run hard on anything.",
+            _ => "Let him swing.",
+        };
+        decision.Why = DecisionExplanation.Rule(string.Join(" ", notes.Append(rule)));
         return decision;
     }
 
@@ -51,6 +83,9 @@ public class OldSchoolManager(Random? rng = null) : ComputerManager(rng)
         if (state.CurrentInning < 7 || ScoreMargin(state) is > 1 or < -3) return;
 
         var batter = state.CurrentBatter;
+        // The book for a pitcher's turn: only when behind or tied late, and only with a reliever to bring in.
+        if (batter.IsPitcher && (state.CurrentInning < 7 || ScoreMargin(state) > 0
+                                 || state.BullpenFor(state.IsTopOfInning).Count == 0)) return;
         var bench = state.Bench(state.IsTopOfInning)
             .Where(p => (p.Overall?.AtBats ?? 0) >= 100 && p.Id != decision.PinchRunnerPlayerId)
             .ToList();
@@ -142,7 +177,7 @@ public class OldSchoolManager(Random? rng = null) : ComputerManager(rng)
 
         // Hand the lead to the closer.
         if (saveSpot && !pitcherIsCloser && closer is not null && closer.IsWarm)
-            return new PitchingMove(ChangeToId: closer.Player.Id);
+            return new PitchingMove(ChangeToId: closer.Player.Id, Why: $"The closer, {closer.Player.Name}, for the save.");
 
         // Fatigue: change once he is tiring (a settled reliever is left alone a little longer).
         bool settled = pitcher.BattersFaced - pitcher.SettleFrom >= FatigueModel.SettleInBatters;
@@ -160,7 +195,8 @@ public class OldSchoolManager(Random? rng = null) : ComputerManager(rng)
             if (next is null && spent)  // nobody ready, but he cannot go on: take the best arm available
                 next = PickReliever(pen, saveSpot, closer);
             if (next is not null)
-                return new PitchingMove(ChangeToId: next.Player.Id);
+                return new PitchingMove(ChangeToId: next.Player.Id,
+                    Why: shelled ? $"{pitcher.Player.Name} is being hit hard." : $"{pitcher.Player.Name} is tiring.");
         }
 
         // Get somebody loose before he is needed.
@@ -168,11 +204,12 @@ public class OldSchoolManager(Random? rng = null) : ComputerManager(rng)
         if (!anyWarming)
         {
             if (saveSoon && !pitcherIsCloser && closer is not null)
-                return new PitchingMove(StartWarmingId: closer.Player.Id);
+                return new PitchingMove(StartWarmingId: closer.Player.Id, Why: $"{closer.Player.Name} warms up for a save.");
             if (pitcher.Condition >= PitcherCondition.Ok && settled)
             {
                 var next = PickReliever(pen, saveSpot, closer);
-                if (next is not null) return new PitchingMove(StartWarmingId: next.Player.Id);
+                if (next is not null)
+                    return new PitchingMove(StartWarmingId: next.Player.Id, Why: $"{next.Player.Name} gets loose.");
             }
         }
         return new PitchingMove();
