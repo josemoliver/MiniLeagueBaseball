@@ -1,0 +1,41 @@
+name: Manager benchmark
+
+# Plays 6,000 seeded computer-versus-computer games between every pair of computer managers
+# (tools/MiniLeague.ManagerBench) and checks each persona against tools/MiniLeague.ManagerBench/expected-ranges.json
+# and against its own profile ratings. It takes a couple of minutes, reports on its own, and does not hold up the
+# Pages deployment (nothing waits for it). The report is written to the run's summary page.
+#
+# It runs when the engine or the tool changes, since those are what can move a persona out of character, and weekly,
+# so a drift that slips in some other way still shows. To see what a change does, run it from the Actions tab.
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/MiniLeague.Engine/**'
+      - 'src/MiniLeague.Web/wwwroot/data/**'
+      - 'tools/MiniLeague.ManagerBench/**'
+      - '.github/workflows/manager-benchmark.yml'
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      games:
+        description: 'Games per pairing, team match-up and seat (20 is the full run)'
+        default: '20'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # The numbers are exact for the same seed, so a failure is a real change in behavior, not noise.
+      - name: Benchmark
+        run: >
+          dotnet run -c Release --project tools/MiniLeague.ManagerBench --
+          --games ${{ github.event.inputs.games || '20' }} --check --summary "$GITHUB_STEP_SUMMARY"
