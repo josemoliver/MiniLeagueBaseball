@@ -10,6 +10,28 @@ namespace MiniLeague.Engine.Services;
 /// </summary>
 public class GameService
 {
+    public const int MaxPlayHints = 10;
+
+    public int PlayHintsRemaining(bool visitor) => State is { } s
+        ? Math.Max(0, MaxPlayHints - (visitor ? s.VisitorHintsUsed : s.HomeHintsUsed)) : 0;
+
+    public bool CanUsePlayHint(bool visitor) => State is { Status: GameStatus.InProgress, PendingInjury: null } s
+        && s.Options.ShowPlayHints
+        && (visitor ? s.VisitorControl : s.HomeControl) == ManagerControl.Human
+        && ((visitor ? s.VisitorLastHintPlay : s.HomeLastHintPlay) == s.Recap.Count
+            || PlayHintsRemaining(visitor) > 0);
+
+    /// <summary>Claims one hint for this side and play; reopening that play is free.</summary>
+    public bool TryUsePlayHint(bool visitor)
+    {
+        if (!CanUsePlayHint(visitor)) return false;
+        var s = State!;
+        if ((visitor ? s.VisitorLastHintPlay : s.HomeLastHintPlay) == s.Recap.Count) return true;
+        if (visitor) { s.VisitorHintsUsed++; s.VisitorLastHintPlay = s.Recap.Count; }
+        else { s.HomeHintsUsed++; s.HomeLastHintPlay = s.Recap.Count; }
+        return true;
+    }
+
     private readonly AtBatResolver _resolver;
     private readonly ComputerManager _cpu;
     private readonly ManagerCatalog? _catalog;

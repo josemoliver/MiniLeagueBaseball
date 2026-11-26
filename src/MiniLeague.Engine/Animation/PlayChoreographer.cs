@@ -214,8 +214,8 @@ internal sealed partial class Staging
 
     // Adds a key, never earlier than the actor's last one (so pieces can be put together without worrying).
     private void Put(string id, double t, FieldPoint at, double z = 0, string? pose = null,
-                     Ease ease = Ease.Linear, double apex = 0) =>
-        _s.Move(id, Math.Max(t, _s.TimeOf(id)), at, z, pose, ease, apex);
+                     Ease ease = Ease.Linear, double apex = 0, string? facing = null) =>
+        _s.Move(id, Math.Max(t, _s.TimeOf(id)), at, z, pose, ease, apex, facing);
 
     /// <summary>
     /// The wind-up and the pitch, ending with the ball at <paramref name="end"/> at the plate time. How the pitcher
@@ -388,7 +388,8 @@ internal sealed partial class Staging
     /// A fielder gets to a point (he starts when the ball is hit), arriving when the ball does or when he can,
     /// whichever is later. Returns when he gets there.
     /// </summary>
-    private double Fetch(Position pos, FieldPoint to, double ballTime, string pose = Poses.Catch)
+    private double Fetch(Position pos, FieldPoint to, double ballTime, string pose = Poses.Catch,
+                         string? facing = null)
     {
         string id = IdOf(pos);
         var from = _s.PointOf(id);
@@ -397,8 +398,9 @@ internal sealed partial class Staging
         _s.Move(id, go, from, pose: Poses.Run);
         // WHY: under a ball that is still in the air a fielder has his glove up before it arrives, not only at the catch.
         double early = arrive - 0.3;
-        if (pose == Poses.Catch && early > go + 0.2)
-            _s.Move(id, early, from.Towards(to, (early - go) / (arrive - go)), pose: Poses.Catch);
+        if ((pose is Poses.Catch or Poses.OverShoulder) && early > go + 0.2)
+            _s.Move(id, early, from.Towards(to, (early - go) / (arrive - go)),
+                pose: pose == Poses.OverShoulder ? Poses.Track : Poses.Catch, facing: facing);
         if (pose == Poses.Dive && arrive - go > 0.35 && from.DistanceTo(to) > 8)
         {
             double launch = arrive - 0.3;
@@ -406,7 +408,7 @@ internal sealed partial class Staging
             _s.Move(id, launch, from.Towards(to, (launch - go) / (arrive - go)), pose: Poses.Dive);
             _s.Move(id, airborne, from.Towards(to, (airborne - go) / (arrive - go)), z: 1.6);
         }
-        _s.Move(id, arrive, to, pose: pose);
+        _s.Move(id, arrive, to, pose: pose, facing: facing);
         return arrive;
     }
 
@@ -452,14 +454,16 @@ internal sealed partial class Staging
     /// The holder throws the ball to a point. Returns when it arrives (see <see cref="SolveThrow"/> for
     /// <paramref name="arriveAfter"/>).
     /// </summary>
-    private double ThrowTo(string throwerId, FieldPoint to, double earliestRelease, double? arriveAfter = null)
+    private double ThrowTo(string throwerId, FieldPoint to, double earliestRelease,
+                           double? arriveAfter = null, bool skipTransfer = false)
     {
         var from = _s.PointOf(throwerId);
         var (release, arrive) = SolveThrow(earliestRelease, from.DistanceTo(to), arriveAfter);
         // WHY: a man who has just fielded the ball moves it from the glove to his throwing hand before he throws (the
         // transfer). It only shows when there is time for it between his last move and the release.
         double transfer = release - 0.12;
-        if (transfer > _s.TimeOf(throwerId) + 0.02) Put(throwerId, transfer, from, pose: Poses.Transfer);
+        if (!skipTransfer && transfer > _s.TimeOf(throwerId) + 0.02)
+            Put(throwerId, transfer, from, pose: Poses.Transfer);
         Put("ball", release, from, 3);
         Put(throwerId, release, from, pose: Poses.Throw);
         Put("ball", arrive, to, 4, ease: Ease.Arc, apex: 3 + from.DistanceTo(to) * 0.05);
@@ -481,7 +485,8 @@ internal sealed partial class Staging
     }
 
     /// <summary>The receiver gets to a point to take a throw arriving at <paramref name="arrive"/>.</summary>
-    private void Receive(string id, FieldPoint at, double arrive, string pose = Poses.Catch, string? facing = null)
+    private void Receive(string id, FieldPoint at, double arrive, string pose = Poses.Catch,
+                         string? facing = null, bool tagAtHome = true)
     {
         var from = _s.PointOf(id);
         double travel = from.DistanceTo(at) / FielderSpeed;
@@ -495,7 +500,7 @@ internal sealed partial class Staging
         _s.Move(id, arrive, at, pose: pose, facing: pose == Poses.Reach ? "left" : facing);
 
         // At the plate the catcher sweeps a tag across, a beat after the ball is in his glove.
-        if (id == "catcher" && at.DistanceTo(FieldGeometry.Home) < 4)
+        if (tagAtHome && id == "catcher" && at.DistanceTo(FieldGeometry.Home) < 4)
         {
             Put(id, arrive + 0.12, FieldGeometry.Home, pose: Poses.Tag);
             Put(id, arrive + 0.6, FieldGeometry.Home, pose: Poses.Stand);

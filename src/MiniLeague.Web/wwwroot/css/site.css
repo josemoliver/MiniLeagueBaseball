@@ -161,6 +161,17 @@ a, .btn-link {
 .decision-panel .decision-tip { color: var(--mud-palette-text-secondary); font-size: 0.75rem; line-height: 1.25; }
 .decision-panel .decision-actions { border-top: 1px solid rgba(11, 78, 162, 0.18); padding-top: 12px; flex-wrap: wrap; }
 .decision-panel .decision-commit { min-width: 116px; font-weight: 700; }
+.decision-panel .hint-button-label { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; flex-wrap: wrap; }
+.play-hint-card { display: grid; gap: 0.55rem; line-height: 1.45; max-height: min(72vh, 42rem); overflow-y: auto; }
+.play-hint-card p { margin: 0; }
+.play-hint-sides { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.play-hint-heading { margin: 0; font-size: 1.1rem; }
+.play-hint-heading:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 3px; }
+.play-hint-situation { font-weight: 700; }
+.play-hint-call { display: grid; gap: 0.15rem; border-left: 4px solid var(--mud-palette-primary); padding: 0.65rem 0.85rem; background: var(--mud-palette-background-gray); }
+.play-hint-call span { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; }
+.play-hint-call strong { font-size: 1.05rem; }
+.play-hint-conditional { color: var(--mud-palette-text-secondary); }
 
 /* WHY: the app bar holds the menu, title, Help, Cast and sound buttons; on a phone the title would otherwise
    wrap onto two lines and be clipped. */

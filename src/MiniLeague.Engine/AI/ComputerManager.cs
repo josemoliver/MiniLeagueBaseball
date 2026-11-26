@@ -24,6 +24,12 @@ public class ComputerManager
     // ── Defensive decisions ─────────────────────────────────────────────────
 
     public virtual DefensiveDecision MakeDefensiveDecision(GameState state, Player? plannedBatter = null)
+        => ChooseDefense(state, plannedBatter, forHint: false);
+
+    // WHY: the advisor uses the Analyst's valuation without the manager's random tie-breaks, pitch mixing or pitchout.
+    internal DefensiveDecision MakeHintDefensiveDecision(GameState state) => ChooseDefense(state, null, forHint: true);
+
+    private DefensiveDecision ChooseDefense(GameState state, Player? plannedBatter, bool forHint)
     {
         using var decision = ManagerDecisionModel.Decision(state);
         var pitcher = state.CurrentPitcher.Player;
@@ -50,7 +56,8 @@ public class ComputerManager
             double value = ManagerDecisionModel.AtBat(state, batter, pitcher, fatigue, pitch, alignment);
             byAlignment[alignment] = Math.Min(byAlignment.GetValueOrDefault(alignment, double.PositiveInfinity), value);
             candidates.Add((alignment, pitch, value));
-            if (value > bestValue - 0.004 && !(Math.Abs(value - bestValue) < 0.004 && Rng.NextDouble() < 0.2))
+            if (forHint ? value >= bestValue - 0.004
+                : value > bestValue - 0.004 && !(Math.Abs(value - bestValue) < 0.004 && Rng.NextDouble() < 0.2))
                 continue;
             bestValue = value;
             best.PitchType = pitch;
@@ -59,7 +66,7 @@ public class ComputerManager
         // WHY: a manager who is hard to read does not always throw the best pitch. Every option gets a chance that falls
         // off with how much worse it is (a softmax whose temperature is PitchMix, in runs), so the best is still the most
         // likely, and a clearly bad one almost never comes up.
-        if (Tuning.PitchMix > 0 && candidates.Count > 1)
+        if (!forHint && Tuning.PitchMix > 0 && candidates.Count > 1)
         {
             double floor = candidates.Min(c => c.Value);
             var weights = candidates.Select(c => Math.Exp(-(c.Value - floor) / Tuning.PitchMix)).ToList();
@@ -77,7 +84,7 @@ public class ComputerManager
                 : $"{best.PitchType} with {best.Alignment}: saves {normal - bestValue:+0.00;-0.00} runs against {batter.Name}.",
             considered);
 
-        if (state.RunnerOnFirst is { } runner && state.RunnerOnSecond is null && state.Outs < 2
+        if (!forHint && state.RunnerOnFirst is { } runner && state.RunnerOnSecond is null && state.Outs < 2
             && Math.Abs(ScoreMargin(state)) <= 2)
         {
             // WHY: A pitchout is a wasted ball. Against a runner who goes it is a steal attempt the catcher is ready
@@ -120,6 +127,15 @@ public class ComputerManager
                 decision.Strategy = ChooseStrategy(state, state.OffenseTeam.Roster.First(p => p.Id == id), decision, out why);
         }
         decision.Why = notes.Count == 0 ? why : why with { Summary = string.Join(" ", notes.Append(why.Summary)) };
+        return decision;
+    }
+
+    internal OffensiveDecision MakeHintOffensiveDecision(GameState state, DefensiveAlignment visibleAlignment)
+    {
+        using var scope = ManagerDecisionModel.Decision(state);
+        var decision = new OffensiveDecision();
+        decision.Strategy = ChooseStrategy(state, state.CurrentBatter, decision, out var why, visibleAlignment);
+        decision.Why = why;
         return decision;
     }
 
@@ -225,11 +241,11 @@ public class ComputerManager
         (p.Overall?.OnBasePercentage ?? 0) + (p.Overall?.SluggingPct ?? 0);
 
     private OffensiveStrategy ChooseStrategy(GameState state, Player batter, OffensiveDecision decision,
-        out DecisionExplanation why)
+        out DecisionExplanation why, DefensiveAlignment? visibleAlignment = null)
     {
         var pitcher = state.CurrentPitcher.Player;
         double fatigue = FatigueModel.GetModifier(state.CurrentPitcher);
-        var alignment = state.IsTopOfInning ? state.HomeAlignment : state.VisitorAlignment;
+        var alignment = visibleAlignment ?? (state.IsTopOfInning ? state.HomeAlignment : state.VisitorAlignment);
         // WHY: the defense's best pitch against him is the one that costs the offense most, so he is valued once per pitch and
         // the lowest is kept (the same valuations the fielding manager's own choice uses, which the decision's cache shares).
         var pitch = PitchType.Fastball;

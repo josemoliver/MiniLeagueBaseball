@@ -72,6 +72,10 @@ public class GameState
     // Control
     public ManagerControl VisitorControl { get; set; }
     public ManagerControl HomeControl { get; set; }
+    public int VisitorHintsUsed { get; set; }
+    public int HomeHintsUsed { get; set; }
+    public int VisitorLastHintPlay { get; set; } = -1;
+    public int HomeLastHintPlay { get; set; } = -1;
 
     /// <summary>
     /// Which computer manager (a <c>ManagerPersona</c> id) runs each side while it is computer-controlled.

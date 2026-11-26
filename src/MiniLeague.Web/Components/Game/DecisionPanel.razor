@@ -95,6 +95,15 @@
         <MudButton Variant="Variant.Outlined" Size="Size.Medium" OnClick="OnSubstitutions">
             SUBS<span class="key-hint">S</span>
         </MudButton>
+        @if (ShowHints)
+        {
+            <MudButton id="play-hint-button" Variant="Variant.Outlined" Size="Size.Medium"
+                       StartIcon="@Icons.Material.Filled.Lightbulb" OnClick="OnHint"
+                       Disabled="@(!HintAvailable)" data-testid="hint-button">
+                <span class="hint-button-label"><span>Hint</span><span class="hint-remaining">@HintRemainingText</span></span>
+                <span class="key-hint">H</span>
+            </MudButton>
+        }
     </MudStack>
 </MudStack>
 
@@ -103,6 +112,10 @@
     [Parameter] public bool ShowOffense { get; set; }
     /// <summary>A human chooses the fielding side's pitch and alignment.</summary>
     [Parameter] public bool ShowDefense { get; set; }
+    /// <summary>Whether this game's human manager can ask for play advice.</summary>
+    [Parameter] public bool ShowHints { get; set; } = true;
+    [Parameter] public bool HintAvailable { get; set; } = true;
+    [Parameter] public string HintRemainingText { get; set; } = string.Empty;
     /// <summary>A runner on first with second open: a steal of second or a hit and run can be called.</summary>
     [Parameter] public bool CanSteal { get; set; }
     /// <summary>What a steal call would send (second, third, or both runners); None when there is nothing to steal.</summary>
@@ -116,6 +129,7 @@
     [Parameter] public EventCallback<(OffensiveDecision? Offense, DefensiveDecision? Defense)> OnDecision { get; set; }
     [Parameter] public EventCallback OnSubstitutions { get; set; }
     [Parameter] public EventCallback OnBoxScore { get; set; }
+    [Parameter] public EventCallback OnHint { get; set; }
 
     private DotNetObjectReference<DecisionPanel>? _self;
 
@@ -140,7 +154,7 @@
     public async Task OnKey(string code, bool shift)
     {
         if (AlignmentMoving || _choosingAlignment) return;
-        var action = Shortcuts.Resolve(code, shift, ShowOffense, ShowDefense);
+        var action = Shortcuts.Resolve(code, shift, ShowOffense, ShowDefense, ShowHints);
         switch (action.Kind)
         {
             case ShortcutKind.Offense:
@@ -153,6 +167,7 @@
             case ShortcutKind.Play: if (!_committing) await OnCommit(); return;
             case ShortcutKind.Substitutions: await OnSubstitutions.InvokeAsync(); return;
             case ShortcutKind.BoxScore: await OnBoxScore.InvokeAsync(); return;
+            case ShortcutKind.Hint: if (HintAvailable) await OnHint.InvokeAsync(); return;
             default: return;
         }
         await InvokeAsync(StateHasChanged);

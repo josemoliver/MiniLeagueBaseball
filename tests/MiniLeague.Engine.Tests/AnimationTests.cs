@@ -569,14 +569,16 @@ public class AnimationTests
             {
                 var s = Script(r, b, seed);
                 var ball = TrackOf(s, "ball").Keys;
-                // The first key after the pitch where the ball is on the ground or coming down is where it lands.
-                var landing = ball.First(k => k.T > PlateTime(s) && k.Ease is Ease.Roll or Ease.Arc);
-                Assert.True(FieldGeometry.IsFair(new FieldPoint(landing.X, landing.Y)));
+                // The pickup can follow an earlier bounce or roll; the glove cue marks where the fielder gets it.
+                var pickup = s.Cues.Single(c => c.Kind == CueKind.Effect && c.Value == "glove");
+                Assert.True(FieldGeometry.IsFair(new FieldPoint(pickup.X!.Value, pickup.Y!.Value)));
+                Assert.Contains(ball, k => k.T > PlateTime(s) &&
+                    Math.Abs(k.X - pickup.X.Value) < 0.01 && Math.Abs(k.Y - pickup.Y.Value) < 0.01);
 
                 // Someone is standing on the ball when he has it.
                 var gatherer = s.Tracks.Where(t => t.ActorId.StartsWith("fielder-"))
                     .Where(t => t.Keys.Any(k => k.Pose is Poses.Catch or Poses.Crouch
-                        && Math.Abs(k.X - landing.X) < 0.01 && Math.Abs(k.Y - landing.Y) < 0.01));
+                        && Math.Abs(k.X - pickup.X.Value) < 0.01 && Math.Abs(k.Y - pickup.Y.Value) < 0.01));
                 Assert.NotEmpty(gatherer);
             }
         }
@@ -644,10 +646,51 @@ public class AnimationTests
         var landings = Enumerable.Range(0, 40).Select(seed =>
         {
             var script = Script(r, b, seed);
-            var k = TrackOf(script, "ball").Keys.First(k => k.T > PlateTime(script) && k.Ease is Ease.Roll or Ease.Arc);
-            return (Math.Round(k.X / 20), Math.Round(k.Y / 20));
+            var pickup = script.Cues.Single(c => c.Kind == CueKind.Effect && c.Value == "glove");
+            return (Math.Round(pickup.X!.Value / 20), Math.Round(pickup.Y!.Value / 20));
         }).Distinct().Count();
         Assert.True(landings > 5, $"only {landings} different landing zones");
+    }
+
+    [Fact]
+    public void Single_VisualVariantsLandBeforeTheFielderPicksUpTheBall()
+    {
+        var (result, before) = Find((r, _) => r.Outcome == OutcomeType.Single && !r.IsBunt && !r.HitAndRun);
+        var seen = new HashSet<string>();
+        for (int seed = 0; seed < 120; seed++)
+        {
+            var script = Script(result, before, seed);
+            string intro = script.Cues.First(c => c.Kind == CueKind.Banner).Value;
+            seen.Add(intro);
+            var pickup = script.Cues.Single(c => c.Kind == CueKind.Effect && c.Value == "glove");
+            var ball = TrackOf(script, "ball").Keys
+                .Where(k => k.T > PlateTime(script) && k.T <= pickup.T).ToList();
+            Assert.True(ball.Count > 0);
+            Assert.True(ball[0].Z <= 0.5, $"{intro}: ball never touched the grass");
+            Assert.Contains(script.Tracks, t => t.ActorId.StartsWith("fielder-") && t.Keys.Any(k =>
+                k.Pose == Poses.Crouch && k.T == pickup.T &&
+                Math.Abs(k.X - pickup.X!.Value) < 0.01 && Math.Abs(k.Y - pickup.Y!.Value) < 0.01));
+
+            if (intro == "LINE DRIVE...")
+            {
+                Assert.Equal(Ease.Arc, ball[0].Ease);
+                Assert.InRange(ball[0].Apex, 8, 18);
+                Assert.Equal(Ease.Roll, ball[1].Ease);
+            }
+            else if (intro == "SHARP HOP TO THE INFIELD...")
+            {
+                Assert.Equal(Ease.Arc, ball[0].Ease);
+                Assert.Equal(Ease.Arc, ball[1].Ease);
+                Assert.InRange(ball[1].Apex, 2, 3);
+            }
+            else if (intro == "SOFT FLY BALL...")
+            {
+                Assert.Equal(Ease.Arc, ball[0].Ease);
+                Assert.Equal(Ease.Roll, ball[1].Ease);
+            }
+        }
+
+        Assert.Equal(5, seen.Count);
     }
 
     // ── Everything else still shows ──────────────────────────────────────────

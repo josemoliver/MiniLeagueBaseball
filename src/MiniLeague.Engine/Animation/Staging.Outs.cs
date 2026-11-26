@@ -59,6 +59,14 @@ internal sealed partial class Staging
         };
     }
 
+    // A slow roller gives the shortstop or third baseman room to charge and use his throwing hand.
+    private FieldPoint SlowRollerLanding(Position pos)
+    {
+        var spot = _spots[pos];
+        double angle = Math.Clamp(spot.AngleDegrees + Between(-5, 5), -40, 40);
+        return FieldPoint.FromPolar(angle, Math.Max(25, spot.DistanceFromHome - Between(22, 34)));
+    }
+
     // Where a ball in the air comes down, near the fielder.
     private FieldPoint CatchPoint(Position pos, Catch kind)
     {
@@ -93,14 +101,21 @@ internal sealed partial class Staging
         var batterMove = moves.FirstOrDefault(m => m.FromBase == 0);
         var fielder = _result.Fielder is { } f && Has(f) ? f : PickGroundFielder();
         string id = IdOf(fielder);
+        bool barehand = !_result.IsBunt && fielder is (Position.Short or Position.Third)
+            && _rng.NextDouble() < 0.22;
 
         ContactPitch();
-        var landing = GroundLanding(fielder);
-        double tBall = RollArrival(landing);
+        var landing = barehand ? SlowRollerLanding(fielder) : GroundLanding(fielder);
+        double tBall = barehand ? Contact + 0.32 + landing.DistanceFromHome / 180 : RollArrival(landing);
         _s.Move("ball", tBall, landing, 0.5, ease: Ease.Roll);
-        double tField = Fetch(fielder, landing, tBall, Poses.Crouch);
+        double tField = Fetch(fielder, landing, tBall, barehand ? Poses.Barehand : Poses.Crouch);
         if (tField > tBall) _s.Move("ball", tField, landing, 0.5);
         _s.Cue(tField, CueKind.Effect, "glove", landing);
+        if (barehand)
+        {
+            _s.Cue(Contact + 0.12, CueKind.Banner, "SLOW ROLLER...");
+            _s.Cue(tField, CueKind.Effect, "barehand", landing);
+        }
         SupportOutfielder(fielder, landing, tField);
 
         // Runners already on base go with the contact.
@@ -120,7 +135,10 @@ internal sealed partial class Staging
         {
             var gloveSpot = firstId == FielderId(Position.First)
                 ? new FieldPoint(first.X + 3.5, first.Y + 1) : first;
-            arrive = ThrowTo(id, gloveSpot, SetForRelay(id, gloveSpot, tField));
+            // WHY: after a barehand scoop the ball is already in the throwing hand; a quick throw
+            // keeps it there instead of animating a glove transfer and a full relay set.
+            double throwReady = barehand ? tField + 0.28 : SetForRelay(id, gloveSpot, tField);
+            arrive = ThrowTo(id, gloveSpot, throwReady, skipTransfer: barehand);
             Receive(firstId, gloveSpot, arrive, firstId == FielderId(Position.First) ? Poses.Reach : Poses.Catch);
             BackUpThrow(id, firstId, first, arrive);
         }
@@ -175,14 +193,19 @@ internal sealed partial class Staging
         Receive(pivot, second, arrive2);
         _s.EndPose(pivot, Poses.Tag);
 
+        // WHY: let the force at second finish before the pivot turns toward first. The runner
+        // may reach the bag later than the throw, especially on a slow roller.
+        var forcedTimes = MoveRunner(runnerOut, Contact + 0.1, SecondsPerBase,
+            minArrival: arrive2 + 0.12, slide: true);
+        double forcedOutAt = forcedTimes.GetValueOrDefault(2, arrive2 + 0.12);
+
         string firstId = Has(Position.First) ? FielderId(Position.First) : "pitcher";
         // WHY: The pivot makes the call, turns and plants before sending the ball to first.
-        double arrive1 = ThrowTo(pivot, first, SetForRelay(pivot, first, arrive2));
+        double arrive1 = ThrowTo(pivot, first, SetForRelay(pivot, first, forcedOutAt + 0.02));
         Receive(firstId, first, arrive1);
         BackUpThrow(pivot, firstId, first, arrive1);
 
         // Both runners are out: each gets there just after the ball.
-        MoveRunner(runnerOut, Contact + 0.1, SecondsPerBase, minArrival: arrive2 + 0.12, slide: true);
         MoveRunner(batterMove, Contact + 0.1, SecondsPerBase, minArrival: arrive1 + 0.12);
 
         _s.Cue(arrive2, CueKind.Sound, "out");
@@ -215,7 +238,10 @@ internal sealed partial class Staging
             && _rng.NextDouble() < 0.18;
         bool dive = !wallCatch && kind != Catch.Pop && pos is not (Position.C or Position.P)
             && _rng.NextDouble() < DiveChance(pos);
+        bool overShoulder = !wallCatch && !dive && kind == Catch.Fly
+            && pos is (Position.Left or Position.Center or Position.Right) && _rng.NextDouble() < 0.23;
         var landing = wallCatch ? WallCatchPoint(pos)
+            : overShoulder ? OverShoulderPoint(pos)
             : platePop ? PlatePopPoint(pos) : dive ? DivePoint(pos, kind) : CatchPoint(pos, kind);
         double d = landing.DistanceFromHome;
         double flight = kind switch { Catch.Fly => 0.6 + d / 170, Catch.Pop => 2.4 + d / 350, _ => 0.3 + d / 320 };
@@ -225,7 +251,8 @@ internal sealed partial class Staging
         double go = Math.Max(Contact + 0.1, _s.TimeOf(id));
         double tCatch = Math.Max(Contact + flight, go + _s.PointOf(id).DistanceTo(landing) / FielderSpeed
             + (wallCatch ? 0.28 : 0));
-        _s.Move("ball", tCatch, landing, wallCatch ? 8 : dive ? 1.5 : 4, ease: Ease.Arc, apex: apex);
+        _s.Move("ball", tCatch, landing, wallCatch ? 8 : overShoulder ? 6 : dive ? 1.5 : 4,
+            ease: Ease.Arc, apex: apex);
         if (wallCatch)
         {
             Fetch(pos, landing, tCatch - 0.28, Poses.Track);
@@ -234,7 +261,8 @@ internal sealed partial class Staging
             Put(id, tCatch + 0.38, landing, pose: Poses.Catch);
         }
         else
-            Fetch(pos, landing, tCatch, dive ? Poses.Dive : Poses.Catch);
+            Fetch(pos, landing, tCatch, dive ? Poses.Dive : overShoulder ? Poses.OverShoulder : Poses.Catch,
+                facing: overShoulder ? "back" : null);
         if (platePop)
         {
             if (pos == Position.C)
@@ -260,6 +288,11 @@ internal sealed partial class Staging
         _s.Cue(Math.Max(Contact + 0.1, tCatch - 0.45), CueKind.Effect, "focus", landing);
         _s.Cue(tCatch, CueKind.Effect, "glove", landing);
         if (wallCatch) _s.Cue(tCatch, CueKind.Effect, "wallcatch", landing);
+        if (overShoulder)
+        {
+            _s.Cue(tCatch, CueKind.Effect, "shouldercatch", landing);
+            Put(id, tCatch + 0.18, landing, pose: Poses.Turn, facing: "front");
+        }
 
         // The batter is out. A runner on third who scores tagged up and went after the catch.
         var moves = _result.RunnerMoves;
@@ -267,7 +300,7 @@ internal sealed partial class Staging
 
         // WHY: The fielder gathers himself on one knee before standing or transferring the ball to throw.
         if (dive) Put(id, tCatch + 0.42, landing, pose: Poses.Crouch);
-        double ready = dive ? 0.75 : wallCatch ? 0.55 : Transfer;
+        double ready = dive ? 0.75 : wallCatch ? 0.55 : overShoulder ? 0.5 : Transfer;
         bool threw = false;
         if (moves.Any(m => m.Fate == RunnerFate.Scored) && id != "catcher")
         {
@@ -276,7 +309,8 @@ internal sealed partial class Staging
             Receive("catcher", HomeCatcher, arrive);
             threw = true;
         }
-        if ((dive || wallCatch) && !threw) Put(id, tCatch + 0.7, landing, pose: Poses.Stand);
+        if ((dive || wallCatch || overShoulder) && !threw)
+            Put(id, tCatch + 0.7, landing, pose: Poses.Stand);
 
         // A hit and run that ends on a line drive: the runner was already off the bag and is doubled off first.
         if (moves.FirstOrDefault(m => m.FromBase == 1 && m.ToBase == 1 && m.IsOut) is { } doubledOff)
@@ -293,6 +327,12 @@ internal sealed partial class Staging
             _s.Cue(tCatch, CueKind.Banner, "CAUGHT AT THE WALL!");
             _s.Cue(tCatch, CueKind.Hold, "0.3");
         }
+        if (overShoulder)
+        {
+            _s.Cue(tCatch, CueKind.Sound, "cheer");
+            _s.Cue(tCatch, CueKind.Banner, "OVER THE SHOULDER!");
+            _s.Cue(tCatch, CueKind.Hold, "0.25");
+        }
         if (dive)
         {
             _s.Cue(tCatch, CueKind.Sound, "cheer");
@@ -300,7 +340,8 @@ internal sealed partial class Staging
             if (pos is Position.Left or Position.Center or Position.Right)
                 _s.Cue(tCatch, CueKind.Hold, "0.3");
         }
-        _s.Cue(tCatch + (dive ? 0.9 : wallCatch ? 0.85 : 0.1), CueKind.Banner, _result.Description);
+        _s.Cue(tCatch + (dive ? 0.9 : wallCatch || overShoulder ? 0.85 : 0.1),
+            CueKind.Banner, _result.Description);
         CheerForRuns(moves, times);
     }
 
@@ -315,6 +356,14 @@ internal sealed partial class Staging
     {
         double angle = Math.Clamp(_spots[pos].AngleDegrees + Between(-4, 4), -40, 40);
         return FieldPoint.FromPolar(angle, FieldGeometry.WallDistance(_before.Stadium, angle) - 5);
+    }
+
+    private FieldPoint OverShoulderPoint(Position pos)
+    {
+        var spot = _spots[pos];
+        double angle = Math.Clamp(spot.AngleDegrees + Between(-4, 4), -40, 40);
+        double limit = FieldGeometry.WallDistance(_before.Stadium, angle) - 12;
+        return FieldPoint.FromPolar(angle, Math.Min(spot.DistanceFromHome + Between(16, 28), limit));
     }
 
     // Where a diving catch is made: well to one side of where he plays (a long way for an outfielder), and never in the stands.

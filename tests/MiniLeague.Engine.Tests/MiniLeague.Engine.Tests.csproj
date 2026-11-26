@@ -22,6 +22,8 @@
     <ProjectReference Include="..\..\src\MiniLeague.Engine\MiniLeague.Engine.csproj" />
     <!-- The computer-manager benchmark tool (it is not in the .slnx): ManagerBenchmarkTests runs a small one. -->
     <ProjectReference Include="..\..\tools\MiniLeague.ManagerBench\MiniLeague.ManagerBench.csproj" />
+    <!-- The survey tool stays outside the solution; this project exercises one seeded matchup. -->
+    <ProjectReference Include="..\..\tools\MiniLeague.SurveyTool\MiniLeague.SurveyTool.csproj" />
   </ItemGroup>
 
 </Project>

@@ -495,7 +495,86 @@ public class GameRoomTests : BunitContext, IAsyncLifetime
         Assert.Equal(GameOptions.Standard, _store.Snapshot!.Options);
     }
 
+    [Fact]
+    public void PlayHintsCanBeSwitchedOffBeforeTheGame()
+    {
+        RenderProviders();
+        var room = OpenGameRoom();
+        Assert.Contains("Show Play Hints", room.Markup);
+        Assert.Equal(2, room.FindAll(".mud-switch input").Count);
+
+        room.FindAll(".mud-switch input")[1].Change(false);
+        Click(room, "PLAY BALL");
+
+        Assert.False(_store.Snapshot!.Options.ShowPlayHints);
+        Assert.Empty(room.FindAll("[data-testid=hint-button]"));
+    }
+
+    [Fact]
+    public void AResumedGameKeepsPlayHintsDisabled()
+    {
+        _store.Json = GameSnapshots.ToJson(SnapshotOf(s =>
+            s.Options = s.Options with { ShowPlayHints = false }));
+        RenderProviders();
+        var room = OpenGameRoom();
+        Click(room, "RESUME");
+
+        room.WaitForState(() => room.Markup.Contains("OFFENSIVE STRATEGY"));
+        Assert.Empty(room.FindAll("[data-testid=hint-button]"));
+        Assert.False(_store.Snapshot!.Options.ShowPlayHints);
+    }
+
     // ── Box score ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void HintShowsBattingAdviceWithoutPlayingTheGame()
+    {
+        var providers = RenderProviders();
+        var room = StartedGame();
+        int playsBefore = _store.Snapshot!.PlayByPlay.Count;
+
+        room.Find("[data-testid=hint-button]").Click();
+        providers.WaitForState(() => providers.FindAll("[data-testid=play-hint-card]").Count > 0);
+        var card = providers.Find("[data-testid=play-hint-card]");
+        Assert.Contains("You are batting", card.TextContent);
+        Assert.Contains("MY CALL", card.TextContent);
+        Assert.DoesNotMatch(@"\d", card.TextContent);
+        Assert.Equal(playsBefore, _store.Snapshot!.PlayByPlay.Count);
+        Assert.Equal(1, _store.Snapshot.VisitorHintsUsed);
+        Assert.Contains("9 left", room.Find("[data-testid=hint-button]").TextContent);
+    }
+
+    [Fact]
+    public void TwoHumanHintCanSwitchFromBattingToFielding()
+    {
+        var providers = RenderProviders();
+        var room = StartedGame(manage: "Both teams");
+        room.Find("[data-testid=hint-button]").Click();
+        providers.WaitForState(() => providers.FindAll("[data-testid=play-hint-card]").Count > 0);
+        Assert.Contains("You are batting", providers.Find("[data-testid=play-hint-card]").TextContent);
+        Assert.Equal(1, _store.Snapshot!.VisitorHintsUsed);
+        Assert.Equal(0, _store.Snapshot.HomeHintsUsed);
+        Click(providers, "Fielding hint");
+        providers.WaitForAssertion(() => Assert.Contains("You are fielding", providers.Find("[data-testid=play-hint-card]").TextContent));
+        Assert.Equal(1, _store.Snapshot!.HomeHintsUsed);
+    }
+
+    [Fact]
+    public void ExhaustedHintsDisableTheButtonOnTheNextPlay()
+    {
+        _store.Json = GameSnapshots.ToJson(SnapshotOf(s =>
+        {
+            s.VisitorHintsUsed = GameService.MaxPlayHints;
+            s.VisitorLastHintPlay = -1;
+        }));
+        RenderProviders();
+        var room = OpenGameRoom();
+        Click(room, "RESUME");
+        room.WaitForState(() => room.FindAll("[data-testid=hint-button]").Count > 0);
+        var button = room.Find("[data-testid=hint-button]");
+        Assert.Contains("0 left", button.TextContent);
+        Assert.True(button.HasAttribute("disabled"));
+    }
 
     [Fact]
     public void TheBoxScoreOpensDuringTheGame_WithBothTeamsHittersAndPitchers()

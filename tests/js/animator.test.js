@@ -275,10 +275,12 @@ test('contact and fielding cues add brief marks, while focus highlights a base',
     const focus = render({ t: 0.1, kind: 'effect', value: 'focus', x: 63.6, y: 63.6 });
     const contact = render({ t: 0.1, kind: 'effect', value: 'contact', x: 0, y: 0 });
     const glove = render({ t: 0.1, kind: 'effect', value: 'glove', x: 80, y: 180 });
+    const bounce = render({ t: 0.1, kind: 'effect', value: 'bounce', x: 80, y: 180 });
 
     assert.equal(count(focus, 'ellipse'), count(plain, 'ellipse') + 1);
     assert.ok(count(contact, 'lineTo') > count(plain, 'lineTo'));
     assert.ok(count(glove, 'lineTo') > count(plain, 'lineTo'));
+    assert.equal(count(bounce, 'fillRect'), count(plain, 'fillRect') + 3);
 });
 
 test('a distant diving catch gets a brief magnified inset without replacing the field', () => {
@@ -315,6 +317,55 @@ test('a distant diving catch gets a brief magnified inset without replacing the 
     const ordinary = { ...script, tracks: script.tracks.map(track => track.actorId === 'fielder-Left'
         ? { ...track, keys: track.keys.map(k => ({ ...k, pose: 'catch' })) } : track) };
     assert.equal(hasInset(render(ordinary, 2)), false);
+});
+
+test('a barehanded slow roller shows the throwing hand at the grass and a pickup inset', () => {
+    const { env, canvas } = start();
+    const actor = { id: 'fielder-Third', kind: 'fielder', team: 'home' };
+    const script = { version: 1, outcome: 'GroundOut', duration: 2.5,
+        actors: [actor, { id: 'ball', kind: 'ball' }],
+        tracks: [
+            { actorId: actor.id, keys: [{ t: 0, x: -72, y: 82, pose: 'stand' },
+                { t: 0.5, x: -72, y: 82, pose: 'run' },
+                { t: 1, x: -55, y: 60, pose: 'barehand' },
+                { t: 1.15, x: -55, y: 60, pose: 'turn' },
+                { t: 1.5, x: -55, y: 60, pose: 'throw' }] },
+            { actorId: 'ball', keys: [{ t: 0, x: 0, y: 0, z: 0.5 },
+                { t: 1, x: -55, y: 60, z: 0.5, ease: 'roll' }] },
+        ], cues: [{ t: 1, kind: 'effect', value: 'barehand', x: -55, y: 60 }] };
+    const { figureParts, handOf } = env.api._internals;
+    const gloveHeight = pose => Math.min(...figureParts(actor, { pose, distance: 0 }, 'front', 0)
+        .filter(p => p.c === '#8b5a2b').map(p => p.y));
+    assert.ok(gloveHeight('barehand') < gloveHeight('crouch'), 'the glove stays by the hip');
+    assert.ok(handOf('barehand', 'front').x > 0, 'the throwing hand scoops the ball');
+    env.api.seek(script, park, 1.04, '');
+    assert.ok(fillTextsOf(canvas).includes('BAREHAND PLAY'));
+    assert.ok(!fillTextsOf(canvas).includes('RELAY CLOSE-UP'));
+});
+
+test('an over-the-shoulder catch faces the wall and gets a brief catch inset', () => {
+    const { env, canvas } = start();
+    const actor = { id: 'fielder-Left', kind: 'fielder', team: 'home' };
+    const script = { version: 1, outcome: 'FlyOut', duration: 3,
+        actors: [actor, { id: 'ball', kind: 'ball' }],
+        tracks: [
+            { actorId: actor.id, keys: [{ t: 0, x: -120, y: 240, pose: 'stand' },
+                { t: 0.8, x: -120, y: 240, pose: 'run' },
+                { t: 1.6, x: -130, y: 265, pose: 'track', facing: 'back' },
+                { t: 2, x: -135, y: 275, pose: 'overShoulder', facing: 'back' },
+                { t: 2.2, x: -135, y: 275, pose: 'turn', facing: 'front' }] },
+            { actorId: 'ball', keys: [{ t: 0, x: 0, y: 0, z: 3 },
+                { t: 2, x: -135, y: 275, z: 6, ease: 'arc', apex: 65 }] },
+        ], cues: [{ t: 2, kind: 'effect', value: 'shouldercatch', x: -135, y: 275 }] };
+    const { prepare, sample, facingOf, handOf } = env.api._internals;
+    const atCatch = sample(prepare(script).tracks.get(actor.id), 2);
+    assert.equal(facingOf(actor, atCatch).view, 'back');
+    assert.ok(handOf('overShoulder', 'back').x > 0);
+    env.api.seek(script, park, 2.05, '');
+    assert.ok(fillTextsOf(canvas).includes('OVER THE SHOULDER'));
+    const before = canvas.ctx.calls.length;
+    env.api.seek(script, park, 2.8, '');
+    assert.ok(!canvas.ctx.calls.slice(before).some(([name, args]) => name === 'fillText' && args[0] === 'OVER THE SHOULDER'));
 });
 
 test('init sizes the canvas to the fixed picture and draws the field', () => {
@@ -1372,6 +1423,39 @@ test('a relay fielder keeps facing the target as he turns and plants', () => {
     assert.ok(canvas.ctx.calls.some(([name, args]) => name === 'fillText' && args[0] === 'RELAY CLOSE-UP'));
 });
 
+test('a double play shows the force, pivot, and release at second before the throw to first', () => {
+    const { env, canvas } = start();
+    const script = { version: 1, outcome: 'DoublePlay', duration: 3,
+        actors: [{ id: 'ball', kind: 'ball' }, { id: 'fielder-Second', kind: 'fielder', team: 'home' },
+            { id: 'runner-1', kind: 'runner', team: 'visitor' },
+            { id: 'batter', kind: 'batter', team: 'visitor' }],
+        tracks: [
+            { actorId: 'ball', keys: [{ t: 0, x: -30, y: 90, z: 3 },
+                { t: 1.4, x: 0, y: 127.28, z: 4 }, { t: 2, x: 0, y: 127.28, z: 3 },
+                { t: 2.35, x: 63.64, y: 63.64, z: 4 }] },
+            { actorId: 'fielder-Second', keys: [{ t: 0, x: 20, y: 115, pose: 'stand' },
+                { t: 1.4, x: 0, y: 127.28, pose: 'tag' },
+                { t: 1.65, x: 0, y: 127.28, pose: 'turn' },
+                { t: 1.8, x: 0, y: 127.28, pose: 'plant' },
+                { t: 2, x: 0, y: 127.28, pose: 'throw' }] },
+            { actorId: 'runner-1', keys: [{ t: 0, x: 63.64, y: 63.64, pose: 'run' },
+                { t: 1.25, x: 18, y: 110, pose: 'slide' },
+                { t: 1.52, x: 0, y: 127.28, pose: 'out' }] },
+            { actorId: 'batter', keys: [{ t: 0, x: -3.5, y: 0, pose: 'run' },
+                { t: 2.48, x: 63.64, y: 63.64, pose: 'out' }] },
+        ], cues: [{ t: 1.52, kind: 'effect', value: 'call', x: 0, y: 127.28 }] };
+
+    env.api.seek(script, park, 1.3, '');
+    assert.ok(fillTextsOf(canvas).includes('DOUBLE PLAY TURN'));
+    assert.ok(!fillTextsOf(canvas).includes('OUT'));
+    env.api.seek(script, park, 1.75, '');
+    assert.ok(fillTextsOf(canvas).includes('OUT'));
+    assert.ok(!fillTextsOf(canvas).includes('RELAY CLOSE-UP'));
+    const before = canvas.ctx.calls.length;
+    env.api.seek(script, park, 2.3, '');
+    assert.ok(!canvas.ctx.calls.slice(before).some(([name, args]) => name === 'fillText' && args[0] === 'DOUBLE PLAY TURN'));
+});
+
 test('a steal call shows the covering fielder and runner in a temporary inset', () => {
     const { env, canvas } = start();
     const script = { version: 1, outcome: 'CaughtStealing', duration: 2,
@@ -1390,6 +1474,51 @@ test('a steal call shows the covering fielder and runner in a temporary inset', 
     const before = canvas.ctx.calls.length;
     env.api.seek(script, park, 2.2, '');
     assert.ok(!canvas.ctx.calls.slice(before).some(([name, args]) => name === 'fillText' && args[0] === 'STEAL AT SECOND'));
+});
+
+test('a steal of third shows a close-up framed at third base', () => {
+    const { env, canvas } = start();
+    const script = { version: 1, outcome: 'StolenBase', duration: 2,
+        actors: [{ id: 'ball', kind: 'ball' }, { id: 'fielder-Third', kind: 'fielder', team: 'home' },
+            { id: 'runner-2', kind: 'runner', team: 'visitor' }],
+        tracks: [
+            { actorId: 'ball', keys: [{ t: 0, x: 0, y: 0, z: 2 }, { t: 1.7, x: -60.64, y: 62.64, z: 4 }] },
+            { actorId: 'fielder-Third', keys: [{ t: 0, x: -70, y: 80, pose: 'stand' },
+                { t: 1.5, x: -60.64, y: 62.64, pose: 'catch' },
+                { t: 1.78, x: -60.64, y: 62.64, pose: 'tag' }] },
+            { actorId: 'runner-2', keys: [{ t: 0, x: 0, y: 127.28, pose: 'run' },
+                { t: 1.6, x: -63.64, y: 63.64, pose: 'safe' }] },
+        ], cues: [{ t: 1.6, kind: 'effect', value: 'call', x: -63.64, y: 63.64 }] };
+
+    env.api.seek(script, park, 1.6, '');
+    assert.ok(canvas.ctx.calls.some(([name, args]) => name === 'fillText' &&
+        args[0] === 'STEAL AT THIRD' && args[1] === 452));
+    assert.ok(fillTextsOf(canvas).includes('SAFE'));
+    assert.ok(!fillTextsOf(canvas).includes('STEAL AT SECOND'));
+});
+
+test('a double steal close-up follows the runner thrown out at third', () => {
+    const { env, canvas } = start();
+    const script = { version: 1, outcome: 'CaughtStealing', duration: 2,
+        actors: [{ id: 'ball', kind: 'ball' }, { id: 'fielder-Third', kind: 'fielder', team: 'home' },
+            { id: 'runner-1', kind: 'runner', team: 'visitor' },
+            { id: 'runner-2', kind: 'runner', team: 'visitor' }],
+        tracks: [
+            { actorId: 'ball', keys: [{ t: 0, x: 0, y: 0, z: 2 }, { t: 1.5, x: -60.64, y: 62.64, z: 4 }] },
+            { actorId: 'fielder-Third', keys: [{ t: 0, x: -70, y: 80, pose: 'stand' },
+                { t: 1.5, x: -60.64, y: 62.64, pose: 'catch' },
+                { t: 1.7, x: -60.64, y: 62.64, pose: 'tag' }] },
+            { actorId: 'runner-1', keys: [{ t: 0, x: 63.64, y: 63.64, pose: 'run' },
+                { t: 1.3, x: 0, y: 127.28, pose: 'safe' }] },
+            { actorId: 'runner-2', keys: [{ t: 0, x: 0, y: 127.28, pose: 'run' },
+                { t: 1.7, x: -63.64, y: 63.64, pose: 'out' }] },
+        ], cues: [{ t: 1.3, kind: 'effect', value: 'call', x: 0, y: 127.28 },
+            { t: 1.7, kind: 'effect', value: 'call', x: -63.64, y: 63.64 }] };
+
+    env.api.seek(script, park, 1.7, '');
+    assert.ok(fillTextsOf(canvas).includes('STEAL AT THIRD'));
+    assert.ok(fillTextsOf(canvas).includes('OUT'));
+    assert.ok(!fillTextsOf(canvas).includes('STEAL AT SECOND'));
 });
 
 test('a ground out at first shows the stretched glove and batter in a call inset', () => {
@@ -1413,6 +1542,39 @@ test('a ground out at first shows the stretched glove and batter in a call inset
     assert.ok(Math.max(...shoes('reach')) - Math.min(...shoes('reach')) >
         Math.max(...shoes('stand')) - Math.min(...shoes('stand')));
     assert.ok(handOf('reach', 'side').x > handOf('catch', 'side').x);
+});
+
+test('a hit with a runner thrown out at third shows the tag and out call in a temporary inset', () => {
+    const { env, canvas } = start();
+    const script = { version: 1, outcome: 'Single', duration: 3,
+        actors: [{ id: 'ball', kind: 'ball' }, { id: 'fielder-Third', kind: 'fielder', team: 'home' },
+            { id: 'runner-1', kind: 'runner', team: 'visitor' }],
+        tracks: [
+            { actorId: 'ball', keys: [{ t: 0, x: -120, y: 200, z: 3 },
+                { t: 1.8, x: -63.64, y: 63.64, z: 4 }] },
+            { actorId: 'fielder-Third', keys: [{ t: 0, x: -70, y: 80, pose: 'stand' },
+                { t: 1.8, x: -63.64, y: 63.64, pose: 'catch' },
+                { t: 2.05, x: -63.64, y: 63.64, pose: 'tag' }] },
+            { actorId: 'runner-1', keys: [{ t: 0, x: 63.64, y: 63.64, pose: 'run' },
+                { t: 1.7, x: -45, y: 80, pose: 'slide' },
+                { t: 2, x: -63.64, y: 63.64, pose: 'out' }] },
+        ], cues: [{ t: 2, kind: 'effect', value: 'call', x: -63.64, y: 63.64 }] };
+
+    env.api.seek(script, park, 1.85, '');
+    assert.ok(fillTextsOf(canvas).includes('PLAY AT THIRD'));
+    assert.ok(!fillTextsOf(canvas).includes('OUT'));
+    env.api.seek(script, park, 2.1, '');
+    assert.ok(fillTextsOf(canvas).includes('PLAY AT THIRD'));
+    assert.ok(fillTextsOf(canvas).includes('OUT'));
+    const before = canvas.ctx.calls.length;
+    env.api.seek(script, park, 2.7, '');
+    assert.ok(!canvas.ctx.calls.slice(before).some(([name, args]) => name === 'fillText' && args[0] === 'PLAY AT THIRD'));
+
+    const safe = { ...script, tracks: script.tracks.map(track => track.actorId === 'runner-1'
+        ? { ...track, keys: track.keys.map(key => key.pose === 'out' ? { ...key, pose: 'safe' } : key) } : track) };
+    const other = start();
+    other.env.api.seek(safe, park, 2.1, '');
+    assert.ok(!fillTextsOf(other.canvas).includes('PLAY AT THIRD'));
 });
 
 test('a close scoring play shows the slide and catcher tag at home without replacing the field', () => {

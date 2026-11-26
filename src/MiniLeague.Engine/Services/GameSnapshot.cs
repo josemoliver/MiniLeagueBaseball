@@ -25,6 +25,10 @@ public class GameSnapshot
     public GameOptions Options { get; set; } = GameOptions.None;
     public ManagerControl VisitorControl { get; set; }
     public ManagerControl HomeControl { get; set; }
+    public int VisitorHintsUsed { get; set; }
+    public int HomeHintsUsed { get; set; }
+    public int VisitorLastHintPlay { get; set; } = -1;
+    public int HomeLastHintPlay { get; set; } = -1;
     public string? VisitorManagerId { get; set; }   // null in games saved before there was a choice of manager
     public string? HomeManagerId { get; set; }
     public GameStatus Status { get; set; }
@@ -115,6 +119,10 @@ public static class GameSnapshots
             Options = s.Options,
             VisitorControl = s.VisitorControl,
             HomeControl = s.HomeControl,
+            VisitorHintsUsed = s.VisitorHintsUsed,
+            HomeHintsUsed = s.HomeHintsUsed,
+            VisitorLastHintPlay = s.VisitorLastHintPlay,
+            HomeLastHintPlay = s.HomeLastHintPlay,
             VisitorManagerId = s.VisitorManagerId,
             HomeManagerId = s.HomeManagerId,
             Status = s.Status,
@@ -215,6 +223,10 @@ public static class GameSnapshots
             DHRule = DesignatedHitterRules.Applies(snap.Options.DesignatedHitter, home),
             VisitorControl = snap.VisitorControl,
             HomeControl = snap.HomeControl,
+            VisitorHintsUsed = snap.VisitorHintsUsed,
+            HomeHintsUsed = snap.HomeHintsUsed,
+            VisitorLastHintPlay = snap.VisitorLastHintPlay,
+            HomeLastHintPlay = snap.HomeLastHintPlay,
             VisitorManagerId = snap.VisitorManagerId,
             HomeManagerId = snap.HomeManagerId,
             Status = snap.Status,

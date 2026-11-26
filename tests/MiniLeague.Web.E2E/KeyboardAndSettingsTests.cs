@@ -12,6 +12,111 @@ public class KeyboardAndSettingsTests(AppFixture app)
     private static ILocator Strategy(IPage page, string label) =>
         page.Locator(".decision-panel button", new PageLocatorOptions { HasText = label });
 
+    [Theory]
+    [InlineData(false, 390)]
+    [InlineData(true, 1280)]
+    public async Task HintOpensByKeyboardAndKeepsPlayKeysInsideTheDialog(bool detailed, int width)
+    {
+        await using var player = await GamePage.OpenAsync(app, "/game", detailed: detailed, width: width);
+        await player.StartGameAsync();
+        await player.WaitUntilIdleAsync();
+        await player.Page.Locator("[data-testid=hint-button]").WaitForAsync();
+        string before = await player.LastPlayAsync();
+
+        await player.Page.Keyboard.PressAsync("KeyH");
+        var card = player.Page.Locator("[data-testid=play-hint-card]");
+        await card.WaitForAsync();
+        Assert.Contains("MY CALL", await card.InnerTextAsync());
+        Assert.DoesNotMatch(@"\d", await card.InnerTextAsync());
+        await player.Page.Locator(".mud-dialog").ScreenshotAsync(new LocatorScreenshotOptions
+        {
+            Path = Path.Combine(Path.GetTempPath(), detailed ? "minileague-hint-detailed.png" : "minileague-hint-phone.png"),
+        });
+        await player.Page.Keyboard.PressAsync("Digit2");
+        Assert.Equal(before, await player.LastPlayAsync());
+        await player.Page.Keyboard.PressAsync("KeyH");
+        await card.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
+        Assert.True(await player.Page.Locator("[data-testid=hint-button]").EvaluateAsync<bool>("el => document.activeElement === el"));
+
+        await player.Page.Locator("[data-testid=hint-button]").ClickAsync();
+        await card.WaitForAsync();
+        await player.Page.Keyboard.PressAsync("Escape");
+        await card.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
+        Assert.Empty(player.Errors);
+    }
+
+    [Fact]
+    public async Task TwoHumanHintSwitchesSidesAndNamesTheFieldingCall()
+    {
+        await using var player = await GamePage.OpenAsync(app, "/game", width: 390);
+        await player.StartGameAsync(manage: "Both teams");
+        await player.Page.Locator(".decision-panel").ScreenshotAsync(new LocatorScreenshotOptions
+        {
+            Path = Path.Combine(Path.GetTempPath(), "minileague-hint-budgets-phone.png"),
+        });
+        await player.Page.Locator("[data-testid=hint-button]").ClickAsync();
+        var card = player.Page.Locator("[data-testid=play-hint-card]");
+        await card.WaitForAsync();
+        Assert.Contains("You are batting", await card.InnerTextAsync());
+        await player.Page.GetByRole(AriaRole.Button, new() { Name = "Fielding hint" }).ClickAsync();
+        Assert.Contains("You are fielding", await card.InnerTextAsync());
+        Assert.Contains("Throw a", await card.InnerTextAsync());
+        Assert.True(await player.Page.Locator(".play-hint-heading").EvaluateAsync<bool>("el => document.activeElement === el"));
+        await player.Page.Locator("[data-testid=hint-close]").ClickAsync();
+        await card.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
+        Assert.Empty(player.Errors);
+    }
+
+    [Fact]
+    public async Task ReopeningAHintAfterResumeDoesNotSpendAnotherOne()
+    {
+        await using var player = await GamePage.OpenAsync(app, "/game");
+        await player.StartGameAsync();
+        var button = player.Page.Locator("[data-testid=hint-button]");
+        await button.WaitForAsync();
+        Assert.Contains("10 LEFT", await button.InnerTextAsync());
+
+        await button.ClickAsync();
+        var card = player.Page.Locator("[data-testid=play-hint-card]");
+        await card.WaitForAsync();
+        await player.Page.Locator("[data-testid=hint-close]").ClickAsync();
+        await card.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
+        Assert.Contains("9 LEFT", await button.InnerTextAsync());
+
+        await player.Page.ReloadAsync();
+        await player.Page.Locator("button", new() { HasText = "RESUME" }).ClickAsync();
+        await button.WaitForAsync();
+        Assert.Contains("9 LEFT", await button.InnerTextAsync());
+        await button.ClickAsync();
+        await card.WaitForAsync();
+        await player.Page.Locator("[data-testid=hint-close]").ClickAsync();
+        await card.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden });
+        Assert.Contains("9 LEFT", await button.InnerTextAsync());
+        Assert.Empty(player.Errors);
+    }
+
+    [Fact]
+    public async Task GameOptionsCanHidePlayHintsForTheGame()
+    {
+        await using var player = await GamePage.OpenAsync(app, "/game", width: 390);
+        await player.Page.Locator("[data-testid=setup-options] summary").ClickAsync();
+        var option = player.Page.Locator("[data-testid=show-play-hints]");
+        Assert.True(await option.IsCheckedAsync());
+        await player.Page.GetByText("Show Play Hints").ClickAsync();
+        Assert.False(await option.IsCheckedAsync());
+        await player.Page.Locator("[data-testid=setup-options]").ScreenshotAsync(new LocatorScreenshotOptions
+        {
+            Path = Path.Combine(Path.GetTempPath(), "minileague-hints-option.png"),
+        });
+
+        await player.Page.Locator("button", new() { HasText = "PLAY BALL" }).ClickAsync();
+        await player.Page.Locator(".decision-panel").WaitForAsync();
+        Assert.Equal(0, await player.Page.Locator("[data-testid=hint-button]").CountAsync());
+        await player.Page.Keyboard.PressAsync("KeyH");
+        Assert.Equal(0, await player.Page.Locator("[data-testid=play-hint-card]").CountAsync());
+        Assert.Empty(player.Errors);
+    }
+
     [Fact]
     public async Task StealIsUnavailableWithEmptyBases()
     {

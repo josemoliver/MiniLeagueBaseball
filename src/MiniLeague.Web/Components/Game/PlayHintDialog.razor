@@ -1,0 +1,106 @@
+@using MiniLeague.Engine.AI
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Show Hint</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="play-hint-card" data-testid="play-hint-card">
+            @if (HasBatting && HasFielding)
+            {
+                <div class="play-hint-sides" role="group" aria-label="Choose hint side">
+                    <MudButton Variant="@(_side == PlayHintSide.Offense ? Variant.Filled : Variant.Outlined)"
+                               Color="Color.Primary" aria-pressed="@(_side == PlayHintSide.Offense)"
+                               Disabled="@(!CanUseSide(PlayHintSide.Offense))"
+                               OnClick="@(() => SwitchSide(PlayHintSide.Offense))">Batting hint</MudButton>
+                    <MudButton Variant="@(_side == PlayHintSide.Defense ? Variant.Filled : Variant.Outlined)"
+                               Color="Color.Primary" aria-pressed="@(_side == PlayHintSide.Defense)"
+                               Disabled="@(!CanUseSide(PlayHintSide.Defense))"
+                               OnClick="@(() => SwitchSide(PlayHintSide.Defense))">Fielding hint</MudButton>
+                </div>
+            }
+            <h3 class="play-hint-heading" tabindex="-1" @ref="_heading">
+                @(_side == PlayHintSide.Offense ? "You are batting" : "You are fielding")
+            </h3>
+            <p class="play-hint-situation">@Current.Situation</p>
+            <p>@Current.Matchup @Current.PitcherNote @Current.PlatoonNote</p>
+            <p>@Current.LeverageNote</p>
+            <section aria-label="My call" class="play-hint-call">
+                <span>MY CALL</span>
+                <strong>@Current.Call</strong>
+            </section>
+            <p><strong>Why:</strong> @Current.Reason</p>
+            @if (Current.Conditional is not null)
+            {
+                <p class="play-hint-conditional"><strong>Watch for:</strong> @Current.Conditional</p>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" data-testid="hint-close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public PlayHint InitialHint { get; set; } = null!;
+    [Parameter] public bool HasBatting { get; set; }
+    [Parameter] public bool HasFielding { get; set; }
+    [Parameter, EditorRequired] public Func<PlayHintSide, Task<PlayHint?>> RequestSide { get; set; } = null!;
+    [Parameter, EditorRequired] public Func<PlayHintSide, bool> CanUseSide { get; set; } = null!;
+
+    private PlayHintSide _side;
+    private PlayHint? _batting;
+    private PlayHint? _fielding;
+    private ElementReference _heading;
+    private DotNetObjectReference<PlayHintDialog>? _self;
+    private PlayHint Current => _side == PlayHintSide.Offense ? _batting! : _fielding!;
+
+    protected override void OnInitialized()
+    {
+        _side = InitialHint.Side;
+        if (_side == PlayHintSide.Offense) _batting = InitialHint;
+        else _fielding = InitialHint;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _self = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("mlbKeys.registerHint", _self); }
+        catch (JSException) { }
+    }
+
+    private async Task SwitchSide(PlayHintSide side)
+    {
+        if (side != _side)
+        {
+            var hint = side == PlayHintSide.Offense ? _batting : _fielding;
+            if (hint is null)
+            {
+                hint = await RequestSide(side);
+                if (hint is null) return;
+                if (side == PlayHintSide.Offense) _batting = hint;
+                else _fielding = hint;
+            }
+        }
+        _side = side;
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        await _heading.FocusAsync();
+    }
+
+    [JSInvokable]
+    public void CloseFromKey() => Close();
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("mlbKeys.unregisterHint"); }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or ObjectDisposedException) { }
+        _self?.Dispose();
+    }
+
+    private void Close() => MudDialog.Cancel();
+}

@@ -247,7 +247,8 @@ public class PlayTemplateTests
             var landing = KeysOf(s, "ball").First(k => k.T > 0.65 && k.Ease == Ease.Roll);
             var fielder = KeysOf(s, r.Fielder == Position.P ? "pitcher" : r.Fielder == Position.C ? "catcher" : $"fielder-{r.Fielder}");
 
-            Assert.Contains(fielder, k => k.Pose == Poses.Crouch && At(k).DistanceTo(At(landing)) < 0.01);   // fielded crouching, glove at the grass
+            Assert.Contains(fielder, k => (k.Pose is Poses.Crouch or Poses.Barehand)
+                && At(k).DistanceTo(At(landing)) < 0.01);
             Assert.Contains(s.Cues, c => c.Value == "out");
             var batter = r.RunnerMoves.Single(m => m.FromBase == 0);
             Assert.Equal(RunnerFate.ForcedOut, batter.Fate);
@@ -268,14 +269,44 @@ public class PlayTemplateTests
             int transfer = keys.ToList().FindIndex(k => k.Pose == Poses.Transfer);
             int throwing = keys.ToList().FindIndex(k => k.Pose == Poses.Throw);
 
-            Assert.True(turn >= 0 && turn < plant && plant < transfer && transfer < throwing,
-                "the fielder turns, plants and transfers before throwing");
+            if (keys.Any(k => k.Pose == Poses.Barehand))
+                Assert.True(turn < 0 && plant < 0 && transfer < 0 && throwing >= 0,
+                    "the barehanded fielder throws directly without moving the ball back to his glove");
+            else
+                Assert.True(turn >= 0 && turn < plant && plant < transfer && transfer < throwing,
+                    "the fielder turns, plants and transfers before throwing");
             var script = Script(r, b);
             var first = KeysOf(script, "fielder-First");
             Assert.Contains(first, k => k.Pose == Poses.Reach && k.T < KeysOf(script, "ball")[^1].T);
             Assert.InRange(At(first[^1]).DistanceTo(FieldGeometry.First), 2, 5);
             Assert.True(At(first[^1]).DistanceTo(At(KeysOf(script, "ball")[^1])) < 0.01);
         }
+    }
+
+    [Fact]
+    public void SlowRoller_IsChargedAndBarehandedBeforeTheThrowToFirst()
+    {
+        var plays = Where((r, _) => r.Outcome == OutcomeType.GroundOut && !r.IsBunt
+            && (r.Fielder is Position.Short or Position.Third)).Take(8).ToList();
+        Assert.NotEmpty(plays);
+        int shown = 0;
+        foreach (var (result, before) in plays)
+            for (int seed = 0; seed < 35; seed++)
+            {
+                var script = Script(result, before, seed);
+                var pickup = script.Cues.FirstOrDefault(c => c.Kind == CueKind.Effect && c.Value == "barehand");
+                if (pickup is null) continue;
+                shown++;
+                var fielder = KeysOf(script, $"fielder-{result.Fielder}");
+                Assert.Contains(fielder, k => k.Pose == Poses.Barehand && k.T == pickup.T);
+                Assert.True(At(fielder[0]).DistanceFromHome >
+                    new FieldPoint(pickup.X!.Value, pickup.Y!.Value).DistanceFromHome + 15);
+                Assert.DoesNotContain(fielder, k => k.Pose == Poses.Transfer);
+                Assert.Contains(fielder, k => k.Pose == Poses.Throw && k.T > pickup.T);
+                Assert.Contains(script.Cues, c => c.Kind == CueKind.Banner && c.Value == "SLOW ROLLER...");
+                Assert.True(KeysOf(script, "ball")[^1].T < Arrival(script, "batter", FieldGeometry.First));
+            }
+        Assert.True(shown >= 5, $"only {shown} barehanded plays");
     }
 
     [Fact]
@@ -401,6 +432,9 @@ public class PlayTemplateTests
             var turn = pivotKeys.Single(k => k.Pose == Poses.Turn);
             var plant = pivotKeys.Single(k => k.Pose == Poses.Plant);
             Assert.True(key.T < turn.T && turn.T < plant.T);
+            var forced = r.RunnerMoves.Single(m => m.FromBase == 1);
+            Assert.True(Arrival(s, RunnerId(forced.Player), FieldGeometry.Second) < turn.T,
+                "the pivot holds the force at second until the runner arrives");
             Assert.True(plant.T < pivotKeys.First(k => k.Pose == Poses.Throw).T);
             Assert.Equal(turn.Facing, plant.Facing);
             Assert.Contains(s.Cues, c => c.Kind == CueKind.Hold && c.T == plant.T && c.Value == "0.18");
@@ -421,10 +455,38 @@ public class PlayTemplateTests
             var catchKey = KeysOf(s, "ball").First(k => k.T > PlateTime(s) + 0.05 && k.Ease == Ease.Arc);
             Assert.True(catchKey.Apex >= 25, "a fly ball goes up");
             string id = r.Fielder == Position.C ? "catcher" : r.Fielder == Position.P ? "pitcher" : $"fielder-{r.Fielder}";
-            Assert.Contains(KeysOf(s, id), k => (k.Pose == Poses.Catch || k.Pose == Poses.Dive) && Math.Abs(k.T - catchKey.T) < 0.005
+            Assert.Contains(KeysOf(s, id), k => (k.Pose is Poses.Catch or Poses.Dive or Poses.OverShoulder)
+                && Math.Abs(k.T - catchKey.T) < 0.005
                 && At(k).DistanceTo(At(catchKey)) < 0.01);
             Assert.Equal(RunnerFate.Retired, r.RunnerMoves.Single(m => m.FromBase == 0).Fate);
         }
+    }
+
+    [Fact]
+    public void Outfielder_RunsBackAndCatchesTheFlyOverHisShoulder()
+    {
+        var plays = Where((r, _) => r.Outcome == OutcomeType.FlyOut
+            && (r.Fielder is Position.Left or Position.Center or Position.Right)).Take(8).ToList();
+        Assert.NotEmpty(plays);
+        int shown = 0;
+        foreach (var (result, before) in plays)
+            for (int seed = 0; seed < 35; seed++)
+            {
+                var script = Script(result, before, seed);
+                var cue = script.Cues.FirstOrDefault(c => c.Kind == CueKind.Effect && c.Value == "shouldercatch");
+                if (cue is null) continue;
+                shown++;
+                var fielder = KeysOf(script, $"fielder-{result.Fielder}");
+                var caught = fielder.Single(k => k.Pose == Poses.OverShoulder);
+                Assert.True(At(caught).DistanceFromHome > At(fielder[0]).DistanceFromHome + 8);
+                Assert.Equal("back", caught.Facing);
+                Assert.Equal(cue.T, caught.T);
+                Assert.Contains(fielder, k => k.Pose == Poses.Track && k.T < caught.T);
+                Assert.Contains(fielder, k => k.Pose == Poses.Turn && k.T > caught.T && k.Facing == "front");
+                Assert.Contains(script.Cues, c => c.Kind == CueKind.Banner && c.Value == "OVER THE SHOULDER!");
+                Assert.Equal(RunnerFate.Retired, result.RunnerMoves.Single(m => m.FromBase == 0).Fate);
+            }
+        Assert.True(shown >= 5, $"only {shown} over-the-shoulder catches");
     }
 
     [Fact]
@@ -614,6 +676,66 @@ public class PlayTemplateTests
             Assert.Contains(catcher, k => k.Pose == Poses.Tag && k.T > received.T
                 && At(k).DistanceTo(FieldGeometry.Home) < 0.01);
         }
+    }
+
+    [Fact]
+    public void Hits_KeepTrailingRunnerOffThirdUntilScoringRunnerRoundsIt()
+    {
+        var plays = new[] { OutcomeType.Single, OutcomeType.Double, OutcomeType.Triple }
+            .SelectMany(outcome => Where((result, _) => result.Outcome == outcome
+                && result.RunnerMoves.Any(m => m.FromBase == 2 && m.Fate == RunnerFate.Scored)
+                && result.RunnerMoves.Any(m => m.ToBase == 3 && m.Fate == RunnerFate.Safe)).Take(10))
+            .ToList();
+        Assert.NotEmpty(plays);
+
+        foreach (var (result, before) in plays)
+        {
+            var script = Script(result, before);
+            var trailing = result.RunnerMoves.First(m => m.ToBase == 3 && m.Fate == RunnerFate.Safe);
+            double roundedThird = result.RunnerMoves.Where(m => m.Fate == RunnerFate.Scored && m.FromBase < 3)
+                .Max(m => Arrival(script, IdOf(m), FieldGeometry.Third));
+            double stoppedAtThird = Arrival(script, IdOf(trailing), FieldGeometry.Third);
+            Assert.True(stoppedAtThird >= roundedThird + 0.29,
+                $"{result.Outcome}: trailing runner reached third at {stoppedAtThird} while scorer rounded it at {roundedThird}");
+        }
+    }
+
+    [Fact]
+    public void TwoOutBasesLoadedHitAndOut_KeepsTaggedRunnerBehindTheScorerAtThird()
+    {
+        var state = NewGame(1).State!;
+        var runners = state.LineupPlayers(true).Skip(1).Take(3).Select(x => x.Player).ToArray();
+        state.Outs = 2;
+        state.RunnerOnFirst = new BaseRunner { Player = runners[0] };
+        state.RunnerOnSecond = new BaseRunner { Player = runners[1] };
+        state.RunnerOnThird = new BaseRunner { Player = runners[2] };
+        var before = PrePlaySnapshot.Capture(state);
+        var result = new PlayResult
+        {
+            Outcome = OutcomeType.Single,
+            Description = "Single; runner out at third",
+            RunsScored = 2,
+            OutsRecorded = 1,
+            ThrownOutFrom = 1,
+            ThrownOutAt = 3,
+            RunnerMoves =
+            [
+                new(runners[2], 3, 4, RunnerFate.Scored),
+                new(runners[1], 2, 4, RunnerFate.Scored),
+                new(runners[0], 1, 3, RunnerFate.TaggedOut),
+                new(state.CurrentBatter, 0, 1, RunnerFate.Safe),
+            ],
+        };
+
+        var script = Script(result, before);
+        double scorerAtThird = Arrival(script, RunnerId(runners[1]), FieldGeometry.Third);
+        double taggedAtThird = Arrival(script, RunnerId(runners[0]), FieldGeometry.Third);
+        Assert.True(taggedAtThird >= scorerAtThird + 0.29);
+        Assert.Contains(script.Cues, cue => cue.Kind == CueKind.Effect && cue.Value == "call"
+            && cue.T == taggedAtThird && cue.X == Math.Round(FieldGeometry.Third.X, 3)
+            && cue.Y == Math.Round(FieldGeometry.Third.Y, 3));
+        Assert.Contains(script.Tracks, track => track.ActorId.StartsWith("fielder-")
+            && track.Keys.Any(key => key.Pose == Poses.Tag && key.T >= taggedAtThird));
     }
 
     [Fact]

@@ -100,7 +100,7 @@
                     <details class="setup-options" data-testid="setup-options">
                         <summary>
                             <span>Game options</span>
-                            <small>Ballpark · starters · field · events · lineups</small>
+                            <small>Ballpark · starters · field · events · hints · lineups</small>
                         </summary>
                         <div class="setup-options-content">
                             <MudStack Spacing="3">
@@ -143,6 +143,8 @@
                                 </MudSelect>
                                 <MudSwitch T="bool" @bind-Value="_randomEvents" Color="Color.Primary"
                                            Label="Random events: injuries, rain delays, ejections" />
+                                <MudSwitch T="bool" @bind-Value="_showPlayHints" Color="Color.Primary"
+                                           Label="Show Play Hints" data-testid="show-play-hints" />
                                 <MudStack Row="true" Spacing="2">
                                     <MudButton Variant="Variant.Outlined" FullWidth="true" Size="Size.Small"
                                                OnClick="@(() => EditLineup(_teamOptions[_visitorIdx], visitor: true))">
@@ -373,6 +375,9 @@ else
                         </div>
                         <DecisionPanel ShowOffense="@_game.OffenseIsHuman"
                                        ShowDefense="@_game.DefenseIsHuman"
+                                       ShowHints="@s.Options.ShowPlayHints"
+                                       HintAvailable="@CanOpenHint()"
+                                       HintRemainingText="@HintButtonLabel()"
                                        CanSteal="@(s.RunnerOnFirst is not null && s.RunnerOnSecond is null)"
                                        StealCall="@RunningRules.StealPlanFor(s)"
                                        CanSqueeze="@(s.RunnerOnThird is not null && s.Outs < 2)"
@@ -380,7 +385,8 @@ else
                                        OnAlignmentChanged="PreviewAlignmentAsync"
                                        OnDecision="HandleDecision"
                                        OnSubstitutions="OpenSubstitutions"
-                                       OnBoxScore="OpenBoxScore" />
+                                       OnBoxScore="OpenBoxScore"
+                                       OnHint="OpenHint" />
                     </MudPaper>
                 }
                 else
@@ -490,6 +496,7 @@ else
     private const string HomePark = "home";
     private string _stadiumChoice = HomePark;
     private bool _randomEvents = true;
+    private bool _showPlayHints = true;
 
     // The designated hitter rule for the game. WHY: the default keeps every game as it was; "Historical" lets the home
     // team's league and year decide, and "Pitchers bat" removes the designated hitter for both teams.
@@ -603,7 +610,11 @@ else
             stadium: ChosenPark(),
             visitorLineupSlots: LineupFor(_teamOptions[_visitorIdx], visitor: true),
             homeLineupSlots: LineupFor(_teamOptions[_homeIdx], visitor: false),
-            options: (_randomEvents ? GameOptions.Standard : GameOptions.None) with { DesignatedHitter = _dhSetting },
+            options: (_randomEvents ? GameOptions.Standard : GameOptions.None) with
+            {
+                DesignatedHitter = _dhSetting,
+                ShowPlayHints = _showPlayHints,
+            },
             visitorStarterId: StarterFor(_teamOptions[_visitorIdx], visitor: true),
             homeStarterId: StarterFor(_teamOptions[_homeIdx], visitor: false),
             visitorManagerId: _visitorManagerId,
@@ -840,6 +851,62 @@ else
         var parameters = new DialogParameters<BoxScoreDialog> { { x => x.State, _game.State! } };
         await DialogService.ShowAsync<BoxScoreDialog>("Box Score", parameters,
             new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+    }
+
+    private async Task OpenHint()
+    {
+        if (_animating || !_game.IsHumanTurn || _game.State is not
+            { Status: GameStatus.InProgress, PendingInjury: null, Options.ShowPlayHints: true } state)
+            return;
+        var initialSide = _game.OffenseIsHuman && _game.CanUsePlayHint(state.IsTopOfInning)
+            ? PlayHintSide.Offense : PlayHintSide.Defense;
+        var initial = await RequestHint(initialSide);
+        if (initial is null) return;
+        var parameters = new DialogParameters<PlayHintDialog>
+        {
+            { x => x.InitialHint, initial },
+            { x => x.HasBatting, _game.OffenseIsHuman },
+            { x => x.HasFielding, _game.DefenseIsHuman },
+            { x => x.RequestSide, RequestHint },
+            { x => x.CanUseSide, CanUseHintSide },
+        };
+        var dialog = await DialogService.ShowAsync<PlayHintDialog>("Show Hint", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });
+        await dialog.Result;
+        try { await JS.InvokeVoidAsync("mlbKeys.focusHint"); }
+        catch (JSException) { }
+    }
+
+    private bool CanOpenHint() => CanUseHintSide(PlayHintSide.Offense) || CanUseHintSide(PlayHintSide.Defense);
+
+    private bool CanUseHintSide(PlayHintSide side)
+    {
+        if (_game.State is not { } state) return false;
+        return side == PlayHintSide.Offense
+            ? _game.OffenseIsHuman && _game.CanUsePlayHint(state.IsTopOfInning)
+            : _game.DefenseIsHuman && _game.CanUsePlayHint(!state.IsTopOfInning);
+    }
+
+    private string HintButtonLabel()
+    {
+        if (_game.State is not { } state) return "";
+        int batting = _game.PlayHintsRemaining(state.IsTopOfInning);
+        int fielding = _game.PlayHintsRemaining(!state.IsTopOfInning);
+        if (_game.OffenseIsHuman && _game.DefenseIsHuman) return $"Bat {batting} · Field {fielding}";
+        return $"{(_game.OffenseIsHuman ? batting : fielding)} left";
+    }
+
+    private async Task<PlayHint?> RequestHint(PlayHintSide side)
+    {
+        if (_animating || !_game.IsHumanTurn || _game.State is not { } state || !CanUseHintSide(side))
+            return null;
+        bool visitor = side == PlayHintSide.Offense ? state.IsTopOfInning : !state.IsTopOfInning;
+        var alignment = _previewAlignment ?? (state.IsTopOfInning ? state.HomeAlignment : state.VisitorAlignment);
+        var hint = PlayHintAdvisor.Get(state, side, side == PlayHintSide.Offense ? alignment : null);
+        if (!_game.TryUsePlayHint(visitor)) return null;
+        await SaveGame();
+        StateHasChanged();
+        return hint;
     }
 
     // After a play, a hurt player on a human-managed team must be replaced before anything else happens.

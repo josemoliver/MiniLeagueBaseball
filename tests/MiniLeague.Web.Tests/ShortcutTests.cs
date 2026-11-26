@@ -106,6 +106,7 @@ public class ShortcutTests : BunitContext, IAsyncLifetime
     [InlineData("KeyP", ShortcutKind.Play)]
     [InlineData("KeyS", ShortcutKind.Substitutions)]
     [InlineData("KeyB", ShortcutKind.BoxScore)]
+    [InlineData("KeyH", ShortcutKind.Hint)]
     [InlineData("KeyZ", ShortcutKind.None)]
     [InlineData("Digit0", ShortcutKind.None)]
     [InlineData("Digit9", ShortcutKind.None)]    // no ninth offensive strategy
@@ -119,6 +120,15 @@ public class ShortcutTests : BunitContext, IAsyncLifetime
     {
         Assert.Equal(ShortcutKind.None, Shortcuts.Resolve("Enter", false, false, false).Kind);
         Assert.Equal(ShortcutKind.None, Shortcuts.Resolve("Digit1", false, false, false).Kind);
+    }
+
+    [Fact]
+    public void HDoesNothingWhenPlayHintsAreOff()
+    {
+        Assert.Equal(ShortcutKind.None,
+            Shortcuts.Resolve("KeyH", false, offense: true, defense: false, showHints: false).Kind);
+        Assert.Equal(ShortcutKind.None,
+            Shortcuts.Resolve("KeyH", false, offense: true, defense: true, showHints: false).Kind);
     }
 
     [Fact]

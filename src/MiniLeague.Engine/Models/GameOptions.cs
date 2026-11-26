@@ -17,6 +17,9 @@ public enum DesignatedHitterSetting
 public record GameOptions(bool Injuries, bool RainDelays, bool Ejections,
     DesignatedHitterSetting DesignatedHitter = DesignatedHitterSetting.DesignatedHitter)
 {
+    // WHY: older saved games have no hint field; their original hint behavior remains enabled on resume.
+    public bool ShowPlayHints { get; init; } = true;
+
     public static GameOptions None => new(false, false, false);
     public static GameOptions Standard => new(true, true, true);
     public bool Any => Injuries || RainDelays || Ejections;

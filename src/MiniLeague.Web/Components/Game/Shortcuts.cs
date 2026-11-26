@@ -2,7 +2,7 @@ using MiniLeague.Engine.Models;
 
 namespace MiniLeague.Web.Components.Game;
 
-public enum ShortcutKind { None, Offense, Pitch, Alignment, IntentionalWalk, Play, Substitutions, BoxScore }
+public enum ShortcutKind { None, Offense, Pitch, Alignment, IntentionalWalk, Play, Substitutions, BoxScore, Hint }
 
 public readonly record struct ShortcutAction(
     ShortcutKind Kind,
@@ -95,7 +95,7 @@ public static class Shortcuts
     /// manages both teams, plain numbers are the offense and Shift + number is the defense.
     /// </summary>
     /// <param name="code">The browser's KeyboardEvent.code, e.g. "Digit4", "Numpad4", "Enter", "KeyS".</param>
-    public static ShortcutAction Resolve(string code, bool shift, bool offense, bool defense)
+    public static ShortcutAction Resolve(string code, bool shift, bool offense, bool defense, bool showHints = true)
     {
         if (!offense && !defense) return default;
 
@@ -104,6 +104,7 @@ public static class Shortcuts
             case "Enter" or "NumpadEnter" or "KeyP": return new(ShortcutKind.Play);
             case "KeyS": return new(ShortcutKind.Substitutions);
             case "KeyB": return new(ShortcutKind.BoxScore);
+            case "KeyH": return showHints ? new(ShortcutKind.Hint) : default;
         }
 
         if (IsShiftOppositeCode(code))
@@ -142,6 +143,7 @@ public static class Shortcuts
         new("Enter  or  P", "Play the pitch"),
         new("S", "Substitutions, bullpen and bench"),
         new("B", "Box score"),
+        new("H", "Show hint"),
     ]);
 
     public static ShortcutCard OffenseCard() => new(

@@ -5,7 +5,7 @@ namespace MiniLeague.Engine.Animation;
 // Singles, doubles and triples.
 internal sealed partial class Staging
 {
-    private enum Kind { GroundThrough, InfieldHit, Bloop }
+    private enum Kind { GroundThrough, InfieldHit, Bloop, LineDrive, ShortHop }
 
     // A runner scoring sometimes slides; a batter taking an extra base slides into it.
     private bool SlidesHome(RunnerMove m) => m.Fate == RunnerFate.Scored && m.FromBase > 0 && _rng.NextDouble() < 0.4;
@@ -17,12 +17,29 @@ internal sealed partial class Staging
     private Dictionary<int, double>[] MoveHitRunners(Func<RunnerMove, bool> otherSlide, RunnerMove? sentOut = null)
     {
         var moves = _result.RunnerMoves;
-        // NOTE: a runner thrown out is moved later, by TagOut, once the throw's arrival is known.
-        var times = MoveAll(Contact + 0.1, SecondsPerBase, slide: otherSlide,
-            skip: m => m.Fate == RunnerFate.Scored && m.FromBase <= 2 || ReferenceEquals(m, sentOut));
+        var times = new Dictionary<int, double>[moves.Count];
+        double thirdClearAt = 0;
         for (int i = 0; i < moves.Count; i++)
-            if (moves[i].Fate == RunnerFate.Scored && moves[i].FromBase <= 2)
-                times[i] = MoveRunner(moves[i], Contact + 0.1, HomePlaySecondsPerBase, slide: true);
+        {
+            var move = moves[i];
+            // NOTE: a runner thrown out is moved later, by TagOut, once the throw's arrival is known.
+            if (ReferenceEquals(move, sentOut))
+            {
+                times[i] = new Dictionary<int, double>();
+                continue;
+            }
+
+            bool slowToHome = move.Fate == RunnerFate.Scored && move.FromBase <= 2;
+            bool endsAtThird = move.ToBase == 3 && move.Fate == RunnerFate.Safe;
+            // WHY: the lead runner may round third slowly on a play at the plate. Keep a trailing
+            // runner from reaching and standing on third until the lead runner is clear of the bag.
+            double? thirdArrival = endsAtThird && thirdClearAt > 0 ? thirdClearAt + 0.3 : null;
+            times[i] = MoveRunner(move, Contact + 0.1,
+                slowToHome ? HomePlaySecondsPerBase : SecondsPerBase,
+                minArrival: thirdArrival, slide: slowToHome || otherSlide(move));
+            if (move.Fate == RunnerFate.Scored && times[i].TryGetValue(3, out var passedThird))
+                thirdClearAt = Math.Max(thirdClearAt, passedThird);
+        }
         return times;
     }
 
@@ -34,19 +51,12 @@ internal sealed partial class Staging
 
         var kind = ChooseKind();
         var (fielder, landing) = ChooseLanding(kind);
-        double distance = landing.DistanceFromHome;
-
-        // The ball goes down (and rolls) or up (and comes down).
-        double tBall = kind == Kind.Bloop ? Contact + 0.4 + distance / 260 : Contact + 0.3 + distance / 260;
-        if (kind == Kind.Bloop)
-            _s.Move("ball", tBall, landing, 0, ease: Ease.Arc, apex: Math.Clamp(distance * 0.18, 12, 45));
-        else
-            _s.Move("ball", tBall, landing, 0.5, ease: Ease.Roll);
+        double tBall = SingleBallPath(kind, landing);
 
         // The fielder gets to the ball (it waits for him if he is slow).
         string id = IdOf(fielder);
-        // A ball that rolls is fielded crouching with the glove at the grass; a bloop is taken with the glove up.
-        double tField = Fetch(fielder, landing, tBall, kind == Kind.Bloop ? Poses.Catch : Poses.Crouch);
+        // WHY: even a bloop has to land before the fielder picks it up; catching it in the air would be an out.
+        double tField = Fetch(fielder, landing, tBall, Poses.Crouch);
         if (tField > tBall) _s.Move("ball", tField, landing, 0.5);
         _s.Cue(tField, CueKind.Effect, "glove", landing);
         SupportOutfielder(fielder, landing, tField);
@@ -62,13 +72,22 @@ internal sealed partial class Staging
             : ChooseThrowTarget(kind, fielder, moves, times);
         if (receiver == id) (receiver, receiverPoint, arriveAfter) = ("pitcher", FieldGeometry.Mound, null);
         double arrive = ThrowTo(id, receiverPoint, tField + 0.25, arriveAfter);
-        Receive(receiver, receiverPoint, arrive, facing: receiver == "catcher" ? (landing.X < 0 ? "left" : "right") : null);
+        // WHY: TagOut times a thrown-out runner's actual arrival; the catcher's usual swipe would be early.
+        Receive(receiver, receiverPoint, arrive, facing: receiver == "catcher" ? (landing.X < 0 ? "left" : "right") : null,
+            tagAtHome: sentOut?.ToBase != 4);
         BackUpThrow(id, receiver, receiverPoint, arrive);
         double? plateCall = sentOut is null ? ClosePlayAtHome(receiver, arrive, moves, times) : null;
         if (sentOut is not null) TagOut(sentOut, receiver, receiverPoint, arrive, moves, times);
 
         _s.Cue(Contact, CueKind.Sound, "hit");
-        _s.Cue(Contact + 0.12, CueKind.Banner, kind == Kind.Bloop ? "BALL IN THE AIR..." : "GROUND BALL IN PLAY...");
+        _s.Cue(Contact + 0.12, CueKind.Banner, kind switch
+        {
+            Kind.Bloop => "SOFT FLY BALL...",
+            Kind.LineDrive => "LINE DRIVE...",
+            Kind.ShortHop => "SHARP HOP TO THE INFIELD...",
+            Kind.InfieldHit => "SLOW ROLLER...",
+            _ => "GROUND BALL IN PLAY...",
+        });
         AnnounceHitAfterPlay(arrive, moves, times, plateCall);
         CheerForRuns(moves, times);
     }
@@ -115,14 +134,53 @@ internal sealed partial class Staging
     {
         double roll = _rng.NextDouble();
         bool canInfield = Has(Position.Second) || Has(Position.Short) || Has(Position.Third);
-        if (roll < 0.20 && canInfield) return Kind.InfieldHit;
-        return roll < 0.60 ? Kind.GroundThrough : Kind.Bloop;
+        if (roll < 0.16) return canInfield ? Kind.ShortHop : Kind.GroundThrough;
+        if (roll < 0.30) return canInfield ? Kind.InfieldHit : Kind.LineDrive;
+        if (roll < 0.58) return Kind.GroundThrough;
+        return roll < 0.80 ? Kind.LineDrive : Kind.Bloop;
+    }
+
+    // A single may roll through, drop softly, skip off the grass, or short-hop an infielder.
+    // Every path reaches the ground before the fielder picks it up; only the picture varies.
+    private double SingleBallPath(Kind kind, FieldPoint landing)
+    {
+        double distance = landing.DistanceFromHome;
+        if (kind is Kind.GroundThrough or Kind.InfieldHit)
+        {
+            double arrive = Contact + 0.3 + distance / 260;
+            _s.Move("ball", arrive, landing, 0.5, ease: Ease.Roll);
+            return arrive;
+        }
+
+        // WHY: the extra key before the pickup shows the ball touching the grass. A low liner
+        // skids onward, a soft fly trickles, and a short hop lifts briefly before the glove.
+        double shortOfFielder = kind == Kind.ShortHop ? 8 : kind == Kind.LineDrive ? 14 : 6;
+        var firstBounce = FieldPoint.FromPolar(landing.AngleDegrees, Math.Max(12, distance - shortOfFielder));
+        double bounce = kind switch
+        {
+            Kind.ShortHop => Contact + 0.22 + distance / 350,
+            Kind.LineDrive => Contact + 0.22 + distance / 380,
+            _ => Contact + 0.4 + distance / 260,
+        };
+        double apex = kind switch
+        {
+            Kind.ShortHop => 5,
+            Kind.LineDrive => Math.Clamp(distance * 0.08, 8, 18),
+            _ => Math.Clamp(distance * 0.18, 12, 45),
+        };
+        _s.Move("ball", bounce, firstBounce, 0.5, ease: Ease.Arc, apex: apex);
+        _s.Cue(bounce, CueKind.Effect, "bounce", firstBounce);
+        double pickedUp = bounce + (kind == Kind.Bloop ? 0.2 : 0.16);
+        _s.Move("ball", pickedUp, landing, 0.5,
+            ease: kind == Kind.ShortHop ? Ease.Arc : Ease.Roll,
+            apex: kind == Kind.ShortHop ? 2.5 : 0);
+        return pickedUp;
     }
 
     // Picks who fields it first, then drops the ball where he can reach it.
     private (Position Fielder, FieldPoint Landing) ChooseLanding(Kind kind)
     {
-        var candidates = (kind == Kind.InfieldHit
+        var candidates = ((kind is Kind.InfieldHit or Kind.ShortHop)
                 ? new[] { Position.Second, Position.Short, Position.Third }
                 : FieldGeometry.Outfielders)
             .Where(Has).ToList();
@@ -134,7 +192,9 @@ internal sealed partial class Staging
         double depth = kind switch
         {
             Kind.InfieldHit => spot.DistanceFromHome + Between(-10, 12),
+            Kind.ShortHop => spot.DistanceFromHome + Between(-14, 8),
             Kind.GroundThrough => spot.DistanceFromHome - Between(10, 35),
+            Kind.LineDrive => spot.DistanceFromHome - Between(18, 38),
             _ => spot.DistanceFromHome - Between(18, 45),
         };
         var landing = FieldPoint.FromPolar(Math.Clamp(angle, -43, 43), Math.Max(depth, 30));
@@ -148,7 +208,7 @@ internal sealed partial class Staging
         if (moves.Any(m => m.Fate == RunnerFate.Scored))
             return ("catcher", new FieldPoint(0, -2), HomeThrowAfter(moves, times));
 
-        if (kind == Kind.InfieldHit && fielder != Position.First && Has(Position.First))
+        if ((kind is Kind.InfieldHit or Kind.ShortHop) && fielder != Position.First && Has(Position.First))
             return (FielderId(Position.First), FieldGeometry.First, LatestAt(moves, times, 1, m => m.FromBase == 0));
 
         int lead = moves.Where(m => m.FromBase > 0 && m.Fate == RunnerFate.Safe && m.ToBase > m.FromBase)
@@ -269,7 +329,8 @@ internal sealed partial class Staging
         }
         else
             arrive = ThrowTo(id, targetPoint, tField + Transfer, arriveAfter);
-        Receive(target, targetPoint, arrive, facing: target == "catcher" ? (rest.X < 0 ? "left" : "right") : null);
+        Receive(target, targetPoint, arrive, facing: target == "catcher" ? (rest.X < 0 ? "left" : "right") : null,
+            tagAtHome: sentOut?.ToBase != 4);
         BackUpThrow(finalThrower, target, targetPoint, arrive);
         double? plateCall = sentOut is null ? ClosePlayAtHome(target, arrive, moves, times) : null;
         if (sentOut is not null) TagOut(sentOut, target, targetPoint, arrive, moves, times);

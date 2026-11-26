@@ -76,8 +76,11 @@ window.mlbAnimator = (() => {
         const looseUntil = error && errorFielder && error.value !== 'error:wildthrow'
             ? tracks.get(errorFielder.id).find(k => k.t > error.t && k.pose === 'crouch')?.t : null;
         return { script, tracks, cues, error, looseUntil,
-            closeups: [homeCall(script, tracks, cues), distantDive(script.actors || [], tracks, cues),
-                script.outcome === 'Error' ? null : relayTurn(script.actors || [], tracks),
+            closeups: [homeCall(script, tracks, cues), hitOutAtThird(script, tracks, cues), doublePlayPivot(script, tracks),
+                barehandPlay(script, tracks, cues), overShoulderCatch(script, tracks, cues),
+                distantDive(script.actors || [], tracks, cues),
+                script.outcome === 'Error' || script.outcome === 'DoublePlay' || cues.some(c => c.value === 'barehand')
+                    ? null : relayTurn(script.actors || [], tracks),
                 stealCall(script, tracks, cues), groundCall(script, cues),
                 errorCloseup(script, tracks, error, errorFielder), homeRunCloseup(script, tracks, cues),
                 wallCatchCloseup(script, tracks, cues)].filter(Boolean) };
@@ -141,14 +144,69 @@ window.mlbAnimator = (() => {
         return null;
     }
 
+    function doublePlayPivot(script, tracks) {
+        if (script.outcome !== 'DoublePlay') return null;
+        const pivot = script.actors.find(a => ['fielder', 'pitcher'].includes(a.kind) && tracks.get(a.id)?.some(k =>
+            k.pose === 'tag' && Math.abs(k.x) < 4 && Math.abs(k.y - 127.28) < 4 &&
+            tracks.get(a.id).some(next => next.pose === 'turn' && next.t > k.t) &&
+            tracks.get(a.id).some(next => next.pose === 'throw' && next.t > k.t)));
+        if (!pivot) return null;
+        const keys = tracks.get(pivot.id);
+        const force = keys.find(k => k.pose === 'tag' && Math.abs(k.x) < 4 && Math.abs(k.y - 127.28) < 4);
+        const release = keys.find(k => k.pose === 'throw' && k.t > force.t);
+        const runner = script.actors.find(a => a.kind === 'runner' && tracks.get(a.id)?.some(k =>
+            k.pose === 'out' && k.t >= force.t && k.t < release.t &&
+            Math.abs(k.x) < 4 && Math.abs(k.y - 127.28) < 4));
+        if (!runner) return null;
+        const out = tracks.get(runner.id).find(k => k.pose === 'out' && k.t >= force.t && k.t < release.t);
+        return { actor: pivot, other: runner, start: force.t - 0.25, end: release.t + 0.18,
+            callT: out.t, callLabel: 'OUT', callColor: '#ff9393', slideThroughCall: true,
+            x: force.x, y: force.y, otherOffset: 20, scale: 2.8, title: 'DOUBLE PLAY TURN' };
+    }
+
+    function barehandPlay(script, tracks, cues) {
+        if (script.outcome !== 'GroundOut') return null;
+        const cue = cues.find(c => c.kind === 'effect' && c.value === 'barehand');
+        if (!cue) return null;
+        const actor = script.actors.find(a => a.kind === 'fielder' && tracks.get(a.id)?.some(k =>
+            k.pose === 'barehand' && Math.abs(k.t - cue.t) < 0.005));
+        if (!actor) return null;
+        const release = tracks.get(actor.id).find(k => k.pose === 'throw' && k.t > cue.t);
+        return { actor, start: cue.t - 0.35, end: (release?.t || cue.t + 0.4) + 0.12,
+            x: cue.x, y: cue.y, scale: 2.8, title: 'BAREHAND PLAY' };
+    }
+
+    function overShoulderCatch(script, tracks, cues) {
+        if (script.outcome !== 'FlyOut') return null;
+        const cue = cues.find(c => c.kind === 'effect' && c.value === 'shouldercatch');
+        if (!cue) return null;
+        const actor = script.actors.find(a => a.kind === 'fielder' && tracks.get(a.id)?.some(k =>
+            k.pose === 'overShoulder' && Math.abs(k.t - cue.t) < 0.005));
+        if (!actor) return null;
+        return { actor, start: cue.t - 0.4, end: cue.t + 0.65,
+            x: cue.x, y: cue.y, scale: 2.8, title: 'OVER THE SHOULDER' };
+    }
+
     function stealCall(script, tracks, cues) {
         if (script.outcome !== 'StolenBase' && script.outcome !== 'CaughtStealing') return null;
-        const call = cues.find(c => c.kind === 'effect' && c.value === 'call' && c.y > 100);
-        const runner = script.actors.find(a => a.kind === 'runner');
-        const cover = script.actors.find(a => a.kind === 'fielder' && tracks.get(a.id)?.some(k => k.pose === 'tag'));
-        if (!call || !runner || !cover) return null;
-        return { actor: cover, other: runner, start: call.t - 0.42, end: call.t + 0.55,
-            x: call.x, y: call.y, title: 'STEAL AT SECOND' };
+        for (const call of cues.filter(c => c.kind === 'effect' && c.value === 'call')) {
+            const third = Math.abs(call.x + 63.64) < 4 && Math.abs(call.y - 63.64) < 4;
+            const second = Math.abs(call.x) < 4 && Math.abs(call.y - 127.28) < 4;
+            if (!second && !third) continue;
+            const cover = script.actors.find(a => ['fielder', 'pitcher'].includes(a.kind) && tracks.get(a.id)?.some(k =>
+                k.pose === 'tag' && Math.hypot(k.x - call.x, k.y - call.y) < 6));
+            const runner = script.actors.find(a => a.kind === 'runner' && tracks.get(a.id)?.some(k =>
+                Math.abs(k.t - call.t) < 0.005 && Math.hypot(k.x - call.x, k.y - call.y) < 4));
+            if (!cover || !runner) continue;
+            const callPose = tracks.get(runner.id).find(k => Math.abs(k.t - call.t) < 0.005 &&
+                Math.hypot(k.x - call.x, k.y - call.y) < 4)?.pose;
+            return { actor: cover, other: runner, start: call.t - 0.42, end: call.t + 0.55,
+                callT: call.t, callLabel: callPose === 'out' ? 'OUT' : 'SAFE',
+                callColor: callPose === 'out' ? '#ff9393' : '#8ee79d',
+                otherOffset: 20, slideThroughCall: true,
+                x: call.x, y: call.y, title: third ? 'STEAL AT THIRD' : 'STEAL AT SECOND' };
+        }
+        return null;
     }
 
     function groundCall(script, cues) {
@@ -159,6 +217,23 @@ window.mlbAnimator = (() => {
         if (!call || !first || !batter) return null;
         return { actor: first, other: batter, start: call.t - 0.42, end: call.t + 0.55,
             x: call.x, y: call.y, title: 'PLAY AT FIRST' };
+    }
+
+    function hitOutAtThird(script, tracks, cues) {
+        if (!['Single', 'Double', 'Triple'].includes(script.outcome)) return null;
+        const call = cues.find(c => c.kind === 'effect' && c.value === 'call' &&
+            Math.abs((c.x || 0) + 63.64) < 4 && Math.abs((c.y || 0) - 63.64) < 4);
+        if (!call) return null;
+        const runner = script.actors.find(a => a.kind === 'runner' && tracks.get(a.id)?.some(k =>
+            k.pose === 'out' && Math.abs(k.t - call.t) < 0.005 &&
+            Math.hypot(k.x - call.x, k.y - call.y) < 4));
+        const cover = script.actors.find(a => ['fielder', 'pitcher'].includes(a.kind) && tracks.get(a.id)?.some(k =>
+            k.pose === 'tag' && k.t >= call.t && k.t <= call.t + 0.2 &&
+            Math.hypot(k.x - call.x, k.y - call.y) < 6));
+        if (!runner || !cover) return null;
+        return { actor: cover, other: runner, start: call.t - 0.45, end: call.t + 0.6,
+            callT: call.t + 0.05, callLabel: 'OUT', callColor: '#ff9393',
+            x: call.x, y: call.y, otherOffset: 20, slideThroughCall: true, title: 'PLAY AT THIRD' };
     }
 
     function homeCall(script, tracks, cues) {
@@ -178,7 +253,7 @@ window.mlbAnimator = (() => {
         if (!runner) return null;
         return { actor: catcher, other: runner, start: crossing.t - 0.38,
             end: (plateDecision ? call.t : receive.t) + 0.55,
-            callT: call.t, decision: !!plateDecision,
+            callT: call.t, callLabel: 'SAFE', decision: !!plateDecision,
             x: 0, y: 0, scale: 1.55, centerY: 95, otherOffset: 25, title: 'PLAY AT HOME' };
     }
 
@@ -734,6 +809,10 @@ window.mlbAnimator = (() => {
             } else if (pose === 'reach') {
                 add(-4.6, -15, 2.2, 4.5, team.jersey); hand(-4.6, -15.5);
                 add(3, -11, 2, 3.2, team.jerseyShade); fist(3, -8);
+            } else if (pose === 'overShoulder') {
+                // Looking back while running: the glove is above and just behind one shoulder.
+                add(-4.6, -13, 1.8, 4, team.jersey); fist(-4.6, -9.5);
+                add(3, -18, 2, 7, team.jerseyShade); mitt(2.4, -20.8, 3.5, 3.5);
             } else if (pose === 'catch' || pose === 'dive' || pose === 'leap') {
                 add(-4.6, -17.5, 1.6, 6.5, team.jersey); add(3, -17.5, 1.6, 6.5, team.jersey);
                 detail(-4.6, -12.6, 1.6, 0.65, team.capShade);
@@ -751,6 +830,10 @@ window.mlbAnimator = (() => {
                 // Bent low, both hands down by the grass: the glove open in front of the feet.
                 add(-4.6, -11, 1.6, 5.4, team.jersey); hand(-4.4, -5.6);
                 add(3, -11, 1.6, 5, team.jersey); fist(2.8, -6.2);
+            } else if (pose === 'barehand') {
+                // The glove stays at the hip while the throwing hand scoops the roller off the grass.
+                add(-4.6, -11, 1.8, 3.3, team.jersey); mitt(-5.1, -9, 3, 3);
+                add(3, -10, 2, 7, team.jerseyShade); fist(3.5, -3.5);
             } else if (pose === 'transfer') {
                 // The ball goes from the glove (left) across to the bare hand (right), at the chest.
                 add(-4.6, -11, 1.6, 3.2, team.jersey); hand(-3.6, -11.4);
@@ -871,6 +954,9 @@ window.mlbAnimator = (() => {
         } else if (pose === 'reach') {
             add(0.4, -14.5, 5.6, 1.6, team.jersey); hand(5.6, -14.4);
             add(-3, -11, 2, 3.2, team.jerseyShade); fist(-3, -8.3);
+        } else if (pose === 'overShoulder') {
+            add(-2.8, -12, 1.8, 3.5, team.jersey); fist(-2.8, -9);
+            add(1, -18, 2, 7, team.jerseyShade); mitt(1.2, -20.5, 3.2, 3.2);
         } else if (pose === 'dive') {
             // The arm points along the body's axis; after rotation the glove leads the horizontal dive.
             add(0.2, -20, 1.7, 9, team.jersey); mitt(-0.4, -22, 3, 3);
@@ -890,6 +976,9 @@ window.mlbAnimator = (() => {
             add(-4.5, -16, 1.6, 5, team.jerseyShade); fist(-4.5, -12);
         } else if (pose === 'crouch') {
             add(0.6, -9.6, 3.6, 1.6, team.jersey); add(3.2, -8.6, 1.6, 4, team.jersey); hand(3.6, -4.9);   // glove down at the grass
+        } else if (pose === 'barehand') {
+            add(-3.3, -11, 2, 3.5, team.jersey); mitt(-3.9, -9.5, 3, 3);
+            add(1, -9.5, 3.2, 2, team.jerseyShade); add(3.6, -8, 2, 4.3, team.jerseyShade); fist(5, -3.8);
         } else if (pose === 'transfer') {
             add(0.6, -10.6, 3, 1.6, team.jersey); hand(3.2, -11.3); fist(1.2, -11.2);   // the ball moving glove to hand
         } else if (pose === 'stretch') {
@@ -976,7 +1065,7 @@ window.mlbAnimator = (() => {
         if (lying) ctx.rotate(f.dir * (st.pose === 'dive' ? DIVE_ROTATION * Math.min(1, (st.poseAge || 0) / 0.2) : -1.25));
         else if (mirrorFigure(actor, f.view, f.dir)) ctx.scale(-1, 1);
         if (actor.kind === 'catcher' && !actor.maskOff && (st.pose === 'stand' || st.pose === 'catch')) ctx.scale(1, 0.82);   // crouching
-        if (st.pose === 'crouch') ctx.scale(1, 0.78);                                                         // a fielder bent over a ground ball
+        if (st.pose === 'crouch' || st.pose === 'barehand') ctx.scale(1, 0.78);                                // a fielder bent over a ground ball
         if (actor.kind === 'batter' && inBatterBox(st) && (st.pose === 'stand' || st.pose === 'swing' || st.pose === 'bunt')) ctx.scale(1, stanceOf(actor).crouch);   // a slap hitter crouches
 
         ctx.fillStyle = OUTLINE;
@@ -1066,8 +1155,10 @@ window.mlbAnimator = (() => {
             if (pose === 'throw' || pose === 'windup') return { x: 1.2, y: -20 };
             if (pose === 'dive') return { x: 1.1, y: -20.5 };
             if (pose === 'catch') return { x: 6, y: -13.9 };
+            if (pose === 'overShoulder') return { x: 2.8, y: -19 };
             if (pose === 'tag') return { x: 5.9, y: -7.9 };
             if (pose === 'crouch') return { x: 4.4, y: -4 };
+            if (pose === 'barehand') return { x: 5.9, y: -3 };
             if (pose === 'transfer') return { x: 2, y: -10.4 };
             if (pose === 'turn' || pose === 'plant') return { x: 3.5, y: -9.8 };
             if (pose === 'pop') return { x: 3.5, y: -9.8 };
@@ -1080,8 +1171,10 @@ window.mlbAnimator = (() => {
         if (pose === 'sidearm') return { x: 9.8, y: -12.2 };
         if (pose === 'throw') return { x: 3.8, y: -19.8 };
         if (pose === 'catch' || pose === 'dive') return { x: -4, y: -18.5 };
+        if (pose === 'overShoulder') return { x: 4, y: -19.4 };
         if (pose === 'tag') return { x: -3.8, y: -2 };
         if (pose === 'crouch') return { x: -3.6, y: -4.7 };
+        if (pose === 'barehand') return { x: 4.4, y: -3 };
         if (pose === 'transfer') return { x: 1.5, y: -10.7 };
         if (pose === 'turn' || pose === 'plant') return { x: -3.6, y: -11.4 };
         if (pose === 'pop') return { x: -1.2, y: -10.5 };
@@ -1109,7 +1202,8 @@ window.mlbAnimator = (() => {
         const u = Math.max(0.5, FIGURE_FEET * p.s / 16);
         const h = handOf(st.pose, f.view, actor.kind);
         const flip = mirrorFigure(actor, f.view, f.dir) ? -1 : 1;
-        const crouch = actor.kind === 'catcher' && !actor.maskOff && (st.pose === 'stand' || st.pose === 'catch') ? 0.82 : st.pose === 'crouch' ? 0.78 : 1;
+        const crouch = actor.kind === 'catcher' && !actor.maskOff && (st.pose === 'stand' || st.pose === 'catch')
+            ? 0.82 : st.pose === 'crouch' || st.pose === 'barehand' ? 0.78 : 1;
         const jump = st.z > 0 ? Math.round(st.z * p.s * 0.6) : 0;
         return { x: Math.round(p.x) + flip * Math.round(h.x * u), y: Math.round(p.y) - jump + Math.round(h.y * crouch * u) };
     }
@@ -1274,6 +1368,22 @@ window.mlbAnimator = (() => {
         ctx.beginPath();
         ctx.ellipse(at.x, at.y, radius, radius * 0.38, 0, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawBounce(ctx, cue, t, calm) {
+        const age = Math.min(1, (t - cue.t) / 0.38);
+        if (age < 0 || age >= 1) return;
+        const at = project(cue.x ?? 0, cue.y ?? 0, 0);
+        ctx.save();
+        ctx.globalAlpha = 0.65 * (1 - age);
+        ctx.fillStyle = '#d2b485';
+        for (const side of [-1, 0, 1]) {
+            const spread = calm ? 0 : age * 9;
+            const x = at.x + side * (3 + spread);
+            const y = at.y - (calm ? 0 : age * (2 + Math.abs(side) * 3));
+            ctx.fillRect(Math.round(x), Math.round(y), side === 0 ? 3 : 2, 2);
+        }
         ctx.restore();
     }
 
@@ -1554,7 +1664,7 @@ window.mlbAnimator = (() => {
         } catch { return false; }
     }
 
-    const NAMED_POSES = new Set(['catch', 'throw', 'tag', 'dive', 'slide', 'swing']);
+    const NAMED_POSES = new Set(['catch', 'throw', 'tag', 'dive', 'slide', 'swing', 'barehand', 'overShoulder']);
 
     function drawActionCloseup(ctx, closeup, drawn, ballKeys, t, calm, ballLoose) {
         if (!closeup) return;
@@ -1583,10 +1693,11 @@ window.mlbAnimator = (() => {
         for (const d of actors) {
             ctx.save();
             if (d === other && closeup.otherOffset) ctx.translate(closeup.otherOffset / (closeup.scale || 3.2), 0);
-            // WHY: Keep the arriving runner down through the call so the glove swipe and slide read as one play.
-            const arriving = closeup.title === 'PLAY AT HOME' && d === other && d.st.pose === 'safe' &&
-                d.st.previousPose === 'slide' && (d.st.poseAge < 0.24 ||
-                    (closeup.decision && t < closeup.callT + 0.2));
+            // WHY: Keep the arriving runner down briefly after the call so the slide and tag read as one play.
+            const arriving = d === other && d.st.previousPose === 'slide' &&
+                (closeup.title === 'PLAY AT HOME' && d.st.pose === 'safe' &&
+                    (d.st.poseAge < 0.24 || (closeup.decision && t < closeup.callT + 0.2)) ||
+                 closeup.slideThroughCall && d.st.pose === 'out' && d.st.poseAge < 0.12);
             drawFigure(ctx, d.actor, arriving ? { ...d.st, pose: 'slide' } : d.st, t);
             ctx.restore();
         }
@@ -1602,9 +1713,9 @@ window.mlbAnimator = (() => {
         ctx.font = 'bold 11px "Courier New", monospace';
         ctx.textAlign = 'left';
         ctx.fillText(closeup.title, x + 10, y + 16);
-        if (closeup.title === 'PLAY AT HOME' && t >= closeup.callT) {
-            ctx.fillStyle = '#8ee79d';
-            ctx.fillText('SAFE', x + w - 40, y + 16);
+        if (closeup.callLabel && t >= closeup.callT) {
+            ctx.fillStyle = closeup.callColor || '#8ee79d';
+            ctx.fillText(closeup.callLabel, x + w - 40, y + 16);
         }
         ctx.restore();
     }
@@ -1652,6 +1763,7 @@ window.mlbAnimator = (() => {
         if (ballKeys) drawPitchTag(text, p.cues, ballKeys, t);
         for (const e of effects) {
             if (e.value === 'burst') drawBurst(ctx, e, t, calm);
+            else if (e.value === 'bounce') drawBounce(ctx, e, t, calm);
             else if (e.value === 'contact' || e.value === 'glove' || e.value === 'call') drawImpact(ctx, e, t, calm);
             else if (e.value.startsWith('error:')) drawMisplay(ctx, e, t, calm);
             else if (e.value === 'wallclear') drawWallClear(ctx, e, t, calm);

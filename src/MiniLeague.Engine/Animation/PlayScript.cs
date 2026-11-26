@@ -41,6 +41,8 @@ public static class Poses
     public const string Sidearm = "sidearm"; // the arm out to the side
     public const string Down = "down";     // lying on the ground
     public const string Crouch = "crouch"; // bent low with the glove at the grass: a man fielding a ground ball
+    public const string Barehand = "barehand"; // an infielder charges a slow roller and scoops it with his throwing hand
+    public const string OverShoulder = "overShoulder"; // an outfielder catches a fly while running back toward the wall
     public const string Transfer = "transfer"; // the ball is coming out of the glove into the throwing hand
     public const string Turn = "turn"; // a cutoff fielder turns toward the next base with the ball secured
     public const string Plant = "plant"; // feet set and throwing arm loaded before the release
