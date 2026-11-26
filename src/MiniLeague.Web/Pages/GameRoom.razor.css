@@ -95,7 +95,7 @@
 @media (max-width: 599px) {
     .mobile-score {
         position: fixed;
-        top: 48px;
+        top: calc(var(--mud-appbar-height) - var(--mud-appbar-height) / 4 + env(safe-area-inset-top));
         left: 0;
         right: 0;
         z-index: 100;

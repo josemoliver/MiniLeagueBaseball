@@ -122,6 +122,23 @@ public class PwaTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void TheInstalledLayoutKeepsTheMenuBelowTheIphoneStatusBar()
+    {
+        string css = Read("css/site.css");
+        string gameCss = File.ReadAllText(Path.Combine(WwwRoot, "..", "Pages", "GameRoom.razor.css"));
+        var layout = RenderLayout();
+
+        Assert.NotNull(layout.Find(".pwa-app-bar"));
+        Assert.NotNull(layout.Find(".pwa-main-content"));
+        Assert.Contains(".pwa-app-bar", css);
+        Assert.Contains("padding-top: env(safe-area-inset-top)", css);
+        Assert.Contains(".mud-appbar-dense ~ .pwa-main-content", css);
+        Assert.Contains("+ env(safe-area-inset-top)", css);
+        Assert.Contains("top: calc(var(--mud-appbar-height)", gameCss);
+        Assert.Contains("+ env(safe-area-inset-top)", gameCss);
+    }
+
+    [Fact]
     public void ThePwaScriptLoadsBeforeTheAppStarts()
     {
         string html = Read("index.html");
